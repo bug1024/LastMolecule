@@ -1,7 +1,8 @@
 class_name MapScreen
 extends Control
 ## 研发地图界面（纯 UI 层）
-## 左侧为当前阶段的分层分支地图（MapCanvas），右侧为本阶段 Boss 预告、竞品格局与 AI 数据面板。
+## 左侧为当前阶段的研发路线图（MapCanvas，从左往右推进），右侧为本阶段 Boss 预告，
+## 竞争格局与 AI 数据收进可展开的小卡片（InfoCard）。
 ## 点击可前往的节点发出 node_requested，由 rd_ui 转发给 GameLogic。
 
 signal node_requested(index: int)
@@ -19,10 +20,12 @@ signal close_requested()
 
 var _game = null
 var _canvas: MapCanvas = null
-var _side_label: RichTextLabel = null
+var _competition_card: InfoCard = null
+var _ai_card: InfoCard = null
 var _boss_box: HBoxContainer = null
 var _hp_label: Label = null          # 顶栏生命值：生命 = 100 - 安全风险
 var _hp_bar: ProgressBar = null
+var _research_bar: ProgressBar = null   # 标题区的前期研究进度条
 
 
 ## 由 rd_ui 注入 GameLogic 并构建地图画布与侧栏
@@ -46,16 +49,44 @@ func bind(game) -> void:
 	_boss_box.add_theme_constant_override("separation", 10)
 	boss_panel.add_child(_boss_box)
 	side.add_child(boss_panel)
-	_side_label = RichTextLabel.new()
-	_side_label.bbcode_enabled = true
-	_side_label.fit_content = true
-	_side_label.custom_minimum_size = Vector2(340, 0)
-	_side_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_side_label.add_theme_font_size_override("normal_font_size", 14)
-	_side_label.add_theme_font_size_override("bold_font_size", 15)
-	side.add_child(_side_label)
+	side.custom_minimum_size = Vector2(320, 0)
+	_competition_card = InfoCard.new("node_event", "ui.competition_title", UIKit.GOLD)
+	_ai_card = InfoCard.new("type_ai", "ui.ai_title", UIKit.ACCENT_BLUE)
+	side.add_child(_competition_card)
+	side.add_child(_ai_card)
 	_close_button.pressed.connect(func() -> void: close_requested.emit())
 	_build_hp(_funding_label.get_parent())
+	_build_header()
+
+
+## 顶部标题区改成「研发地图 · 阶段名」一行 + 带进度条的前期研究小标签
+func _build_header() -> void:
+	var header: HBoxContainer = _close_button.get_parent()
+	_stage_label.get_parent().remove_child(_stage_label)
+	header.add_child(_stage_label)
+	header.move_child(_stage_label, 1)
+	_stage_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_stage_label.theme_type_variation = &"HeaderLabel"
+	_stage_label.add_theme_font_size_override("font_size", 22)
+	(header.get_child(0) as Control).size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	var parent := _pos_label.get_parent()
+	var index := _pos_label.get_index()
+	var chip := HBoxContainer.new()
+	chip.add_theme_constant_override("separation", 8)
+	chip.tooltip_text = tr("hub.research_tip") % 30
+	chip.mouse_filter = Control.MOUSE_FILTER_PASS
+	chip.add_child(UIKit.icon_rect("stat_progress", 18, UIKit.ACCENT_BLUE))
+	_research_bar = ProgressBar.new()
+	_research_bar.custom_minimum_size = Vector2(180, 8)
+	_research_bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_research_bar.show_percentage = false
+	_research_bar.add_theme_stylebox_override("fill", UIKit.filled(UIKit.ACCENT_BLUE, UIKit.ACCENT_BLUE, 4))
+	_research_bar.add_theme_stylebox_override("background", UIKit.filled(Color(0.1, 0.12, 0.16), Color(0.25, 0.3, 0.36), 4))
+	chip.add_child(_research_bar)
+	parent.remove_child(_pos_label)
+	chip.add_child(_pos_label)
+	parent.add_child(chip)
+	parent.move_child(chip, index)
 
 
 ## 顶栏最前面加「♥ 生命 80/100」和血条：地图上选路时也能看到还剩多少血
@@ -91,7 +122,10 @@ func refresh() -> void:
 		return
 	var s: ProjectState = _game.get_state()
 	var map: ResearchMap = _game.get_map()
-	_stage_label.text = tr("ui.stage_key_label") + tr("stage." + map.get_stage())
+	_stage_label.text = "· " + tr("stage." + map.get_stage())
+	_stage_label.add_theme_color_override("font_color", BattleView.STAGE_TINT.get(s.stage, Color(0.5, 0.7, 0.8)).lightened(0.45))
+	_research_bar.max_value = maxi(_game.get_progress_gate(), 1)
+	_research_bar.value = mini(s.research_progress, _game.get_progress_gate())
 	_pos_label.text = tr("ui.map_progress") % [mini(s.research_progress, _game.get_progress_gate()), _game.get_progress_gate()]
 	_funding_label.text = tr("ui.map_funding") % s.funding
 	var hp := maxi(0, 100 - s.safety_risk)
@@ -102,13 +136,16 @@ func refresh() -> void:
 	_hp_bar.add_theme_stylebox_override("fill", UIKit.filled(hp_color, hp_color, 4))
 	_hp_bar.add_theme_stylebox_override("background", UIKit.filled(Color(0.1, 0.12, 0.16), Color(0.25, 0.3, 0.36), 4))
 	_canvas.rest_heal = _game.get_rest_heal()
+	_canvas.tint = BattleView.STAGE_TINT.get(s.stage, Color(0.2, 0.5, 0.5))
 	_year_label.text = tr("ui.year") % s.year
 	_hint_label.text = tr("ui.map_hint_fast") if _game.fast_track else tr("ui.map_hint")
 	var boss: Dictionary = _game.get_boss_info()
 	var boss_title := tr("encounter." + String(boss.get("id", "")))
 	_canvas.set_map(map.get_layers(), map.path, map.get_choices(), _game.is_idle(), boss_title)
 	_fill_boss(boss, boss_title)
-	_side_label.text = _side_text()
+	_competition_card.set_content(tr("ui.final_bar") % [_game.get_final_efficacy_bar(), _game.get_final_safety_limit()], competition_text())
+	var ai: Dictionary = _game.get_ai_info()
+	_ai_card.set_content(tr("hub.ai_summary") % [tr("tier." + String(ai.tier)), ai.multiplier, ai.deviation], _ai_text(ai))
 
 
 ## Boss 预告：形象、名称、专属机制与前期研究的削弱幅度
@@ -135,19 +172,14 @@ func _fill_boss(boss: Dictionary, title: String) -> void:
 	var cut := roundi((1.0 - float(boss.get("hp_scale", 1.0))) * 100)
 	col.add_child(UIKit.label(tr("map.boss_cut") % cut if cut >= 0 else tr("map.boss_buff") % -cut,
 		UIKit.ACCENT if cut > 0 else UIKit.TEXT_DIM, 13, true))
+	if _game.rp2d > 0 and _game.state.stage == "二期临床试验":
+		col.add_child(UIKit.label(tr("ui.rp2d_line") % _game.rp2d, UIKit.GOLD, 13, true))
 	_boss_box.add_child(col)
 
 
-func _side_text() -> String:
-	var lines: Array[String] = ["[b]" + tr("ui.competition_title") + "[/b]", competition_text()]
-	var ai: Dictionary = _game.get_ai_info()
-	lines.append("")
-	lines.append("[b]" + tr("ui.ai_title") + "[/b]")
-	lines.append(tr("ui.ai_line") % [ai.effective, tr("tier." + String(ai.tier)), ai.multiplier, ai.deviation])
-	lines.append(tr("ui.data_line") % [ai.run_data, ai.company_data, ai.level, ai.run_process])
-	if _game.rp2d > 0:
-		lines.append(tr("ui.rp2d_line") % _game.rp2d)
-	return "\n".join(lines)
+func _ai_text(ai: Dictionary) -> String:
+	return "\n".join([tr("ui.ai_line") % [ai.effective, tr("tier." + String(ai.tier)), ai.multiplier, ai.deviation],
+		tr("ui.data_line") % [ai.run_data, ai.company_data, ai.level, ai.run_process], BattleView.ai_next_text(ai)])
 
 
 ## 竞品状态、终审门槛与最新动态（BBCode），主界面右栏也复用

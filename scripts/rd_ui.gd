@@ -13,24 +13,24 @@ extends Control
 @onready var _map_screen = $MapScreen
 
 @onready var _project_label: Label = %ProjectLabel
-@onready var _stage_label: Label = %StageLabel
-@onready var _funding_label: Label = %FundingLabel
-@onready var _year_label: Label = %YearLabel
-@onready var _progress_bar: ProgressBar = %ProgressBar
-@onready var _success_label: Label = %SuccessLabel
-@onready var _safety_label: Label = %SafetyLabel
-@onready var _event_label: Label = %EventLabel
-@onready var _advance_button: Button = %AdvanceButton
-@onready var _challenge_label: Label = %ChallengeLabel
-@onready var _challenge_button: Button = %ChallengeButton
-@onready var _abilities_label: Label = %AbilitiesLabel
 @onready var _float_layer: Control = %FloatLayer
 @onready var _company_label: Label = %CompanyLabel
 @onready var _help_button: Button = %HelpButton
 @onready var _menu_button: Button = %MenuButton
 @onready var _pipeline: PipelineView = %Pipeline
-@onready var _molecule_art: MoleculeArt = %MoleculeArt
-@onready var _competition_label: RichTextLabel = %CompetitionLabel
+
+# 研发总览实验室场景（HubView）里的控件：指标飘字锚点与按钮
+var _hub: HubView
+var _stage_label: Label
+var _funding_label: Label
+var _year_label: Label
+var _progress_bar: ProgressBar
+var _success_label: Label
+var _safety_label: Label
+var _event_label: Label
+var _advance_button: Button
+var _challenge_label: Control
+var _challenge_button: Button
 
 const EVENT_COLOR := {
 	"positive": Color(0.31, 0.78, 0.55),
@@ -45,7 +45,6 @@ var _pause_menu: PauseMenu
 var _settings: SettingsPanel
 var _help: HelpPanel
 var _ending: EndingPanel
-var _player_hud: PlayerHud
 
 const OVERLAY_Z := 200
 
@@ -66,6 +65,7 @@ func _ready() -> void:
 	_game_logic.reward_claimed.connect(_on_reward_claimed)
 	_game_logic.news_posted.connect(_on_news_posted)
 	_game_logic.run_ended.connect(_on_run_ended)
+	_build_hub()
 	_advance_button.pressed.connect(_on_advance_pressed)
 	_challenge_button.pressed.connect(_on_view_deck_pressed)
 
@@ -77,10 +77,6 @@ func _ready() -> void:
 	_battle_view.bind(_game_logic.get_battle_manager(), _game_logic)
 	_battle_view.continue_pressed.connect(_flush_after_battle)
 	_game_logic.player_leveled.connect(_battle_view.on_player_leveled)
-	_player_hud = PlayerHud.new()
-	var metrics: VBoxContainer = $Layout/VBox/Body/LeftPanel/VBox
-	metrics.add_child(HSeparator.new())
-	metrics.add_child(_player_hud)
 	_battle_view.pile_requested.connect(func(cards: Array, title_key: String) -> void:
 		_card_popup.show_cards(cards, "view", 0, 0, _game_logic.get_ai_info(), title_key))
 	_reward_popup.reward_claimed.connect(_game_logic.claim_reward)
@@ -105,6 +101,23 @@ func _ready() -> void:
 		_game_logic.replay_pending()   # 新局开场就有待做的选择（LM-001 研究路线）
 
 
+## 研发总览：实验室场景放在管线进度条下方，占满剩余空间
+func _build_hub() -> void:
+	_hub = HubView.new()
+	_hub.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	$Layout/VBox.add_child(_hub)
+	_stage_label = _hub.stage_label
+	_funding_label = _hub.funding_label
+	_year_label = _hub.year_label
+	_progress_bar = _hub.progress_bar
+	_success_label = _hub.efficacy_label
+	_safety_label = _hub.hp_label
+	_event_label = _hub.event_label
+	_advance_button = _hub.advance_button
+	_challenge_label = _hub.ai_card.anchor()
+	_challenge_button = _hub.challenge_button
+
+
 func _build_overlays() -> void:
 	_help = HelpPanel.new()
 	_settings = SettingsPanel.new()
@@ -123,12 +136,8 @@ func _build_overlays() -> void:
 
 
 func _style_buttons() -> void:
-	var primary := UIKit.button("", "", "primary")
-	for state_name in ["normal", "hover", "pressed"]:
-		_advance_button.add_theme_stylebox_override(state_name, primary.get_theme_stylebox(state_name))
-	primary.free()
-	_advance_button.icon = UIKit.icon("node_research")
-	_advance_button.set_meta("sfx", "open")
+	if not _finished:
+		_advance_button.text = tr("ui.enter_map")
 	_challenge_button.text = tr("ui.view_deck")
 	_help_button.text = tr("title.help")
 	_menu_button.text = tr("pause.menu")
@@ -181,28 +190,11 @@ func _on_map_updated() -> void:
 
 func _on_state_synced(state) -> void:
 	_project_label.text = tr(_game_logic.get_project_name())
-	_stage_label.text = tr("stage." + state.stage)
 	var stages: Array = _game_logic.get_stages()
 	_pipeline.set_stages(stages, maxi(stages.find(state.stage), 0))
-	_molecule_art.stage_index = maxi(stages.find(state.stage), 0)
-	_molecule_art.health = clampf(0.5 + (state.efficacy - state.safety_risk) / 120.0, 0.0, 1.0)
 	var company: Company = _game_logic.company
 	_company_label.text = tr("ui.hub_company") % [company.runs + 1, company.process_level()]
-	_competition_label.text = _map_screen.competition_text()
-	if _player_hud:
-		_player_hud.refresh(_game_logic)
-	_funding_label.text = tr("ui.hub_funding") % state.funding
-	_year_label.text = tr("ui.year") % state.year
-	_progress_bar.max_value = _game_logic.get_progress_gate()
-	_progress_bar.value = mini(state.research_progress, _game_logic.get_progress_gate())
-	_success_label.text = tr("ui.efficacy_value") % [state.efficacy, _game_logic.get_final_efficacy_bar()]
-	_safety_label.text = tr("ui.safety_value") % [state.safety_risk, maxi(0, 100 - state.safety_risk), _game_logic.get_final_safety_limit()]
-	_safety_label.tooltip_text = tr("ui.hp_tip")
-	_safety_label.mouse_filter = Control.MOUSE_FILTER_PASS
-	var ai: Dictionary = _game_logic.get_ai_info()
-	_challenge_label.text = tr("ui.hub_ai_detail") % [ai.effective, tr("tier." + String(ai.tier)), ai.multiplier, ai.deviation,
-		ai.run_data, ai.company_data, ai.level] + "\n" + BattleView.ai_next_text(ai)
-	_refresh_abilities(state)
+	_hub.refresh(_game_logic, _map_screen.competition_text())
 
 
 func _on_state_changed(deltas: Dictionary) -> void:
@@ -352,17 +344,6 @@ func _on_news_posted(items: Array) -> void:
 			args.append(tr(a) if a is String else a)
 		_spawn_float(tr(String(item.key)) % args, Color(0.95, 0.8, 0.4))
 	_on_state_synced(_game_logic.get_state())
-
-
-func _refresh_abilities(state) -> void:
-	if state.abilities.is_empty():
-		_abilities_label.text = tr("ui.hub_abilities_none")
-		return
-	var names: Array[String] = []
-	for ability_id in state.abilities:
-		var ability: Dictionary = _game_logic.get_ability_by_id(String(ability_id))
-		names.append("· " + tr(String(ability.get("name_key", String(ability_id)))))
-	_abilities_label.text = "\n".join(names)
 
 
 func _on_run_ended(outcome: String, reason_key: String, summary: Dictionary) -> void:

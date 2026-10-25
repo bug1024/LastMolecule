@@ -9,6 +9,7 @@ var _archive: ArchivePanel
 var _credits: CreditsPanel
 var _logo: TextureRect
 var _confirm: ConfirmDialog
+var _hero: TitleHero
 var _project_select: ProjectSelectPanel
 
 
@@ -92,8 +93,12 @@ func _build() -> void:
 
 	var right := VBoxContainer.new()
 	right.custom_minimum_size = Vector2(360, 0)
+	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	right.alignment = BoxContainer.ALIGNMENT_END
 	row.add_child(right)
+	_hero = TitleHero.new()
+	_hero.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	right.add_child(_hero)
 	var card := PanelContainer.new()
 	card.add_theme_stylebox_override("panel", UIKit.panel_style(Color(0.07, 0.09, 0.13, 0.82), Color(0.27, 0.4, 0.45), 14))
 	_company_box = VBoxContainer.new()
@@ -105,7 +110,9 @@ func _build() -> void:
 	_settings = SettingsPanel.new()
 	_settings.allow_reset = true
 	_settings.locale_changed.connect(func() -> void: _rebuild_after_locale.call_deferred())
-	_settings.closed.connect(_fill_company)
+	_settings.closed.connect(func() -> void:
+		_fill_company()
+		_hero.refresh())   # 设置里可能重置了公司档案
 	_help = HelpPanel.new()
 	_archive = ArchivePanel.new()
 	_credits = CreditsPanel.new()

@@ -831,3 +831,15 @@ card.exp_safety_net,安全药理学网络,Safety Pharmacology Net
 card.exp_stable_platform,稳定平台,Stable Platform
 status.retain_block,护盾保留,Keep Block
 status.retain_block.desc,回合开始时护盾不清零。,Block no longer resets at the start of your turn.
+hub.funding,资金 %d 亿,Funding %d
+hub.efficacy,疗效 %d / %d,Efficacy %d / %d
+hub.efficacy_tip,终审需要疗效 ≥ %d。疗效越高，战斗开局力量越高。,The final review needs efficacy ≥ %d. Higher efficacy also means more Strength at the start of battles.
+hub.research,前期研究 %d / %d,Research %d / %d
+hub.research_tip,前期研究会削弱本阶段 Boss 的生命（最多 %d%%）。地图上的「研究」节点能推进它。,Research weakens this stage's boss HP (up to %d%%). Research nodes on the map advance it.
+hub.safety_tip,当前安全风险 %d；终审需要低于 %d。,Current safety risk %d; the final review needs it below %d.
+hub.ai_summary,%s · 效果 ×%.2f · 失误 %d%%,%s · power ×%.2f · miss %d%%
+hub.abilities_summary,已有 %d 项（点开查看）,%d owned (click to view)
+hub.abilities_empty,暂无,None yet
+hero.shelved,搁置中 · 研究证据 %d / %d,Shelved · research evidence %d / %d
+hero.unlocked,证据已集齐：可以重启它了,Evidence complete: it can be restarted
+hero.done,已获批 · %s,Approved · %s
