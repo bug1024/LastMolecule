@@ -1,7 +1,7 @@
 class_name ModalPanel
 extends Control
 ## 模态面板基类：半透明遮罩 + 居中面板 + 标题栏（含返回按钮），Esc 关闭。
-## 标题栏：圆形图标徽章（icon_name）+ 标题 + 副标题（subtitle_key）+ 返回；下方一条强调色渐隐线。
+## 标题栏：圆形图标徽章（icon_name）+ 标题 + 副标题（subtitle_key）+ 右上角圆形 ✕ 关闭；下方一条强调色渐隐线。
 ## 面板背景：角落里淡淡的六边形纹理与强调色光晕（accent），让各个面板有统一但各有颜色的「封面感」。
 ## 子类在 _build(content) 中往 content 里添加内容；open()/close() 带淡入淡出。
 
@@ -106,8 +106,7 @@ func _construct() -> void:
 	if not subtitle_key.is_empty():
 		names.add_child(UIKit.label(tr(subtitle_key), Color(accent.lightened(0.2), 0.8), 14))
 	bar.add_child(names)
-	var back := UIKit.button(tr("ui.back"), "ui_back", "normal", Vector2(110, 40))
-	back.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var back := UIKit.close_button(accent)
 	back.pressed.connect(close)
 	bar.add_child(back)
 	outer.add_child(bar)

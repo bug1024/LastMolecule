@@ -58,6 +58,7 @@ func bind(game) -> void:
 	_ai_card = InfoCard.new("type_ai", "ui.ai_title", UIKit.ACCENT_BLUE)
 	side.add_child(_competition_card)
 	side.add_child(_ai_card)
+	UIKit.style_close_button(_close_button, UIKit.ACCENT)
 	_close_button.pressed.connect(func() -> void: close_requested.emit())
 	_build_hp(_funding_label.get_parent())
 	_build_header()

@@ -32,6 +32,38 @@ static func icon_rect(icon_name: String, size: float, color: Color) -> TextureRe
 	return rect
 
 
+## 弹窗右上角的圆形「✕」关闭按钮：平时是淡淡的圆圈，悬停时染上面板的强调色（取代原来的「返回」文字按钮）
+static func close_button(accent: Color = ACCENT) -> Button:
+	var btn := Button.new()
+	style_close_button(btn, accent)
+	return btn
+
+
+static func style_close_button(btn: Button, accent: Color = ACCENT) -> void:
+	btn.text = ""
+	btn.icon = null
+	btn.custom_minimum_size = Vector2(38, 38)
+	btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	btn.tooltip_text = TranslationServer.translate("ui.back") + "（Esc）"
+	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	btn.focus_mode = Control.FOCUS_NONE
+	var empty := StyleBoxEmpty.new()
+	for state_name in ["normal", "hover", "pressed", "focus", "disabled"]:
+		btn.add_theme_stylebox_override(state_name, empty)
+	btn.mouse_entered.connect(btn.queue_redraw)
+	btn.mouse_exited.connect(btn.queue_redraw)
+	btn.draw.connect(func() -> void:
+		var hover := btn.is_hovered()
+		var c := btn.size * 0.5
+		var r := minf(btn.size.x, btn.size.y) * 0.5 - 1.0
+		btn.draw_circle(c, r, Color(accent, 0.24 if hover else 0.06))
+		btn.draw_arc(c, r, 0, TAU, 40, Color(accent, 0.9) if hover else Color(0.6, 0.68, 0.76, 0.35), 1.5, true)
+		var k := r * 0.36
+		var ink := Color.WHITE if hover else Color(0.75, 0.8, 0.86)
+		btn.draw_line(c + Vector2(-k, -k), c + Vector2(k, k), ink, 2.0, true)
+		btn.draw_line(c + Vector2(-k, k), c + Vector2(k, -k), ink, 2.0, true))
+
+
 ## kind："normal" / "primary"（主操作，绿色）/ "danger"（危险操作，红色）
 static func button(text: String, icon_name := "", kind := "normal", min_size := Vector2(0, 44)) -> Button:
 	var btn := Button.new()
