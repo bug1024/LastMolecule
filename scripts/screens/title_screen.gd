@@ -1,5 +1,5 @@
 extends Control
-## 标题界面：右侧大半屏是 LM-001 主视觉（TitleHero），左侧标题 + 游戏式菜单（一个发光主按钮 + 无边框文字项），
+## 标题界面：右侧大半屏是 LM-001 主视觉（TitleHero），左侧标题 + 统一风格的半透明菜单按钮（主按钮绿色描边、轻微呼吸光），
 ## 公司概况缩成右下角一行。
 
 var _menu: VBoxContainer
@@ -66,28 +66,25 @@ func _build() -> void:
 	left.add_child(gap)
 
 	_menu = VBoxContainer.new()
-	_menu.add_theme_constant_override("separation", 4)
+	_menu.add_theme_constant_override("separation", 8)
 	_menu.custom_minimum_size = Vector2(320, 0)
 	_menu.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	left.add_child(_menu)
 	var saved := RunSave.summary()
 	if not saved.is_empty():
-		_primary_button("title.continue", _on_continue)
+		_menu_button("title.continue", "ui_play", _on_continue, true)
 		var project := tr("project.title") % [String(saved.project_code), tr("project.type." + String(saved.project_type))]
 		var line := UIKit.label(tr("title.continue_line") % [project, tr("stage." + String(saved.stage)), int(saved.year), int(saved.funding)], UIKit.ACCENT, 14)
 		_menu.add_child(line)
-		_menu_item("title.start", _on_start)
+		_menu_button("title.start", "ui_plus", _on_start)
 	else:
-		_primary_button("title.start", _on_start)
-	var gap2 := Control.new()
-	gap2.custom_minimum_size = Vector2(0, 8)
-	_menu.add_child(gap2)
-	_menu_item("title.archive", func() -> void: _archive.open())
-	_menu_item("title.help", func() -> void: _help.open())
-	_menu_item("title.settings", func() -> void: _settings.open())
-	_menu_item("title.credits", func() -> void: _credits.open())
+		_menu_button("title.start", "ui_play", _on_start, true)
+	_menu_button("title.archive", "ui_archive", func() -> void: _archive.open())
+	_menu_button("title.help", "ui_help", func() -> void: _help.open())
+	_menu_button("title.settings", "type_process", func() -> void: _settings.open())
+	_menu_button("title.credits", "ui_music", func() -> void: _credits.open())
 	if OS.get_name() != "Web":
-		_menu_item("title.quit", func() -> void: get_tree().quit())
+		_menu_button("title.quit", "ui_power", func() -> void: get_tree().quit())
 
 	var version := UIKit.label(tr("title.version"), Color(UIKit.TEXT_DIM, 0.6), 13)
 	version.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
@@ -122,39 +119,53 @@ func _build() -> void:
 	_intro()
 
 
-## 主按钮：大号发光胶囊
-func _primary_button(key: String, action: Callable) -> void:
-	var btn := UIKit.button(tr(key), "ui_play", "primary", Vector2(300, 58))
-	btn.add_theme_font_size_override("font_size", 22)
-	btn.pressed.connect(action)
-	_menu.add_child(btn)
-	_primary = btn
-
-
-## 次级菜单：无边框的文字项，悬停时变亮并在左侧出现箭头
-func _menu_item(key: String, action: Callable) -> void:
+## 菜单按钮：统一的半透明「玻璃」胶囊，同尺寸、同样的小图标与悬停光晕；
+## 主按钮（开始 / 继续）只用绿色描边和淡绿底区分，不再是一整块实心绿
+func _menu_button(key: String, icon_name: String, action: Callable, primary := false) -> void:
 	var btn := Button.new()
-	btn.text = "   " + tr(key)
+	btn.text = tr(key)
+	btn.icon = UIKit.icon(icon_name)
 	btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	btn.flat = true
-	btn.custom_minimum_size = Vector2(300, 38)
-	btn.add_theme_font_size_override("font_size", 20)
-	btn.add_theme_color_override("font_color", Color(0.72, 0.78, 0.84))
-	btn.add_theme_color_override("font_hover_color", Color(1, 1, 1))
-	btn.add_theme_color_override("font_pressed_color", UIKit.ACCENT.lightened(0.3))
-	btn.add_theme_color_override("font_focus_color", Color(0.72, 0.78, 0.84))
-	var empty := StyleBoxEmpty.new()
-	for state_name in ["normal", "hover", "pressed", "focus"]:
-		btn.add_theme_stylebox_override(state_name, empty)
+	btn.add_theme_constant_override("icon_max_width", 20)
+	btn.add_theme_constant_override("h_separation", 12)
+	btn.custom_minimum_size = Vector2(300, 48)
+	btn.add_theme_font_size_override("font_size", 20 if primary else 19)
+	var accent: Color = UIKit.ACCENT if primary else Color(0.55, 0.78, 0.9)
+	var text_color := Color(0.92, 1.0, 0.95) if primary else Color(0.78, 0.84, 0.9)
+	for state_name in ["font_color", "font_focus_color"]:
+		btn.add_theme_color_override(state_name, text_color)
+	btn.add_theme_color_override("font_hover_color", Color.WHITE)
+	btn.add_theme_color_override("font_pressed_color", Color.WHITE)
+	btn.add_theme_color_override("icon_normal_color", accent.lightened(0.1))
+	btn.add_theme_color_override("icon_hover_color", Color.WHITE)
+	btn.add_theme_color_override("icon_focus_color", accent.lightened(0.1))
+	btn.add_theme_stylebox_override("normal", _menu_style(accent, primary, false))
+	btn.add_theme_stylebox_override("focus", _menu_style(accent, primary, false))
+	btn.add_theme_stylebox_override("hover", _menu_style(accent, primary, true))
+	btn.add_theme_stylebox_override("pressed", _menu_style(accent.darkened(0.2), primary, true))
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	btn.mouse_entered.connect(func() -> void:
-		btn.text = "▸  " + tr(key)
-		GameAudio.sfx("hover"))
-	btn.mouse_exited.connect(func() -> void: btn.text = "   " + tr(key))
+	btn.mouse_entered.connect(func() -> void: GameAudio.sfx("hover"))
 	btn.pressed.connect(func() -> void:
 		GameAudio.sfx("click")
 		action.call())
 	_menu.add_child(btn)
+	if primary:
+		_primary = btn
+
+
+func _menu_style(accent: Color, primary: bool, hover: bool) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(accent, 0.2 if hover else (0.14 if primary else 0.0)).blend(Color(0.05, 0.08, 0.11, 0.6))
+	sb.border_color = Color(accent, 0.95 if hover else (0.75 if primary else 0.28))
+	sb.set_border_width_all(2 if hover or primary else 1)
+	sb.set_corner_radius_all(12)
+	sb.content_margin_left = 18
+	sb.content_margin_right = 18
+	sb.anti_aliasing = true
+	if hover:
+		sb.shadow_color = Color(accent, 0.3)
+		sb.shadow_size = 10
+	return sb
 
 
 func _fill_company() -> void:
@@ -181,10 +192,10 @@ func _intro() -> void:
 	tween.tween_property(_logo, "rotation", TAU / 6, 1.2).from(0.0).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
 
-## 主按钮呼吸光：提示「从这里开始」
+## 主按钮轻微呼吸光：提示「从这里开始」
 func _process(_delta: float) -> void:
 	if _primary and is_instance_valid(_primary):
-		_primary.modulate = Color(1, 1, 1).lerp(Color(1.12, 1.18, 1.12), 0.5 + 0.5 * sin(Time.get_ticks_msec() / 500.0))
+		_primary.modulate = Color(1, 1, 1).lerp(Color(1.06, 1.1, 1.06), 0.5 + 0.5 * sin(Time.get_ticks_msec() / 600.0))
 
 
 func _rebuild_after_locale() -> void:

@@ -1057,7 +1057,7 @@ func _test_title_screen() -> void:
 	await process_frame
 	var labels: Array[String] = []
 	for b in title.find_children("*", "Button", true, false):
-		labels.append((b as Button).text.strip_edges())   # 次级菜单项前面留了箭头位置的空格
+		labels.append((b as Button).text.strip_edges())
 	_expect(labels.has(title.tr("title.start")) and labels.has(title.tr("title.settings")) and labels.has(title.tr("title.archive")),
 		"Title screen offers start, settings and archive")
 	title._settings.open()
