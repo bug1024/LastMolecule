@@ -371,7 +371,7 @@ help.tab.battles,阶段试验,Stage Trials
 help.tab.cards,卡牌与 AI,Cards & AI
 help.tab.decisions,立项决策,Go / No-Go
 help.tab.glossary,术语,Glossary
-help.goal,[b][color=#4fc896]目标：让候选药物获批上市[/color][/b]\n候选药物要依次走过 [b]发现 → 临床前 → 一期 → 二期 → 三期[/b]，最后通过上市审评。\n\n[b]项目类型[/b]：立项时选择项目类型。不同类型的起始牌组、终审要求和战斗规则不同，需要不同打法（例如[color=#ffcf73]高选择性项目[/color]猛攻会脱靶）。每个项目有自己的编号，LM-001 是公司搁置多年的那个分子。\n\n[b]四项核心指标[/b]\n· [color=#f2cc66]资金[/color]：每走一个地图节点花 1 亿、过 1 年。资金耗尽 = 失败。\n· [color=#5ad99a]疗效[/color]：整局累积。终审要求疗效 ≥ 门槛（起始 60，竞品获批后会提高）。\n· [color=#f28c73]安全风险[/color]：越低越好。终审要求 < 70；涨到 100 会被监管叫停。\n· [color=#73c0ff]数据[/color]：决定 AI 卡有多强，结束时一部分沉淀为公司数据。\n\n[b]三种结局[/b]\n· [color=#5ad99a]获批上市[/color]：成功！沉淀 60% 数据。\n· [color=#f2cc66]主动终止[/color]：在里程碑判断不值得继续而止损，沉淀 60% 数据，并把部分剩余资金带到下个项目。\n· [color=#ed6b6b]研发失败[/color]：资金耗尽或安全风险爆表，只沉淀 30% 数据。\n\n现实中的药物研发就是在[b]更快推进[/b]和[b]尽量少出现疾病进展（PD）与不良反应（AE）[/b]之间找平衡。,"[b][color=#4fc896]Goal: get your candidate approved[/color][/b]\nThe candidate must pass [b]Discovery → Preclinical → Phase I → Phase II → Phase III[/b], then the marketing review.\n\n[b]Program types[/b]: pick a type when you launch. Each type changes the starting deck, final review bar and battle rules, so each needs a different plan (e.g. a [color=#ffcf73]High-Selectivity[/color] program punishes attack spam). Every program gets its own code; LM-001 is the molecule the company shelved long ago.\n\n[b]Four core metrics[/b]\n· [color=#f2cc66]Funding[/color]: every map node costs 1 and takes a year. Run out and you fail.\n· [color=#5ad99a]Efficacy[/color]: accumulates all run. The final review needs efficacy ≥ the bar (60 at first; rises when a competitor is approved).\n· [color=#f28c73]Safety risk[/color]: lower is better. The final review needs < 70; at 100 regulators halt the program.\n· [color=#73c0ff]Data[/color]: powers AI cards; part of it is banked as company data at the end.\n\n[b]Three endings[/b]\n· [color=#5ad99a]Approved[/color]: success! Banks 60% of the data.\n· [color=#f2cc66]Terminated[/color]: you cut losses at a milestone. Banks 60% of the data and carries some funding forward.\n· [color=#ed6b6b]Failed[/color]: funding ran out or safety hit the ceiling. Banks only 30%.\n\nReal drug R&D is a balance between [b]moving fast[/b] and [b]avoiding disease progression (PD) and adverse events (AE)[/b]."
+help.goal,[b][color=#4fc896]目标：让候选药物获批上市[/color][/b]\n候选药物要依次走过 [b]发现 → 临床前 → 一期 → 二期 → 三期[/b]，最后通过上市审评。\n\n[b]项目类型[/b]：立项时选择项目类型。不同类型的起始牌组、终审要求和战斗规则不同，需要不同打法（例如[color=#ffcf73]高选择性项目[/color]猛攻会脱靶）。每个项目有自己的编号。\n\n[b]主线：最后的分子[/b]：LM-001 是公司搁置多年的那个分子。项目获批（或在一期之后的里程碑主动终止）会得到该类项目的[color=#73c0ff]研究证据[/color]；集齐 2 项就能重启 LM-001，证据决定它能走哪条研究路线。\n\n[b]四项核心指标[/b]\n· [color=#f2cc66]资金[/color]：每走一个地图节点花 1 亿、过 1 年。资金耗尽 = 失败。\n· [color=#5ad99a]疗效[/color]：整局累积。终审要求疗效 ≥ 门槛（起始 60，竞品获批后会提高）。\n· [color=#f28c73]安全风险[/color]：越低越好。终审要求 < 70；涨到 100 会被监管叫停。\n· [color=#73c0ff]数据[/color]：决定 AI 卡有多强，结束时一部分沉淀为公司数据。\n\n[b]三种结局[/b]\n· [color=#5ad99a]获批上市[/color]：成功！沉淀 60% 数据。\n· [color=#f2cc66]主动终止[/color]：在里程碑判断不值得继续而止损，沉淀 60% 数据，并把部分剩余资金带到下个项目。\n· [color=#ed6b6b]研发失败[/color]：资金耗尽或安全风险爆表，只沉淀 30% 数据。\n\n现实中的药物研发就是在[b]更快推进[/b]和[b]尽量少出现疾病进展（PD）与不良反应（AE）[/b]之间找平衡。,"[b][color=#4fc896]Goal: get your candidate approved[/color][/b]\nThe candidate must pass [b]Discovery → Preclinical → Phase I → Phase II → Phase III[/b], then the marketing review.\n\n[b]Program types[/b]: pick a type when you launch. Each type changes the starting deck, final review bar and battle rules, so each needs a different plan (e.g. a [color=#ffcf73]High-Selectivity[/color] program punishes attack spam). Every program gets its own code.\n\n[b]Campaign: The Last Molecule[/b]: LM-001 is the molecule the company shelved long ago. Approving a program (or terminating it at a milestone from Phase I on) earns that type's [color=#73c0ff]research evidence[/color]; with 2 you can restart LM-001, and your evidence decides its research routes.\n\n[b]Four core metrics[/b]\n· [color=#f2cc66]Funding[/color]: every map node costs 1 and takes a year. Run out and you fail.\n· [color=#5ad99a]Efficacy[/color]: accumulates all run. The final review needs efficacy ≥ the bar (60 at first; rises when a competitor is approved).\n· [color=#f28c73]Safety risk[/color]: lower is better. The final review needs < 70; at 100 regulators halt the program.\n· [color=#73c0ff]Data[/color]: powers AI cards; part of it is banked as company data at the end.\n\n[b]Three endings[/b]\n· [color=#5ad99a]Approved[/color]: success! Banks 60% of the data.\n· [color=#f2cc66]Terminated[/color]: you cut losses at a milestone. Banks 60% of the data and carries some funding forward.\n· [color=#ed6b6b]Failed[/color]: funding ran out or safety hit the ceiling. Banks only 30%.\n\nReal drug R&D is a balance between [b]moving fast[/b] and [b]avoiding disease progression (PD) and adverse events (AE)[/b]."
 help.map,[b]每个阶段是一张分支地图[/b]\n从上往下走：第一层是实验难题，中间随机，最后一层是平台建设（休整），然后挑战本阶段 [color=#ed6b6b]BOSS[/color]，最后到达里程碑。\n\n[b]节点类型[/b]\n· [color=#d98c73]实验难题[/color]：普通战斗，赢了选卡。\n· [color=#f9b840]关键难关[/color]：精英战斗，更难，但能拿研发能力。\n· [color=#5aadf2]研究[/color]：三选一研究方案并拿一张卡；[b]前期研究会削弱本阶段 Boss 的生命（最多 30%）[/b]。\n· [color=#f2b84c]事件[/color]：随机事件。\n· [color=#66d18c]合作融资[/color]：拿投资、买卡或删卡。\n· [color=#73ccbf]平台建设[/color]：安全评估（安全风险 -25）、升级卡或梳理流程。\n· [color=#f280cc]加速通道[/color]：后续节点不耗时，但 Boss 更强。\n\n[b]时间与资金[/b]\n每个节点花几个月，满一年扣 2 亿年度成本，竞品也会推进。资金耗尽 = 失败。,"[b]Each stage is a branching map[/b]\nWalk down: the first row is challenges, the middle is random, the last row is rest (Platform), then the stage [color=#ed6b6b]BOSS[/color], then the milestone.\n\n[b]Node types[/b]\n· [color=#d98c73]Challenge[/color]: normal fight, pick a card.\n· [color=#f9b840]Critical Hurdle[/color]: elite fight, harder, grants an ability.\n· [color=#5aadf2]Research[/color]: pick a plan and a card; [b]research weakens this stage's boss HP (up to 30%)[/b].\n· [color=#f2b84c]Event[/color]: random event.\n· [color=#66d18c]Partner[/color]: funding, buy or remove cards.\n· [color=#73ccbf]Platform[/color]: Safety Review (risk -25), upgrade a card, or build process.\n· [color=#f280cc]Fast track[/color]: later nodes cost no time, but the boss is stronger.\n\n[b]Time and money[/b]\nNodes take months; each full year costs 2 funding and moves competitors. Run out of funding and you fail."
 help.battles,[b]战斗规则（类似杀戮尖塔）[/b]\n· 每回合 3 点[color=#f2cc66]能量[/color]、抽 5 张牌，打出卡牌消耗能量，最后点「结束回合」（快捷键 E）。\n· 敌人头顶的[b]意图[/b]告诉你它下回合要干什么：红色数字是伤害，盾牌是护盾，箭头是增益，水滴是给你上负面状态。\n· [color=#7fb3ff]护盾[/color]能挡伤害，但到你下回合开始就清零。挡不住的伤害会直接变成[color=#f28c73]安全风险[/color]——它就是你的血量，涨到 100 项目就被叫停。\n· 开局[color=#5ad99a]力量[/color]来自项目疗效：疗效越高，每次伤害越高。\n\n[b]五个阶段 Boss，各有绝招[/b]\n[color=#9b6cf2]发现 · 活性悬崖[/color]：一回合打出超过 3 张攻击牌会反噬。\n[color=#8ed14a]临床前 · 毒性风暴[/color]：给你叠中毒，每 3 回合一记器官毒性重击。\n[color=#ee4a4a]一期 · 剂量限制性毒性[/color]：可以加剂量，你和它一起变强；锁定的剂量带进二期。\n[color=#4a8df0]二期 · 疾病进展[/color]：每回合越来越强，还往你牌堆塞不良反应。\n[color=#58c9b9]三期 · 多中心试验[/color]：三个中心一起上，没被攻击到的中心会加护盾。\n\n地图右侧随时可以看到本阶段 Boss 的预告。,"[b]Combat (Slay the Spire style)[/b]\n· Each turn: 3 [color=#f2cc66]energy[/color], draw 5. Cards cost energy; press End Turn (E) when done.\n· Enemy [b]intents[/b] show next turn's plan: red numbers are damage, shields are Block, arrows are buffs, drops are debuffs on you.\n· [color=#7fb3ff]Block[/color] absorbs damage but resets on your next turn. Unblocked damage becomes [color=#f28c73]safety risk[/color] — your HP. At 100 the program is halted.\n· Starting [color=#5ad99a]Strength[/color] comes from project efficacy: higher efficacy, harder hits.\n\n[b]Five stage bosses, each with a twist[/b]\n[color=#9b6cf2]Discovery · Activity Cliff[/color]: more than 3 attacks in a turn backfires.\n[color=#8ed14a]Preclinical · Toxicity Storm[/color]: stacks Poison, Organ Toxicity every 3 turns.\n[color=#ee4a4a]Phase I · Dose-Limiting Toxicity[/color]: raise the dose to buff both sides; the locked dose carries into Phase II.\n[color=#4a8df0]Phase II · Disease Progression[/color]: grows every turn and seeds Adverse Events into your deck.\n[color=#58c9b9]Phase III · Multicenter Trial[/color]: three sites at once; any site you don't hit gains Block.\n\nThe map always previews the current stage boss."
 help.cards,[b]五类卡牌，各有定位[/b]\n· [color=#8c6bf2]分子设计[/color]：主力输出——伤害、破绽（易伤）、力量成长。\n· [color=#f2b84c]实验验证[/color]：护盾与数据，还能抑制对手药效。\n· [color=#f07070]临床策略[/color]：中毒（中毒）、抽牌、能量，终点评估可以引爆中毒。\n· [color=#4aa0ff]AI 技术[/color]：数值最高，但吃数据、可能偏差。\n· [color=#73ccbf]流程建设[/color]：能力牌，整场持续生效。\n\n[b]AI 卡有多强，取决于数据[/b]\n有效数据 =（本局数据 + 继承的公司数据）× 数据利用率。\n· 低档（< 20）：效果 ×0.5，偏差 30%\n· 中档（< 60）：效果 ×1，偏差 15%\n· 高档（≥ 60）：效果 ×1.75，偏差 5%\n[color=#ed6b6b]偏差[/color]：卡牌效果作废，还会往牌堆塞「噪声数据」或让你受伤。\n\n先用实验卡攒数据、用流程卡提升利用率，AI 才会真正发力——战斗里打出的数据卡会让同一场的 AI 卡立刻变强。\n\n[b]看不清？[/b]右键（或长按）任意一张卡，会打开大图和完整说明。,"[b]Five card types, five roles[/b]\n· [color=#8c6bf2]Molecular[/color]: main damage — hits, Weak Spot, Strength growth.\n· [color=#f2b84c]Experiment[/color]: Block and data, plus Weak.\n· [color=#f07070]Clinical[/color]: Poison (poison), draw, energy; Endpoint Readout detonates it.\n· [color=#4aa0ff]AI[/color]: biggest numbers, but needs data and may deviate.\n· [color=#73ccbf]Process[/color]: powers that last all battle.\n\n[b]AI strength depends on data[/b]\nEffective data = (run data + inherited company data) × utilization.\n· Low (< 20): ×0.5, 30% deviation\n· Mid (< 60): ×1, 15% deviation\n· High (≥ 60): ×1.75, 5% deviation\n[color=#ed6b6b]Deviation[/color]: the effect is void and Noisy Data or self-damage follows.\n\nBuild data with experiments and utilization with process first — data gained mid-battle powers up AI cards right away.\n\n[b]Can't read it?[/b] Right-click (or hold) any card for a big view and full text."
@@ -719,5 +719,85 @@ mechanic.selective,选择性要求：一回合打出超过 %d 张攻击牌，每
 mechanic.selective.trigger,脱靶！选择性不足，掉 %d 血,Off-target! Lose %d HP
 battle.rule_left,放心攻击 %d 张,%d safe attacks
 battle.rule_none,再攻击会脱靶\n（破绽目标除外）,Next attack backfires\n(Weak Spot targets OK)
-battle.rule_tip,高选择性项目：每回合只有前 2 张攻击牌安全；攻击带「破绽」的目标不计数。,High-Selectivity: only your first 2 attacks each turn are safe; attacks on Weak Spot targets don't count.
+battle.rule_tip,攻击牌反噬计数：项目选择性要求（打带「破绽」的目标不计数）与 Boss「活性悬崖」（所有攻击都计数）取更紧的那个。悬停或选中攻击牌可看这张会不会反噬。,Attack backfire counter: the tighter of the program's selectivity rule (Weak Spot targets don't count) and the Activity Cliff boss (every attack counts). Hover or select an attack to preview its backfire.
 archive.project,%s %s,%s %s
+project.type.chronic,长期安全性项目,Long-Term Safety Program
+project.type.chronic.tag,慢性用药：风险会慢慢累积，拖久了病会变强,"Chronic use: risk builds up, and long fights get dangerous"
+project.type.chronic.desc,慢性病要长期用药，单次风险不高，但会一点点累积。\n· 每进入新阶段，残留风险累积：安全风险 +5。\n· 一期、二期、三期的所有战斗：每 2 回合敌人力量 +1，一味防守会被拖垮。\n· 平台休整多降 30 风险；起始牌组带「临床监测」（护盾＋清除坏状态）和「剂量方案」（中毒）。\n· 终审疗效门槛降到 55，但安全风险要低于 60。\n· 一期里程碑有一次项目专属决策。,"Chronic diseases need long-term treatment: each dose is low-risk, but it adds up.\n· Each new stage adds residual risk: safety risk +5.\n· In every Phase I–III battle, enemies gain 1 Strength every 2 turns, so pure turtling gets ground down.\n· Platform rest heals 30; the starting deck has Clinical Monitoring (Block + cleanse) and Dosing Regimen (Poison).\n· The efficacy bar drops to 55, but safety risk must be below 60.\n· A program-specific decision at the Phase I milestone."
+project.type.final,最后的分子,The Last Molecule
+project.type.final.tag,重启公司搁置多年的 LM-001,"Restart LM-001, shelved for years"
+project.type.final.desc,LM-001 活性极高，但安全窗口窄、反复失败。靠以前项目攒下的研究证据，才有办法重启它。\n· 开局按已有证据选择研究路线：每条路线解决一个难题，也有代价。\n· 发现到一期：选择性要求（第 3 张攻击牌起脱靶 5 血，破绽目标除外）。\n· 二期、三期：每 2 回合敌人力量 +1。\n· 三期最终 Boss「最后的分子」；终审疗效 ≥ 70、安全风险 < 60。\n· 获批或在一期之后主动终止，都会迎来主线结局。,"LM-001 is extremely potent but has a narrow safety window and failed again and again. Only the evidence from your earlier programs makes a restart possible.\n· Choose a research route at the start based on your evidence: each solves one problem at a cost.\n· Discovery to Phase I: selectivity rule (from the 3rd attack each turn, 5 HP backfire; Weak Spot targets exempt).\n· Phase II and III: enemies gain 1 Strength every 2 turns.\n· Final boss in Phase III; final review needs efficacy ≥ 70 and safety risk < 60.\n· Approval, or terminating after Phase I, leads to a campaign ending."
+project.locked,需要 %d 项研究证据才能重启（已有 %d 项）,Needs %d pieces of research evidence (you have %d)
+project.select.evidence,已有研究证据：%s,Research evidence: %s
+project.select.evidence_none,还没有研究证据。项目获批，或在一期之后的里程碑主动终止，可以获得该类项目的证据。,"No research evidence yet. Get a program approved, or terminate it at a milestone from Phase I on, to earn that type's evidence."
+evidence.foundation,基础研发证据,Foundational R&D
+evidence.selectivity,选择性证据,Selectivity Evidence
+evidence.long_safety,长期安全性证据,Long-Term Safety Evidence
+milestone.opt_tag,项目决策,Program decision
+milestone.selective.desc,「%s」阶段试验已攻克（终审门槛 %d，当前疗效 %d）。临床前数据显示：分子的选择性仍是最大隐患。进入临床前，选一条路：,"The %s trial is beaten (bar %d, efficacy %d). Preclinical data says selectivity is still the main risk. Pick a path before the clinic:"
+milestone.opt.sel_refine,继续优化选择性,Keep Improving Selectivity
+milestone.opt.sel_refine.desc,多花 6 个月改造分子：临床风险更低，后面不再有脱靶规则。,Spend 6 more months on the molecule: lower clinical risk; no off-target rule later.
+milestone.opt.sel_potency,保留活性，带着风险进临床,"Keep Potency, Accept the Risk"
+milestone.opt.sel_potency.desc,之后所有战斗开局力量 +1，但一期到三期也要遵守选择性要求。,"+1 Strength in every later battle, but the selectivity rule follows you into Phase I–III."
+milestone.opt.sel_narrow,限定目标人群,Narrow the Target Population
+milestone.opt.sel_narrow.desc,只给最可能获益的患者用药：疗效 +8，但终审需要本局数据 ≥ 55（用来证明分层）。,"Treat only the patients most likely to benefit: efficacy +8, but the final review needs 55+ run data to prove the stratification."
+milestone.chronic.desc,「%s」阶段试验已攻克（终审门槛 %d，当前疗效 %d）。长期用药的风险开始显现，选一条路：,"The %s trial is beaten (bar %d, efficacy %d). Long-term risks are showing. Pick a path:"
+milestone.opt.chr_longtox,开展长期毒理研究,Run Long-Term Toxicology
+milestone.opt.chr_longtox.desc,多花 6 个月：之后进入新阶段不再累积残留风险。,6 more months: no more residual risk when entering later stages.
+milestone.opt.chr_push,先推进，边做边看,"Push On, Monitor as You Go"
+milestone.opt.chr_push.desc,疗效 +6，但之后每进入新阶段残留风险再 +4。,"Efficacy +6, but each later stage adds 4 more residual risk."
+milestone.opt.chr_lowdose,改用低剂量方案,Switch to a Low-Dose Regimen
+milestone.opt.chr_lowdose.desc,之后战斗开局力量 -1，但终审的安全线放宽 5。,"-1 Strength in later battles, but the final safety limit rises by 5."
+milestone.final.desc,「%s」阶段试验已攻克（终审门槛 %d，当前疗效 %d）。二期结果让团队分成两派：,"The %s trial is beaten (bar %d, efficacy %d). The Phase II readout splits the team:"
+milestone.opt.fin_broad,扩大适应症,Broaden the Indication
+milestone.opt.fin_broad.desc,疗效 +10，但终审需要本局数据 ≥ 60 证明更多人群获益。,"Efficacy +10, but the final review needs 60+ run data to show benefit in more patients."
+milestone.opt.fin_focus,聚焦核心人群,Focus on the Core Population
+milestone.opt.fin_focus.desc,花 2 亿补充研究：终审的安全线放宽 5。,Spend 2 on extra studies: the final safety limit rises by 5.
+route.title,重启 LM-001：选择研究路线,Restarting LM-001: Choose a Route
+route.desc,LM-001 有两个老问题：选择性差、长期毒性大。你之前项目攒下的证据，决定了能走哪条路。,LM-001 has two old problems: poor selectivity and long-term toxicity. The evidence from your earlier programs decides which routes are open.
+route.route_standard,常规路线,Conventional Route
+route.route_standard.desc,不做额外改造，正面迎接所有难题。,No extra redesign: face every problem head-on.
+route.route_selective,提高选择性路线,Selectivity Route
+route.route_selective.desc,用选择性证据改造分子：发现到一期不再有脱靶规则。改造花费 8 亿。,Redesign the molecule with your selectivity evidence: no off-target rule from Discovery to Phase I. Costs 8.
+route.route_stable,提高稳定性路线,Stability Route
+route.route_stable.desc,用长期安全性证据优化代谢：二期、三期敌人不再越打越强。起步疗效 -8。,Optimize metabolism with your long-term safety evidence: Phase II/III enemies no longer ramp up. Starting efficacy -8.
+route.tag.none,无需证据,No evidence needed
+route.tag.selectivity,选择性证据,Selectivity evidence
+route.tag.long_safety,长期安全性证据,Long-term safety evidence
+final.desc_data,监管机构审评你的上市申请。项目疗效 %d / 门槛 %d，安全风险 %d / 需低于 %d，本局数据 %d / 需 %d。,Regulators review your application. Efficacy %d / bar %d; safety risk %d / below %d; run data %d / need %d.
+mechanic.chronic,疾病进展：每 %d 回合所有敌人力量 +1，别拖太久。,Progression: every %d turns all enemies gain 1 Strength. Don't drag it out.
+mechanic.chronic.trigger,病情进展！敌人力量 +1,Disease progresses! Enemies +1 Strength
+battle.backfire.safe,✓ 这张不会反噬,✓ No backfire
+battle.backfire.exempt,破绽目标：不算脱靶,Weak Spot: no off-target
+battle.backfire.project,项目脱靶 -%d,Off-target -%d
+battle.backfire.boss,Boss 反噬 -%d,Boss backfire -%d
+enemy.last_molecule,最后的分子,The Last Molecule
+encounter.boss_final,最后的分子 LM-001,The Last Molecule LM-001
+encounter.boss_final.desc,LM-001 本身：一回合超过 3 张攻击牌会反噬，而且每回合越来越强。,"LM-001 itself: more than 3 attacks in a turn backfires, and it grows stronger every turn."
+move.cliff,活性悬崖,Activity Cliff
+move.narrow_window,窄安全窗,Narrow Window
+move.rebind,重新结合,Rebind
+move.burst,爆发,Burst
+ending.evidence_new,获得研究证据：%s,Research evidence gained: %s
+ending.evidence_have,这类证据公司已经有了：%s（同类只记首次）,Already have this evidence: %s (only the first counts)
+ending.final_unlocked,已集齐 %d 项研究证据：可以重启 LM-001「最后的分子」了！,"%d pieces of evidence: you can now restart LM-001, The Last Molecule!"
+ending.final_progress,研究证据 %d / %d：集齐后可以重启 LM-001。,Research evidence %d / %d: collect them to restart LM-001.
+ending.stats,本局：攻击 %d 次，其中打破绽 %d 次，反噬 %d 次。,"This run: %d attacks, %d on Weak Spots, %d backfires."
+ending.chain_title,这家公司走过的路,How Your Company Got Here
+chain.evidence,%s %s %s → %s,%s %s %s → %s
+chain.decision,　决策：%s,  Decision: %s
+chain.route,LM-001 选择「%s」,LM-001 took the %s
+campaign.badge,主线结局,Campaign Ending
+campaign.approved_route_standard.title,最后的分子,The Last Molecule
+campaign.approved_route_standard.flavor,没有捷径，团队用一个个项目练出的本事，硬生生把 LM-001 推到了终点。,No shortcuts: the skills your team built project by project carried LM-001 all the way.
+campaign.approved_route_selective.title,精准命中,A Precise Hit
+campaign.approved_route_selective.flavor,当年那个选择性项目里学到的方法，让 LM-001 终于只打该打的靶点。多年的失败，换来了一次精准的成功。,What you learned on that selectivity program finally let LM-001 hit only its target. Years of failure became one precise success.
+campaign.approved_route_stable.title,细水长流,Built to Last
+campaign.approved_route_stable.flavor,长期安全性研究教会团队耐心。LM-001 不再是一把双刃剑，而是病人可以长期依靠的药。,Long-term safety work taught your team patience. LM-001 is no longer a double-edged sword but a medicine patients can rely on.
+campaign.leave_answer.title,把答案留下,Leave the Answer
+campaign.leave_answer.flavor,你决定停下 LM-001，并把所有数据整理公开。证明一条路走不通，同样是科学的进步：后来的人不必再摔同一跤。,You stopped LM-001 and published everything. Proving a path is a dead end is progress too: those who come after won't fall the same way.
+campaign.free_play,主线已完成。你可以继续做自由项目，也可以再挑战 LM-001。,"The campaign is complete. Keep running free programs, or take on LM-001 again."
+archive.evidence,研究证据,Research Evidence
+archive.evidence_line,%s：来自 %s（%s）,%s: from %s (%s)
+archive.campaign_done,主线结局：%s,Campaign ending: %s
+route.event_tag,立项决策,Launch decision

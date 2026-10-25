@@ -786,6 +786,50 @@
      }
     }
    ]
+  },
+  {
+   "id": "last_molecule",
+   "hp": [
+    200,
+    200
+   ],
+   "shape": "crystal",
+   "color": "#e8c060",
+   "size": 1.7,
+   "pattern": "cycle",
+   "boss": true,
+   "mechanic": "offtarget",
+   "mechanic_value": 3,
+   "start_status": {
+    "ritual": 1
+   },
+   "moves": [
+    {
+     "id": "cliff",
+     "intent": "attack",
+     "damage": 12
+    },
+    {
+     "id": "narrow_window",
+     "intent": "attack_debuff",
+     "damage": 7,
+     "add_card": {
+      "id": "ae_card",
+      "value": 1
+     }
+    },
+    {
+     "id": "rebind",
+     "intent": "defend",
+     "block": 16
+    },
+    {
+     "id": "burst",
+     "intent": "attack",
+     "damage": 5,
+     "hits": 3
+    }
+   ]
   }
  ]
 }

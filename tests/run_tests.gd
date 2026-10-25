@@ -50,6 +50,9 @@ func _run() -> void:
 	_test_ai_next_tier()
 	_test_card_face_readable()
 	_test_project_types()
+	_test_backfire_preview()
+	_test_program_decisions()
+	_test_evidence_and_campaign()
 	_test_upgrade_preview()
 	_test_run_save()
 	_test_card_roles()
@@ -323,6 +326,115 @@ func _test_project_types() -> void:
 	m.free()
 
 
+## 两种反噬统一计数与出牌预告；慢性项目的敌人成长
+func _test_backfire_preview() -> void:
+	var m := _manager(["activity_cliff"], ["mol_hit", "mol_hit", "mol_hit", "mol_hit", "mol_hit"],
+		{"rules": {"offtarget_limit": 2, "offtarget_damage": 5, "precise_free": true}}, "boss")
+	m.energy = 9
+	m.enemies[0].max_hp = 999
+	m.enemies[0].hp = 999
+	m.enemies[0].add_status("vulnerable", 5)
+	_expect(m.safe_attacks_left() == 2 and m.boss_attacks_left() == 3, "Safe-attack counter takes the tighter of program and boss limits")
+	m.play_card(m.hand[0], 0)
+	m.play_card(m.hand[0], 0)
+	m.play_card(m.hand[0], 0)
+	_expect(m.rule_attacks_left() == 2 and m.safe_attacks_left() == 0, "Weak Spot attacks skip the program rule but still count for the boss")
+	var preview := m.backfire_preview(m.hand[0], 0)
+	_expect(bool(preview.exempt) and int(preview.project) == 0 and int(preview.boss) == 4,
+		"Preview shows the program exemption and the boss backfire separately")
+	var lines := BattleView.backfire_lines(preview)
+	_expect(lines.size() == 2, "Backfire preview lists both rule outcomes")
+	_expect(int(m.stats.attacks) == 3 and int(m.stats.precise) == 3, "Battle stats count attacks and Weak Spot hits")
+	m.free()
+	var r := _manager(["poor_solubility"], ["exp_assay", "exp_assay", "exp_assay", "exp_assay", "exp_assay"], {"rules": {"enemy_ramp_every": 2}})
+	r.enemies[0].max_hp = 999
+	r.enemies[0].hp = 999
+	r.end_turn()
+	_expect(r.enemies[0].get_status("strength") == 0, "No ramp on turn 2")
+	r.end_turn()
+	_expect(r.enemies[0].get_status("strength") == 1, "Enemies gain Strength every 2 turns in chronic programs")
+	_expect(r.get_mechanic_lines()[0].key == "mechanic.chronic", "The ramp rule is listed in the battle banner")
+	r.free()
+
+
+## 项目专属里程碑决策、阶段残留风险、存档
+func _test_program_decisions() -> void:
+	RunSave.new_project_type = "selective"
+	var g := _new_game()
+	g.state.stage = "临床前研究"
+	g.state.stage_battle_won = true
+	var seen: Array = []
+	g.event_offered.connect(func(event: Dictionary, _gate: bool) -> void: seen.append(event))
+	g._offer_milestone()
+	var ids: Array = seen[0].choices.map(func(c: Dictionary) -> String: return String(c.get("option", c.action)))
+	_expect(ids == ["sel_refine", "sel_potency", "sel_narrow", "terminate"], "Selective programs offer a three-way preclinical decision")
+	g.resolve_event_choice("milestone", 1)
+	_expect(g.state.stage == "一期临床试验" and g.decisions == ["sel_potency"], "A decision advances the stage and is recorded")
+	_expect(int(g.get_battle_rules().get("offtarget_limit", 0)) == 2, "Keeping potency extends the selectivity rule into Phase I")
+	_expect(int(g.run_flags.strength) == 1, "Keeping potency grants +1 Strength")
+	var saved: Dictionary = g.to_save()
+	_expect(saved.decisions == ["sel_potency"] and int(saved.run_flags.strength) == 1, "Decisions and flags are saved")
+	g.free()
+	RunSave.new_project_type = "chronic"
+	var c := _new_game()
+	var risk: int = c.state.safety_risk
+	c._advance_stage("临床前研究")
+	_expect(c.state.safety_risk == risk + 5, "Chronic programs add residual risk at each new stage")
+	c.state.stage = "一期临床试验"
+	c.state.stage_battle_won = true
+	c._offer_milestone()
+	c.resolve_event_choice("milestone", 0)
+	risk = c.state.safety_risk
+	c._advance_stage("三期临床试验")
+	_expect(c.state.safety_risk == risk and c.decisions == ["chr_longtox"], "Long-term toxicology stops the residual risk")
+	_expect(int(c.get_battle_rules().get("enemy_ramp_every", 0)) == 2, "Chronic ramp rule applies in Phase III")
+	c.free()
+
+
+## 研究证据、LM-001 解锁 / 路线 / Boss / 主线结局
+func _test_evidence_and_campaign() -> void:
+	var company := Company.new()
+	_expect(company.grant_evidence("selectivity", {"code": "LM-003"}) and not company.grant_evidence("selectivity", {}),
+		"Each kind of evidence is granted only once")
+	_expect(not company.final_unlocked(), "One piece of evidence does not unlock LM-001")
+	company.grant_evidence("foundation", {"code": "LM-002"})
+	_expect(company.final_unlocked(), "Two pieces of evidence unlock LM-001")
+	RunSave.new_project_type = "selective"
+	var g := _new_game()
+	g.state.stage = "临床前研究"
+	g.state.stage_battle_won = true
+	_expect(g._evidence_earned("terminated").is_empty(), "Terminating before Phase I earns no evidence")
+	g.state.stage = "一期临床试验"
+	_expect(g._evidence_earned("terminated") == "selectivity" and g._evidence_earned("approved") == "selectivity",
+		"Approval or a quality termination earns the program's evidence")
+	var ended: Array = []
+	g.run_ended.connect(func(_o: String, _r: String, summary: Dictionary) -> void: ended.append(summary))
+	g._finish("approved", "msg.marketing_approved")
+	_expect(String(ended[0].evidence) == "selectivity" and bool(ended[0].evidence_new) and g.company.has_evidence("selectivity"),
+		"Finishing reports and stores new evidence")
+	_expect(String(g.company.history[0].evidence) == "selectivity" and g.company.history[0].has("stats"), "History records evidence and stats")
+	g.free()
+	RunSave.new_project_type = "final"
+	var f := _new_game()
+	_expect(f.project_code == "LM-001" and not f.is_idle(), "LM-001 opens with a route choice")
+	f.company.evidence = {"selectivity": {"run": 1}, "foundation": {"run": 2}}
+	f._queue_route_choice()
+	var routes: Array = f._current_event.choices.map(func(c: Dictionary) -> String: return String(c.route))
+	_expect(routes == ["route_standard", "route_selective"], "Routes depend on the evidence the company holds")
+	var funds: int = f.state.funding
+	f.resolve_event_choice("route", 1)
+	_expect(f.route == "route_selective" and f.state.funding == funds - 8 and f.is_idle(), "Choosing a route applies its cost")
+	_expect(f.get_battle_rules().is_empty(), "The selectivity route removes the off-target rule")
+	f.state.stage = "三期临床试验"
+	_expect(String(f.get_boss_info().id) == "boss_final" and int(f.get_battle_rules().get("enemy_ramp_every", 0)) == 2,
+		"LM-001 has its own final boss and keeps the ramp rule")
+	_expect(f._campaign_ending("approved") == "approved_route_selective" and f._campaign_ending("terminated") == "leave_answer",
+		"LM-001 approval or termination after Phase I ends the campaign")
+	f.state.stage = "临床前研究"
+	_expect(f._campaign_ending("terminated").is_empty() and f._campaign_ending("failed").is_empty(), "Early stops and failures are not campaign endings")
+	f.free()
+
+
 ## 战斗手牌尺寸（0.9 倍）下，所有卡、中英文，牌面文字都不小于 12px，名称不超出名称条
 func _test_card_face_readable() -> void:
 	var small: Array[String] = []
@@ -587,13 +699,15 @@ func _simulate(runs: int) -> void:
 	var stages := {}
 	var battles := {}
 	var years := 0
+	var data_sum := 0
 	var ends := {}
 	var type_arg := ""
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--type="):
 			type_arg = arg.trim_prefix("--type=")
 	Bot.respect_rules = _arg_int("--naive=") == 0
-	print("project type: %s, respect rules: %s" % [type_arg if not type_arg.is_empty() else "standard", Bot.respect_rules])
+	Bot.decision_index = _arg_int("--decision=")
+	print("project type: %s, respect rules: %s, decision: %d" % [type_arg if not type_arg.is_empty() else "standard", Bot.respect_rules, Bot.decision_index])
 	for s in runs:
 		RunSave.new_project_type = type_arg
 		var game := _new_game(10000 + s)
@@ -607,6 +721,7 @@ func _simulate(runs: int) -> void:
 			entry[1] += int(result.battles[battle_key][1])
 			battles[battle_key] = entry
 		years += game.state.year
+		data_sum += game.state.data
 		var end_key := "%s eff=%d" % [game.state.stage, game.state.efficacy / 10 * 10]
 		ends[end_key] = int(ends.get(end_key, 0)) + 1
 		game.free()
@@ -618,6 +733,7 @@ func _simulate(runs: int) -> void:
 	for key in battle_keys:
 		print("battle %s: %d wins / %d fights" % [key, battles[key][0], battles[key][1]])
 	print("avg year: %.1f" % (float(years) / runs))
+	print("avg data: %.1f" % (float(data_sum) / runs))
 	var keys := ends.keys()
 	keys.sort()
 	for k in keys:

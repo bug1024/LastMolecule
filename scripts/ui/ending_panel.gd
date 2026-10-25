@@ -1,6 +1,7 @@
 class_name EndingPanel
 extends Control
-## 一局结束的结局画面：结局图标与标题、原因、项目数据、公司结算，以及「再来一局 / 返回标题」。
+## 一局结束的结局画面：结局图标与标题、原因、项目数据、公司结算、研究证据，以及「再来一局 / 返回标题」。
+## 最终项目 LM-001 的主线结局会换成战役标题与文案，并列出因果链：哪些项目带来了哪些证据、做过哪些决策、选了哪条路线。
 
 signal restart_requested()
 
@@ -44,17 +45,27 @@ func show_ending(outcome: String, reason_key: String, summary: Dictionary, state
 	style.shadow_color = Color(color, 0.25)
 	style.shadow_size = 24
 	_panel.add_theme_stylebox_override("panel", style)
-	var icon := UIKit.icon_rect("outcome_" + outcome, 84, color)
+	var campaign := String(summary.get("campaign_ending", ""))
+	if not campaign.is_empty():
+		color = UIKit.GOLD
+		style.border_color = color
+		style.shadow_color = Color(color, 0.3)
+	var icon := UIKit.icon_rect("logo" if not campaign.is_empty() else "outcome_" + outcome, 84, color)
 	icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_box.add_child(icon)
-	var title := UIKit.header(tr("ending." + outcome + ".title"), 36, color)
+	if not campaign.is_empty():
+		var badge := UIKit.label(tr("campaign.badge"), UIKit.GOLD, 15)
+		badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_box.add_child(badge)
+	var title := UIKit.header(tr("campaign.%s.title" % campaign) if not campaign.is_empty() else tr("ending." + outcome + ".title"), 36, color)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_box.add_child(title)
 	var reason := UIKit.label(tr(reason_key), UIKit.TEXT, 16, true)
 	reason.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	reason.custom_minimum_size = Vector2(560, 0)
 	_box.add_child(reason)
-	var flavor := UIKit.label(tr("ending." + outcome + ".flavor"), UIKit.TEXT_DIM, 14, true)
+	var flavor := UIKit.label(tr("campaign.%s.flavor" % campaign) if not campaign.is_empty() else tr("ending." + outcome + ".flavor"),
+		UIKit.TEXT if not campaign.is_empty() else UIKit.TEXT_DIM, 14 if campaign.is_empty() else 16, true)
 	flavor.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	flavor.custom_minimum_size = Vector2(560, 0)
 	_box.add_child(flavor)
@@ -85,6 +96,9 @@ func show_ending(outcome: String, reason_key: String, summary: Dictionary, state
 		var up := UIKit.header(tr("ending.level_up") % summary.level_after, 18, UIKit.GOLD)
 		up.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		_box.add_child(up)
+	_add_evidence(summary)
+	if not campaign.is_empty():
+		_add_chain()
 
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -104,6 +118,61 @@ func show_ending(outcome: String, reason_key: String, summary: Dictionary, state
 	var tween := create_tween().set_parallel(true)
 	tween.tween_property(self, "modulate:a", 1.0, 0.4)
 	tween.tween_property(_panel, "scale", Vector2.ONE, 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+## 研究证据与本局统计；还没解锁 LM-001 时显示进度
+func _add_evidence(summary: Dictionary) -> void:
+	var company := Company.new()
+	company.load_save()
+	var lines: Array = []   # [文字, 颜色]
+	var evidence := String(summary.get("evidence", ""))
+	if not evidence.is_empty():
+		var fresh := bool(summary.get("evidence_new", false))
+		lines.append([tr("ending.evidence_new" if fresh else "ending.evidence_have") % tr("evidence." + evidence), UIKit.ACCENT_BLUE if fresh else UIKit.TEXT_DIM])
+	if String(summary.get("campaign_ending", "")).is_empty():
+		var need := int(ProjectTypes.config().get("final_unlock_evidence", 2))
+		lines.append([tr("ending.final_unlocked") % need, UIKit.GOLD] if company.final_unlocked() \
+			else [tr("ending.final_progress") % [company.evidence.size(), need], UIKit.TEXT_DIM])
+	var stats: Dictionary = company.history[0].get("stats", {}) if not company.history.is_empty() else {}
+	if int(stats.get("attacks", 0)) > 0:
+		lines.append([tr("ending.stats") % [int(stats.attacks), int(stats.get("precise", 0)), int(stats.get("backfires", 0))], UIKit.TEXT_DIM])
+	for line in lines:
+		var label := UIKit.label(String(line[0]), line[1], 15, true)
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		label.custom_minimum_size = Vector2(560, 0)
+		_box.add_child(label)
+
+
+## 主线结局的因果链：每项证据来自哪个项目、那次做过的决策，以及 LM-001 选的路线
+func _add_chain() -> void:
+	var company := Company.new()
+	company.load_save()
+	_box.add_child(HSeparator.new())
+	var head := UIKit.header(tr("ending.chain_title"), 18, UIKit.GOLD)
+	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_box.add_child(head)
+	for line in chain_lines(company):
+		var label := UIKit.label(line, UIKit.TEXT, 15, true)
+		label.custom_minimum_size = Vector2(560, 0)
+		_box.add_child(label)
+
+
+static func chain_lines(company: Company) -> Array[String]:
+	var t := TranslationServer
+	var lines: Array[String] = []
+	var ids: Array = company.evidence.keys()
+	ids.sort_custom(func(a: String, b: String) -> bool: return int(company.evidence[a].get("run", 0)) < int(company.evidence[b].get("run", 0)))
+	for id in ids:
+		var src: Dictionary = company.evidence[id]
+		lines.append(t.translate("chain.evidence") % [String(src.get("code", "")), t.translate("project.type." + String(src.get("project_type", ""))),
+			t.translate("ending." + String(src.get("outcome", ""))), t.translate("evidence." + String(id))])
+		for d in src.get("decisions", []):
+			if not String(d).begins_with("route:"):
+				lines.append(t.translate("chain.decision") % t.translate("milestone.opt." + String(d)))
+	var route := String(company.campaign.get("route", ""))
+	if not route.is_empty():
+		lines.append(t.translate("chain.route") % t.translate("route." + route))
+	return lines
 
 
 func _cell(grid: GridContainer, icon_name: String, key: String, value: String) -> void:

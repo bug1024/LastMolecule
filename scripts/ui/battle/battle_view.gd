@@ -43,7 +43,7 @@ var _selected: ResearchCard = null
 var _hover_enemy := -1
 var _energy_label: Label
 var _energy_orb: Control
-var _rule_label: Label               # 选择性项目：本回合还能放心打几张攻击牌
+var _rule_label: Label               # 脱靶反噬：本回合还能放心打几张攻击牌 / 当前这张牌的反噬预告
 var _draw_button: Button
 var _discard_button: Button
 var _end_button: Button
@@ -153,7 +153,7 @@ func _build() -> void:
 	_energy_orb.add_child(_energy_label)
 	_rule_label = UIKit.label("", UIKit.GOLD, 14, true)
 	_rule_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_rule_label.size = Vector2(150, 40)
+	_rule_label.size = Vector2(150, 62)
 	_rule_label.tooltip_text = tr("battle.rule_tip")
 	_rule_label.mouse_filter = Control.MOUSE_FILTER_PASS
 	add_child(_rule_label)
@@ -315,7 +315,8 @@ func _on_battle_started(encounter: Dictionary) -> void:
 		ew.pressed.connect(_on_enemy_pressed)
 		ew.hovered.connect(func(idx: int, on: bool) -> void:
 			_hover_enemy = idx if on else (-1 if _hover_enemy == idx else _hover_enemy)
-			_refresh_faces())
+			_refresh_faces()
+			_refresh_energy())
 		_shake_root.add_child(ew)
 		_enemy_widgets.append(ew)
 	var kind := String(encounter.get("kind", "fight"))
@@ -657,6 +658,7 @@ func _on_card_hover(card: ResearchCard, on: bool) -> void:
 	if _selected == null:
 		_refresh_faces()
 		_layout_hand()
+	_refresh_energy()
 
 
 func _on_card_input(event: InputEvent, card: ResearchCard) -> void:
@@ -825,10 +827,31 @@ func _refresh_intents() -> void:
 func _refresh_energy() -> void:
 	_energy_label.text = "%d/%d" % [_manager.energy, _manager.max_energy]
 	_energy_orb.queue_redraw()
-	var left := _manager.rule_attacks_left()
+	var left := _manager.safe_attacks_left()
 	_rule_label.visible = left >= 0
+	var card := _selected if _selected != null else _hover_card
+	var lines := backfire_lines(_manager.backfire_preview(card, _hover_enemy)) if card != null and card.kind == "attack" else []
+	if not lines.is_empty():
+		_rule_label.text = "\n".join(lines)
+		_rule_label.add_theme_color_override("font_color", UIKit.DANGER.lightened(0.15) if lines.size() > 1 or not lines[0].begins_with("✓") else UIKit.ACCENT.lightened(0.2))
+		return
 	_rule_label.text = tr("battle.rule_left") % left if left > 0 else tr("battle.rule_none")
 	_rule_label.add_theme_color_override("font_color", UIKit.GOLD if left > 0 else UIKit.DANGER.lightened(0.15))
+
+
+## 反噬预告文字：「项目脱靶 -5」「破绽目标：项目规则豁免」「Boss 反噬 -4」；什么都不会发生时为「✓ 这张不会反噬」
+static func backfire_lines(preview: Dictionary) -> Array:
+	var t := TranslationServer
+	var lines: Array = []
+	if bool(preview.get("exempt", false)):
+		lines.append(t.translate("battle.backfire.exempt"))
+	if int(preview.get("project", 0)) > 0:
+		lines.append(t.translate("battle.backfire.project") % int(preview.project))
+	if int(preview.get("boss", 0)) > 0:
+		lines.append(t.translate("battle.backfire.boss") % int(preview.boss))
+	if lines.is_empty() or (lines.size() == 1 and bool(preview.get("exempt", false))):
+		lines.push_front(t.translate("battle.backfire.safe"))
+	return lines
 
 
 ## 「再 +6 数据（或 +1 流程）→ AI 威力 ×1」/「AI 已满档」

@@ -80,6 +80,10 @@ var resumed := false                 # 本局是从存档继续的
 var project_type := "standard"       # 项目类型 id
 var project_code := ""               # 项目编号，如 LM-002
 var _type_cfg: Dictionary = {}
+var run_stats := {"attacks": 0, "precise": 0, "backfires": 0}   # 本局累计：攻击牌 / 打破绽目标的攻击 / 反噬次数
+var run_flags := {}                  # 项目专属决策带来的持续效果（见 projects.json milestones）
+var decisions: Array = []            # 本局做过的项目专属决策 id（写入公司历史，结局因果链用）
+var route := ""                      # 最终项目 LM-001 选择的研究路线 id
 var _event_is_gate := false
 
 
@@ -114,6 +118,8 @@ func _ready() -> void:
 			state.funding += bonus
 			company.save()
 		_map.generate(state.stage, rng)
+		if not (_type_cfg.get("routes", []) as Array).is_empty():
+			_queue_route_choice()
 	_battle_manager = BattleManager.new()
 	_battle_manager.rng = rng
 	_battle_manager.tier_provider = _ai_tier
@@ -128,15 +134,17 @@ func _ready() -> void:
 func _apply_project_type(type_id: String, code: String) -> void:
 	_type_cfg = ProjectTypes.find(type_id if not type_id.is_empty() else ProjectTypes.default_id())
 	project_type = String(_type_cfg.get("id", "standard"))
-	project_code = code if not code.is_empty() else ProjectTypes.code_for_run(company.runs)
+	# 最终项目有固定编号（LM-001）；普通项目用传入的编号（读档）或按公司项目次数生成
+	project_code = String(_type_cfg.get("code", code if not code.is_empty() else ProjectTypes.code_for_run(company.runs)))
 	_project = ProjectTypes.apply_overrides(JsonData.load_dict(PROJECT_DATA_PATH), _type_cfg)
 	var starter: Array = _type_cfg.get("starter_cards", [])
 	deck = (starter if not starter.is_empty() else JsonData.load_dict(CARDS_DATA_PATH).get("starter_cards", [])).duplicate()
 
 
-## 读档后由 UI 在连好信号后调用：重新弹出存档时正在进行的事件 / 选卡 / 奖励，或重开那场战斗
+## 读档后（或新局开场就有待做的选择时）由 UI 在连好信号后调用：
+## 重新弹出正在进行的事件 / 选卡 / 奖励，或重开那场战斗
 func replay_pending() -> void:
-	if not resumed:
+	if not resumed and _phase == RoundPhase.IDLE:
 		return
 	state_synced.emit(state)
 	map_updated.emit()
@@ -173,6 +181,7 @@ func to_save() -> Dictionary:
 		"fast_track": fast_track, "months": months, "battle_kind": _battle_kind,
 		"player_xp": player_xp, "battles_fought": battles_fought,
 		"project_type": project_type, "project_code": project_code,
+		"run_stats": run_stats.duplicate(), "run_flags": run_flags.duplicate(true), "decisions": decisions.duplicate(), "route": route,
 	}
 
 
@@ -197,6 +206,12 @@ func _load_run(d: Dictionary) -> bool:
 	_battle_kind = String(d.get("battle_kind", ""))
 	player_xp = int(d.get("player_xp", 0))
 	battles_fought = int(d.get("battles_fought", 0))
+	var stats: Dictionary = d.get("run_stats", {})
+	for key in run_stats:
+		run_stats[key] = int(stats.get(key, 0))
+	run_flags = d.get("run_flags", {})
+	decisions = d.get("decisions", []).duplicate()
+	route = String(d.get("route", ""))
 	_current_event = d.get("event", {})
 	_event_is_gate = bool(d.get("event_is_gate", false))
 	_pick_purpose = String(d.get("pick_purpose", ""))
@@ -334,12 +349,35 @@ func get_project_type() -> Dictionary:
 	return _type_cfg
 
 
-## 本阶段生效的项目战斗规则（不在规则阶段时为空）
+## 本阶段生效的项目战斗规则（合并成一个字典；不在任何规则阶段时为空）
+## battle_rules 可以是单条或多条规则，每条有自己的 stages；最终项目的路线可以移除某条（remove_rules），
+## 项目专属决策可以把规则延长到更多阶段（run_flags.rule_stages）
 func get_battle_rules() -> Dictionary:
-	var rules: Dictionary = _type_cfg.get("battle_rules", {})
-	if rules.is_empty() or not (rules.get("stages", []) as Array).has(state.stage):
-		return {}
-	return rules
+	var merged := {}
+	var removed: Array = _route_cfg().get("remove_rules", [])
+	for rule in _rule_list():
+		if removed.has(String(rule.get("id", ""))):
+			continue
+		var stages: Array = (rule.get("stages", []) as Array).duplicate()
+		if String(rule.get("id", "")) == String(run_flags.get("rule_id", "")) or not run_flags.has("rule_id"):
+			stages.append_array(run_flags.get("rule_stages", []))
+		if stages.has(state.stage):
+			merged.merge(rule, true)
+	merged.erase("stages")
+	merged.erase("id")
+	return merged
+
+
+func _rule_list() -> Array:
+	var raw = _type_cfg.get("battle_rules", [])
+	return [raw] if raw is Dictionary and not (raw as Dictionary).is_empty() else (raw if raw is Array else [])
+
+
+func _route_cfg() -> Dictionary:
+	for r in _type_cfg.get("routes", []):
+		if String(r.get("id", "")) == route:
+			return r
+	return {}
 
 
 ## 前期研究最多削弱 Boss 的百分比（阶段进度条的上限）
@@ -349,9 +387,15 @@ func get_progress_gate() -> int:
 
 ## 本阶段 Boss 信息 {id, enemies, hp_scale}
 func get_boss_info() -> Dictionary:
-	var boss: Dictionary = _encounters.get("stages", {}).get(state.stage, {}).get("boss", {}).duplicate()
+	var boss: Dictionary = _stage_boss().duplicate()
 	boss["hp_scale"] = _boss_hp_scale()
 	return boss
+
+
+## 本阶段 Boss（项目类型可以用 boss_overrides 换成专属 Boss）
+func _stage_boss() -> Dictionary:
+	var custom: Dictionary = _type_cfg.get("boss_overrides", {}).get(state.stage, {})
+	return custom if not custom.is_empty() else _encounters.get("stages", {}).get(state.stage, {}).get("boss", {})
 
 
 ## 研发团队等级（1 起）
@@ -389,7 +433,12 @@ func get_final_efficacy_bar() -> int:
 
 
 func get_final_safety_limit() -> int:
-	return int(_project.get("final_review", {}).get("safety_risk_below", 70))
+	return int(_project.get("final_review", {}).get("safety_risk_below", 70)) + int(run_flags.get("final_safety_bonus", 0))
+
+
+## 终审额外要求的本局数据（精准分层等决策带来，0 表示没有）
+func get_final_data_min() -> int:
+	return int(run_flags.get("final_data_min", 0))
 
 
 ## 阶段 id 列表（发现 → 获批上市）
@@ -550,7 +599,7 @@ func _start_battle(kind: String) -> void:
 	var stage_cfg: Dictionary = _encounters.get("stages", {}).get(state.stage, {})
 	var encounter: Dictionary
 	if kind == "boss":
-		encounter = stage_cfg.get("boss", {}).duplicate()
+		encounter = _stage_boss().duplicate()
 	else:
 		var pool: Array = stage_cfg.get("elite" if kind == "elite" else "normal", [])
 		if pool.is_empty():
@@ -565,7 +614,7 @@ func _start_battle(kind: String) -> void:
 	for ability_id in state.abilities:
 		abilities.append(get_ability_by_id(String(ability_id)))
 	var bonus := get_player_bonus()
-	var strength := get_efficacy_strength() + int(bonus.get("strength", 0))
+	var strength := get_efficacy_strength() + int(bonus.get("strength", 0)) + int(run_flags.get("strength", 0))
 	if kind == "boss" and state.stage == "二期临床试验":
 		strength += rp2d
 	_battle_manager.start_battle(encounter, build_deck(), abilities, {
@@ -600,6 +649,9 @@ func _on_battle_ended(victory: bool, outcome: Dictionary) -> void:
 		return
 	run_process += int(outcome.get("process", 0))
 	battles_fought += 1
+	var stats: Dictionary = outcome.get("stats", {})
+	for key in run_stats:
+		run_stats[key] = int(run_stats[key]) + int(stats.get(key, 0))
 	if bool(outcome.get("intel", false)):
 		competition.intel_revealed = true
 	var effects := {"safety_risk": int(outcome.get("damage_taken", 0)), "data": int(outcome.get("data", 0))}
@@ -672,29 +724,77 @@ func _enter_milestone() -> void:
 func _offer_milestone() -> void:
 	var is_last := state.stage == _last_stage()
 	var desc_key := "milestone.desc_won" if state.stage_battle_won else "milestone.desc_lost"
+	var choices: Array = []
+	var options: Array = _type_cfg.get("milestones", {}).get(state.stage, [])
+	if options.is_empty():
+		choices.append({"label_key": "milestone.final" if is_last else "milestone.continue", "requires": {"battle_won": true},
+			"effects": {}, "action": "continue"})
+	else:
+		# 项目专属决策：每个选项都是「带着某种方案继续」，效果持续到项目结束
+		desc_key = "milestone.%s.desc" % project_type if state.stage_battle_won else desc_key
+		for option in options:
+			var key := "milestone.opt.%s" % String(option.id)
+			var effects: Dictionary = option.get("effects", {})
+			var cost := -int(effects.get("funding", 0))
+			var requires := {"battle_won": true}
+			if cost > 0:
+				requires["funding_min"] = cost + 1
+			choices.append({"label_key": key, "desc_key": key + ".desc", "tag_key": "milestone.opt_tag",
+				"requires": requires, "effects": effects, "action": "decide", "option": String(option.id)})
+	choices.append({"label_key": "milestone.terminate", "effects": {}, "action": "terminate"})
 	_offer_event({"id": "milestone", "title_key": "node.milestone", "desc_key": desc_key,
-		"desc_args": [_tr_stage(state.stage), get_final_efficacy_bar(), state.efficacy], "choices": [
-			{"label_key": "milestone.final" if is_last else "milestone.continue", "requires": {"battle_won": true},
-				"effects": {}, "action": "continue"},
-			{"label_key": "milestone.terminate", "effects": {}, "action": "terminate"},
-		]}, true)
+		"desc_args": [_tr_stage(state.stage), get_final_efficacy_bar(), state.efficacy], "choices": choices}, true)
+
+
+## 最终项目开场：按公司已有的研究证据选择研究路线
+func _queue_route_choice() -> void:
+	var choices: Array = []
+	for r in _type_cfg.get("routes", []):
+		var need := String(r.get("requires", ""))
+		if not need.is_empty() and not company.has_evidence(need):
+			continue
+		var key := "route." + String(r.id)
+		choices.append({"label_key": key, "desc_key": key + ".desc", "tag_key": "route.tag." + (need if not need.is_empty() else "none"),
+			"effects": r.get("effects", {}), "action": "route", "route": String(r.id)})
+	_current_event = {"id": "route", "tag_key": "route.event_tag", "title_key": "route.title", "desc_key": "route.desc", "choices": choices}
+	_event_is_gate = true
+	_phase = RoundPhase.WAITING_EVENT
+	_autosave()
 
 
 func _offer_final_review() -> void:
 	var review: Dictionary = _project.get("final_review", {})
 	var extra: Dictionary = review.get("extra_study", {})
-	_offer_event({"id": "final_review", "title_key": "node.final_review", "desc_key": "final.desc",
-		"desc_args": [state.efficacy, get_final_efficacy_bar(), state.safety_risk, get_final_safety_limit()], "choices": [
-			{"label_key": "final.submit", "requires": {"efficacy_min": get_final_efficacy_bar(),
-				"safety_risk_below": get_final_safety_limit()}, "effects": {}, "action": "submit"},
+	var submit_req := {"efficacy_min": get_final_efficacy_bar(), "safety_risk_below": get_final_safety_limit()}
+	var desc_key := "final.desc"
+	var desc_args := [state.efficacy, get_final_efficacy_bar(), state.safety_risk, get_final_safety_limit()]
+	if get_final_data_min() > 0:
+		submit_req["data_min"] = get_final_data_min()
+		desc_key = "final.desc_data"
+		desc_args.append_array([state.data, get_final_data_min()])
+	_offer_event({"id": "final_review", "title_key": "node.final_review", "desc_key": desc_key,
+		"desc_args": desc_args, "choices": [
+			{"label_key": "final.submit", "requires": submit_req, "effects": {}, "action": "submit"},
 			{"label_key": "final.extra_study", "requires": {"funding_min": -int(extra.get("funding", -3)) + 1},
 				"effects": extra, "action": "final_review"},
 			{"label_key": "milestone.terminate", "effects": {}, "action": "terminate"},
 		]}, true)
 
 
-func _run_action(action: String, _choice: Dictionary) -> void:
+func _run_action(action: String, choice: Dictionary) -> void:
 	match action:
+		"decide":
+			_apply_decision(String(choice.get("option", "")))
+			if _phase == RoundPhase.FINISHED:
+				return
+			if state.stage == _last_stage():
+				_offer_final_review()
+			else:
+				_advance_stage(_next_stage())
+		"route":
+			route = String(choice.get("route", ""))
+			decisions.append("route:" + route)
+			_finish_node()
 		"card_reward":
 			_offer_card_pick("add", _sample_cards(_plan_card_choices))
 		"buy":
@@ -760,7 +860,40 @@ func _finish_node() -> void:
 	map_updated.emit()
 
 
+## 项目专属决策：记录 id，套用持续效果（flags）与耗时
+func _apply_decision(option_id: String) -> void:
+	for option in _type_cfg.get("milestones", {}).get(state.stage, []):
+		if String(option.get("id", "")) != option_id:
+			continue
+		decisions.append(option_id)
+		var flags: Dictionary = option.get("flags", {})
+		for key in flags:
+			if flags[key] is Array:
+				var list: Array = run_flags.get(key, [])
+				list.append_array(flags[key])
+				run_flags[key] = list
+			elif flags[key] is bool:
+				run_flags[key] = flags[key]
+			else:
+				run_flags[key] = int(run_flags.get(key, 0)) + int(flags[key])
+		_pass_time(int(option.get("months", 0)))
+		_check_end_conditions()
+		return
+
+
+## 慢性项目：每进入新阶段，长期用药的残留风险累积（决策可关闭或加重）
+func _stage_drift() -> int:
+	if bool(run_flags.get("drift_off", false)):
+		return 0
+	return int(_project.get("stage_safety_drift", 0)) + int(run_flags.get("drift_extra", 0))
+
+
 func _advance_stage(stage: String) -> void:
+	var drift := _stage_drift()
+	if drift > 0:
+		_apply_effects({"safety_risk": drift})
+		if _check_end_conditions():
+			return
 	_apply_effects({"stage": stage, "set_research_progress": 0})
 	state.stage_battle_won = false
 	fast_track = false
@@ -772,10 +905,43 @@ func _advance_stage(stage: String) -> void:
 func _finish(outcome: String, reason_key: String) -> void:
 	_phase = RoundPhase.FINISHED
 	RunSave.clear()
-	var summary := company.settle_run(state.data, outcome, state.funding,
-		{"stage": state.stage, "year": state.year, "efficacy": state.efficacy, "safety_risk": state.safety_risk,
-			"project_type": project_type, "project_code": project_code})
+	var evidence_id := _evidence_earned(outcome)
+	var record := {"stage": state.stage, "year": state.year, "efficacy": state.efficacy, "safety_risk": state.safety_risk,
+		"project_type": project_type, "project_code": project_code, "stats": run_stats.duplicate(),
+		"decisions": decisions.duplicate(), "evidence": evidence_id}
+	var evidence_new := company.grant_evidence(evidence_id, {"code": project_code, "project_type": project_type,
+		"outcome": outcome, "run": company.runs + 1, "decisions": decisions.duplicate()})
+	var ending := _campaign_ending(outcome)
+	if not ending.is_empty() and not company.is_campaign_done():
+		company.campaign = {"ending": ending, "route": route, "code": project_code, "run": company.runs + 1}
+	var summary := company.settle_run(state.data, outcome, state.funding, record)
+	summary["evidence"] = evidence_id
+	summary["evidence_new"] = evidence_new
+	summary["campaign_ending"] = ending
 	run_ended.emit(outcome, reason_key, summary)
+
+
+## 本局获得的研究证据：获批，或在一期及以后的里程碑主动终止（高质量终止）才有
+func _evidence_earned(outcome: String) -> String:
+	var id := String(_type_cfg.get("evidence", ""))
+	if id.is_empty():
+		return ""
+	if outcome == "approved":
+		return id
+	if outcome == "terminated" and state.stage_battle_won and _stages().find(state.stage) >= _stages().find("一期临床试验"):
+		return id
+	return ""
+
+
+## 最终项目的战役结局：获批 → 按路线的结局；一期之后主动终止并留下证据 → 「把答案留下」
+func _campaign_ending(outcome: String) -> String:
+	if not bool(_type_cfg.get("final", false)):
+		return ""
+	if outcome == "approved":
+		return "approved_" + (route if not route.is_empty() else "standard_route")
+	if outcome == "terminated" and _stages().find(state.stage) >= _stages().find("一期临床试验"):
+		return "leave_answer"
+	return ""
 
 
 # ---------- 内部实现 ----------

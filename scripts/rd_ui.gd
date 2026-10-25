@@ -101,6 +101,8 @@ func _ready() -> void:
 		_game_logic.replay_pending()
 		if _game_logic.is_idle() and _game_logic.has_started_map():
 			_map_screen.show_map()
+	elif not _game_logic.is_idle():
+		_game_logic.replay_pending()   # 新局开场就有待做的选择（LM-001 研究路线）
 
 
 func _build_overlays() -> void:

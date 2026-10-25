@@ -88,7 +88,7 @@ static func _choose_event(game: Node) -> void:
 		"fast_track":
 			preferred = 1
 		"milestone":
-			preferred = 0
+			preferred = mini(decision_index, choices.size() - 2) if choices.size() > 2 else 0
 		"final_review":
 			preferred = 0 if state.can_meet(choices[0].get("requires", {})) else (1 if state.funding > 4 else 2)
 	if preferred >= 0 and preferred < choices.size() and state.can_meet(choices[preferred].get("requires", {})):
@@ -128,6 +128,7 @@ static func _choose_card(game: Node) -> void:
 
 
 ## 打完一个回合（公开给测试用）
+static var decision_index := 0     # 项目专属里程碑决策选第几个（模拟不同决策）
 static var respect_rules := true   # false 时无视项目规则一味猛攻（模拟「攻击最高的牌全拿」）
 
 

@@ -1,14 +1,15 @@
 {
-  "_comment": "项目类型：在 project.json 基础上覆盖。overrides 按键合并（字典逐层合并）；starter_cards 替换起始牌组；card_pool_bonus 为奖励卡池权重倍数（可把起始专属卡放进卡池）；battle_rules 为本类项目在指定阶段所有战斗中生效的规则。项目编号 LM-001 保留给主线最终分子，普通项目从 LM-002 起按公司项目次数递增。",
+  "_comment": "项目类型：在 project.json 基础上覆盖。overrides 按键合并（字典逐层合并）；starter_cards 替换起始牌组；card_pool_bonus 为奖励卡池权重倍数（可把起始专属卡放进卡池）；battle_rules 为一条或多条战斗规则，各自按 stages 生效；milestones 为某阶段里程碑的项目专属决策（effects 立即生效，flags 持续到项目结束，months 额外耗时）；evidence 为获批或高质量终止时获得的研究证据。final 类型为主线最终项目 LM-001：持有 final_unlock_evidence 项证据后解锁，开局按证据选择 routes，boss_overrides 替换阶段 Boss。普通项目编号从 LM-002 起按公司项目次数递增。",
   "default": "standard",
   "code_format": "LM-%03d",
   "code_start": 2,
+  "final_unlock_evidence": 2,
   "types": [
     {
       "id": "standard",
       "difficulty": 1,
       "icon": "type_molecular",
-      "evidence": ""
+      "evidence": "foundation"
     },
     {
       "id": "selective",
@@ -23,12 +24,80 @@
         "mol_hit", "mol_hit", "mol_hit", "mol_target", "mol_target",
         "exp_assay", "exp_assay", "exp_assay", "exp_biomarker", "ai_screen"
       ],
-      "card_pool_bonus": { "mol_target": 4, "exp_biomarker": 3, "ai_structure": 3 },
-      "battle_rules": {
-        "stages": ["候选化合物发现", "临床前研究"],
-        "offtarget_limit": 2,
-        "offtarget_damage": 5,
-        "precise_free": true
+      "card_pool_bonus": {
+        "mol_target": 4, "exp_biomarker": 3, "ai_structure": 3,
+        "mol_covalent": 3, "mol_multivalent": 2, "exp_controls": 2
+      },
+      "battle_rules": [
+        { "id": "offtarget", "stages": ["候选化合物发现", "临床前研究"],
+          "offtarget_limit": 2, "offtarget_damage": 5, "precise_free": true }
+      ],
+      "milestones": {
+        "临床前研究": [
+          { "id": "sel_refine", "effects": { "funding": -3, "safety_risk": -10 }, "months": 6 },
+          { "id": "sel_potency", "effects": {}, "flags": { "strength": 1, "rule_stages": ["一期临床试验", "二期临床试验", "三期临床试验"] } },
+          { "id": "sel_narrow", "effects": { "efficacy": 8 }, "flags": { "final_data_min": 55 } }
+        ]
+      }
+    },
+    {
+      "id": "chronic",
+      "difficulty": 2,
+      "icon": "status_metallicize",
+      "evidence": "long_safety",
+      "overrides": {
+        "rest_heal": 30,
+        "stage_safety_drift": 5,
+        "final_review": { "efficacy_min": 55, "safety_risk_below": 60 }
+      },
+      "starter_cards": [
+        "mol_hit", "mol_hit", "mol_hit", "mol_hit", "exp_assay",
+        "exp_assay", "exp_assay", "clin_monitor", "clin_dosing", "ai_screen"
+      ],
+      "card_pool_bonus": {
+        "proc_sop": 3, "clin_monitor": 3, "proc_review": 3, "clin_dosing": 2, "clin_endpoint": 2, "clin_combo": 2
+      },
+      "battle_rules": [
+        { "id": "ramp", "stages": ["一期临床试验", "二期临床试验", "三期临床试验"], "enemy_ramp_every": 2 }
+      ],
+      "milestones": {
+        "一期临床试验": [
+          { "id": "chr_longtox", "effects": { "funding": -3 }, "months": 6, "flags": { "drift_off": true } },
+          { "id": "chr_push", "effects": { "efficacy": 6 }, "flags": { "drift_extra": 4 } },
+          { "id": "chr_lowdose", "effects": {}, "flags": { "strength": -1, "final_safety_bonus": 5 } }
+        ]
+      }
+    },
+    {
+      "id": "final",
+      "final": true,
+      "code": "LM-001",
+      "difficulty": 3,
+      "icon": "logo",
+      "evidence": "",
+      "overrides": {
+        "initial_funding_billion": 45,
+        "final_review": { "efficacy_min": 70, "safety_risk_below": 60 }
+      },
+      "card_pool_bonus": { "mol_target": 2, "exp_biomarker": 2, "proc_sop": 2, "clin_monitor": 2 },
+      "battle_rules": [
+        { "id": "offtarget", "stages": ["候选化合物发现", "临床前研究", "一期临床试验"],
+          "offtarget_limit": 2, "offtarget_damage": 5, "precise_free": true },
+        { "id": "ramp", "stages": ["二期临床试验", "三期临床试验"], "enemy_ramp_every": 2 }
+      ],
+      "boss_overrides": {
+        "三期临床试验": { "id": "boss_final", "enemies": ["last_molecule"] }
+      },
+      "routes": [
+        { "id": "route_standard", "requires": "", "effects": {} },
+        { "id": "route_selective", "requires": "selectivity", "remove_rules": ["offtarget"], "effects": { "funding": -8 } },
+        { "id": "route_stable", "requires": "long_safety", "remove_rules": ["ramp"], "effects": { "efficacy": -8 } }
+      ],
+      "milestones": {
+        "二期临床试验": [
+          { "id": "fin_broad", "effects": { "efficacy": 10 }, "flags": { "final_data_min": 60 } },
+          { "id": "fin_focus", "effects": { "funding": -2 }, "flags": { "final_safety_bonus": 5 } }
+        ]
       }
     }
   ]

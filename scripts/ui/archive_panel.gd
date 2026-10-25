@@ -51,6 +51,21 @@ func _refresh() -> void:
 	_body.add_child(level_box)
 
 	_body.add_child(HSeparator.new())
+	_body.add_child(UIKit.header(tr("archive.evidence"), 18))
+	if company.evidence.is_empty():
+		_body.add_child(UIKit.label(tr("project.select.evidence_none"), UIKit.TEXT_DIM, 14, true))
+	for id in company.evidence:
+		var src: Dictionary = company.evidence[id]
+		_body.add_child(UIKit.label(tr("archive.evidence_line") % [tr("evidence." + String(id)),
+			tr("project.title") % [String(src.get("code", "")), tr("project.type." + String(src.get("project_type", "")))],
+			tr("ending." + String(src.get("outcome", "")))], UIKit.ACCENT_BLUE, 14, true))
+	var need := int(ProjectTypes.config().get("final_unlock_evidence", 2))
+	if company.is_campaign_done():
+		_body.add_child(UIKit.label(tr("archive.campaign_done") % tr("campaign.%s.title" % String(company.campaign.get("ending", ""))), UIKit.GOLD, 15))
+	else:
+		_body.add_child(UIKit.label(tr("ending.final_unlocked") % need if company.final_unlocked() else tr("ending.final_progress") % [company.evidence.size(), need],
+			UIKit.GOLD, 14, true))
+	_body.add_child(HSeparator.new())
 	_body.add_child(UIKit.header(tr("archive.history"), 18))
 	if company.history.is_empty():
 		_body.add_child(UIKit.label(tr("archive.empty"), UIKit.TEXT_DIM, 15, true))

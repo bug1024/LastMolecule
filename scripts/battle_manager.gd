@@ -16,6 +16,7 @@ extends Node
 ## 项目规则 rules（由项目类型决定，见 data/projects.json battle_rules）：
 ##   offtarget_limit / offtarget_damage：一回合超过 limit 张攻击牌，每多 1 张掉 damage 血（选择性项目）；
 ##   precise_free：攻击带「破绽」的目标不计入。
+##   enemy_ramp_every：每隔 N 回合所有敌人力量 +1（慢性项目：拖得越久越危险）。
 
 signal battle_started(encounter: Dictionary)
 signal turn_started(turn: int)
@@ -55,6 +56,7 @@ var dose_max := 4
 var attacks_this_turn := 0
 var rules: Dictionary = {}           # 项目规则，见文件头
 var rule_attacks := 0                # 本回合计入项目规则的攻击牌数
+var stats := {"attacks": 0, "precise": 0, "backfires": 0}   # 本场统计：攻击牌数 / 打破绽目标的攻击 / 反噬次数
 var last_deviation := false
 
 var _enemy_defs := {}
@@ -90,6 +92,7 @@ func start_battle(enc: Dictionary, deck: Array, abilities: Array, ctx: Dictionar
 	player.hp = clampi(int(ctx.get("hp", player.max_hp)), 1, player.max_hp)
 	_start_hp = player.hp
 	rules = ctx.get("rules", {})
+	stats = {"attacks": 0, "precise": 0, "backfires": 0}
 	if int(ctx.get("strength", 0)) > 0:
 		player.add_status("strength", int(ctx.strength))
 	if int(ctx.get("dexterity", 0)) > 0:
@@ -151,6 +154,9 @@ func play_card(card: ResearchCard, target_index := -1) -> bool:
 		_apply_card_effect(effect, card, target, multiplier)
 	if card.kind == "attack":
 		attacks_this_turn += 1
+		stats.attacks += 1
+		if precise:
+			stats.precise += 1
 		_check_offtarget()
 		if _active and not (precise and bool(rules.get("precise_free", false))):
 			rule_attacks += 1
@@ -255,6 +261,8 @@ func get_mechanic_lines() -> Array:
 	var lines: Array = []
 	if int(rules.get("offtarget_limit", 0)) > 0:
 		lines.append({"key": "mechanic.selective", "args": [int(rules.offtarget_limit), int(rules.get("offtarget_damage", 3))]})
+	if int(rules.get("enemy_ramp_every", 0)) > 0:
+		lines.append({"key": "mechanic.chronic", "args": [int(rules.enemy_ramp_every)]})
 	var seen := {}
 	for e in enemies:
 		if e.mechanic.is_empty() or seen.has(e.mechanic):
@@ -302,6 +310,7 @@ func get_outcome() -> Dictionary:
 		"intel": intel,
 		"dose": dose,
 		"kind": String(encounter.get("kind", "fight")),
+		"stats": stats.duplicate(),
 	}
 
 
@@ -314,6 +323,7 @@ func _begin_turn() -> void:
 	_dosed_this_turn = false
 	player.block = 0
 	_emit({"t": "turn", "turn": turn})
+	_ramp_enemies()
 	_tick_poison(player, "player", 0)
 	if _check_end():
 		return
@@ -516,8 +526,19 @@ func _check_offtarget() -> void:
 	for e in enemies:
 		if e.is_alive() and e.mechanic == "offtarget" and attacks_this_turn > int(e.data.get("mechanic_value", 3)):
 			_emit({"t": "mechanic", "key": "mechanic.offtarget.trigger", "args": [OFFTARGET_DAMAGE]})
+			stats.backfires += 1
 			_hurt(player, "player", 0, OFFTARGET_DAMAGE, true)
 			return
+
+
+## 慢性项目：每隔 N 回合敌人整体变强一档
+func _ramp_enemies() -> void:
+	var every := int(rules.get("enemy_ramp_every", 0))
+	if every <= 0 or turn <= 1 or (turn - 1) % every != 0:
+		return
+	_emit({"t": "mechanic", "key": "mechanic.chronic.trigger", "args": []})
+	for i in enemies.size():
+		_add_status(enemies[i], "enemy", i, "strength", 1)
 
 
 ## 选择性项目：本回合计入的攻击牌超过上限，每多 1 张反噬一次
@@ -527,13 +548,48 @@ func _check_rule_offtarget() -> void:
 		return
 	var damage := int(rules.get("offtarget_damage", 3))
 	_emit({"t": "mechanic", "key": "mechanic.selective.trigger", "args": [damage]})
+	stats.backfires += 1
 	_hurt(player, "player", 0, damage, true)
 
 
-## 本回合还能放心打出几张不带破绽目标的攻击牌（没有规则时为 -1）
+## 本回合还能打几张不带破绽目标的攻击牌而不触发项目脱靶（没有项目规则时为 -1）
 func rule_attacks_left() -> int:
 	var limit := int(rules.get("offtarget_limit", 0))
 	return maxi(0, limit - rule_attacks) if limit > 0 else -1
+
+
+## Boss「活性悬崖」：本回合还能打几张攻击牌（破绽目标也计数；没有该 Boss 时为 -1）
+func boss_attacks_left() -> int:
+	for e in enemies:
+		if e.is_alive() and e.mechanic == "offtarget":
+			return maxi(0, int(e.data.get("mechanic_value", 3)) - attacks_this_turn)
+	return -1
+
+
+## 界面计数：两种反噬中更紧的那个（都没有时为 -1）
+func safe_attacks_left() -> int:
+	var a := rule_attacks_left()
+	var b := boss_attacks_left()
+	if a < 0:
+		return b
+	return a if b < 0 else mini(a, b)
+
+
+## 打出这张牌会触发的反噬预告 {project, boss, exempt}：project / boss 为掉血量，exempt 表示破绽目标豁免了项目规则
+func backfire_preview(card: ResearchCard, target := -1) -> Dictionary:
+	var result := {"project": 0, "boss": 0, "exempt": false}
+	if card == null or card.kind != "attack":
+		return result
+	var t := _resolve_target(target) if card.target == "enemy" else -1
+	if int(rules.get("offtarget_limit", 0)) > 0:
+		if t >= 0 and enemies[t].get_status("vulnerable") > 0 and bool(rules.get("precise_free", false)):
+			result.exempt = true
+		elif rule_attacks + 1 > int(rules.offtarget_limit):
+			result.project = int(rules.get("offtarget_damage", 3))
+	var left := boss_attacks_left()
+	if left == 0:
+		result.boss = OFFTARGET_DAMAGE
+	return result
 
 
 func _on_type_played(card: ResearchCard) -> void:

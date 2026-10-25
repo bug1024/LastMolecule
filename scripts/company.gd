@@ -1,6 +1,8 @@
 class_name Company
 extends RefCounted
-## 公司资产（跨局保留）：公司数据、流程等级、历史记录。
+## 公司资产（跨局保留）：公司数据、流程等级、历史记录、研究证据与主线战役进度。
+## 研究证据：各类项目获批（或高质量终止）时首次获得，记录来源；集齐足够证据后解锁最终项目 LM-001，
+## 并决定 LM-001 能选哪些研究路线（见 data/projects.json）。
 ## 配置来自 data/company.json；存档写入 user://company.json。
 ## 有效数据 = (本局数据 + min(公司数据 × 迁移率, 上限)) × 数据利用率
 
@@ -16,6 +18,8 @@ var approvals := 0
 var start_funding_bonus := 0  # 下一局开局资金加成（主动终止时结转）
 var history: Array = []       # 最近的项目记录（新的在前），见 settle_run
 var best_years := 0           # 最快获批用时（年），0 表示尚未获批
+var evidence := {}            # 证据 id → {code, project_type, outcome, run}（同一种只记首次）
+var campaign := {}            # 主线战役：{ending, route, code, run}；空表示尚未完成
 
 const HISTORY_LIMIT := 12
 
@@ -37,6 +41,8 @@ func load_save() -> void:
 	start_funding_bonus = int(saved.get("start_funding_bonus", 0))
 	history = saved.get("history", [])
 	best_years = int(saved.get("best_years", 0))
+	evidence = saved.get("evidence", {})
+	campaign = saved.get("campaign", {})
 
 
 func save() -> void:
@@ -50,6 +56,7 @@ func save() -> void:
 		"data": data, "runs": runs, "approvals": approvals,
 		"start_funding_bonus": start_funding_bonus,
 		"history": history, "best_years": best_years,
+		"evidence": evidence, "campaign": campaign,
 	}, "  "))
 
 
@@ -148,7 +155,30 @@ func reset() -> void:
 	start_funding_bonus = 0
 	history = []
 	best_years = 0
+	evidence = {}
+	campaign = {}
 	save()
+
+
+## 记录一项研究证据；已经有了返回 false（不重复奖励）
+func grant_evidence(id: String, source: Dictionary) -> bool:
+	if id.is_empty() or evidence.has(id):
+		return false
+	evidence[id] = source.duplicate()
+	return true
+
+
+func has_evidence(id: String) -> bool:
+	return evidence.has(id)
+
+
+## 最终项目 LM-001 是否已解锁（持有足够的研究证据）
+func final_unlocked() -> bool:
+	return evidence.size() >= int(ProjectTypes.config().get("final_unlock_evidence", 2))
+
+
+func is_campaign_done() -> bool:
+	return not campaign.is_empty()
 
 
 ## 开局领取资金加成（只生效一次）
