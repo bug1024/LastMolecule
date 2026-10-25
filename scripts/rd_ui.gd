@@ -196,7 +196,9 @@ func _on_state_synced(state) -> void:
 	_progress_bar.max_value = _game_logic.get_progress_gate()
 	_progress_bar.value = mini(state.research_progress, _game_logic.get_progress_gate())
 	_success_label.text = tr("ui.efficacy_value") % [state.efficacy, _game_logic.get_final_efficacy_bar()]
-	_safety_label.text = tr("ui.safety_value") % [state.safety_risk, _game_logic.get_final_safety_limit()]
+	_safety_label.text = tr("ui.safety_value") % [state.safety_risk, maxi(0, 100 - state.safety_risk), _game_logic.get_final_safety_limit()]
+	_safety_label.tooltip_text = tr("ui.hp_tip")
+	_safety_label.mouse_filter = Control.MOUSE_FILTER_PASS
 	var ai: Dictionary = _game_logic.get_ai_info()
 	_challenge_label.text = tr("ui.hub_ai_detail") % [ai.effective, tr("tier." + String(ai.tier)), ai.multiplier, ai.deviation,
 		ai.run_data, ai.company_data, ai.level] + "\n" + BattleView.ai_next_text(ai)

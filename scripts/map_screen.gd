@@ -21,6 +21,8 @@ var _game = null
 var _canvas: MapCanvas = null
 var _side_label: RichTextLabel = null
 var _boss_box: HBoxContainer = null
+var _hp_label: Label = null          # 顶栏生命值：生命 = 100 - 安全风险
+var _hp_bar: ProgressBar = null
 
 
 ## 由 rd_ui 注入 GameLogic 并构建地图画布与侧栏
@@ -53,6 +55,30 @@ func bind(game) -> void:
 	_side_label.add_theme_font_size_override("bold_font_size", 15)
 	side.add_child(_side_label)
 	_close_button.pressed.connect(func() -> void: close_requested.emit())
+	_build_hp(_funding_label.get_parent())
+
+
+## 顶栏最前面加「♥ 生命 80/100」和血条：地图上选路时也能看到还剩多少血
+func _build_hp(row: Control) -> void:
+	var box := HBoxContainer.new()
+	box.add_theme_constant_override("separation", 8)
+	box.mouse_filter = Control.MOUSE_FILTER_PASS
+	box.tooltip_text = tr("ui.hp_tip")
+	box.add_child(UIKit.icon_rect("ui_heart", 20, UIKit.DANGER))
+	_hp_label = UIKit.label("", UIKit.TEXT, 16)
+	box.add_child(_hp_label)
+	_hp_bar = ProgressBar.new()
+	_hp_bar.custom_minimum_size = Vector2(150, 14)
+	_hp_bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_hp_bar.show_percentage = false
+	_hp_bar.max_value = 100
+	_hp_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(_hp_bar)
+	var gap := Control.new()
+	gap.custom_minimum_size = Vector2(18, 0)
+	box.add_child(gap)
+	row.add_child(box)
+	row.move_child(box, 0)
 
 
 func show_map() -> void:
@@ -68,6 +94,14 @@ func refresh() -> void:
 	_stage_label.text = tr("ui.stage_key_label") + tr("stage." + map.get_stage())
 	_pos_label.text = tr("ui.map_progress") % [mini(s.research_progress, _game.get_progress_gate()), _game.get_progress_gate()]
 	_funding_label.text = tr("ui.map_funding") % s.funding
+	var hp := maxi(0, 100 - s.safety_risk)
+	_hp_label.text = tr("ui.hp_value") % hp
+	_hp_bar.value = hp
+	var hp_color: Color = UIKit.ACCENT if hp > 60 else (UIKit.GOLD if hp > 30 else UIKit.DANGER)
+	_hp_label.add_theme_color_override("font_color", hp_color.lightened(0.15))
+	_hp_bar.add_theme_stylebox_override("fill", UIKit.filled(hp_color, hp_color, 4))
+	_hp_bar.add_theme_stylebox_override("background", UIKit.filled(Color(0.1, 0.12, 0.16), Color(0.25, 0.3, 0.36), 4))
+	_canvas.rest_heal = _game.get_rest_heal()
 	_year_label.text = tr("ui.year") % s.year
 	_hint_label.text = tr("ui.map_hint_fast") if _game.fast_track else tr("ui.map_hint")
 	var boss: Dictionary = _game.get_boss_info()

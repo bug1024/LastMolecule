@@ -20,6 +20,7 @@ const NODE_META := {
 	"milestone": {"label": "map.type.milestone", "color": Color(0.45, 0.85, 0.95)},
 }
 
+var rest_heal := 25   # 平台建设「安全评估」能回多少血（由地图界面按项目类型设置，显示在节点提示里）
 var _layers: Array = []
 var _path: Array = []
 var _choices: Array = []
@@ -62,7 +63,7 @@ func _build_node(node: Dictionary, layer: int, index: int, center: Vector2, boss
 	if type == "boss":
 		btn.size = Vector2(NODE_SIZE.x + 70, NODE_SIZE.y + 8)
 		btn.position = center - btn.size * 0.5
-	btn.tooltip_text = tr(String(meta.label) + ".tip")
+	btn.tooltip_text = tr(String(meta.label) + ".tip") % [rest_heal, rest_heal] if type == "platform" else tr(String(meta.label) + ".tip")
 	btn.icon = UIKit.icon("node_" + type)
 	btn.add_theme_constant_override("icon_max_width", 20)
 	btn.set_meta("sfx", "node")

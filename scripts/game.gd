@@ -578,8 +578,13 @@ func _offer_partner() -> void:
 		]})
 
 
+## 平台建设「安全评估」降低的安全风险（= 回血量）
+func get_rest_heal() -> int:
+	return int(_project.get("rest_heal", 15))
+
+
 func _offer_platform() -> void:
-	var heal := int(_project.get("rest_heal", 15))
+	var heal := get_rest_heal()
 	_offer_event({"id": "platform", "tag_key": "ui.decision_tag", "title_key": "node.platform", "desc_key": "node.platform.desc", "choices": [
 		{"label_key": "platform.rest", "label_args": [heal], "effects": {"safety_risk": -heal}, "action": ""},
 		{"label_key": "platform.upgrade", "effects": {}, "action": "upgrade"},

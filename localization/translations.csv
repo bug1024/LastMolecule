@@ -259,13 +259,13 @@ map.type.event.tip,随机事件,Random event
 map.type.partner,合作融资,Partner
 map.type.partner.tip,注资、买卡或删卡,"Funding, buy or remove cards"
 map.type.platform,平台建设,Platform
-map.type.platform.tip,安全评估回血、升级一张卡或梳理流程,"Recover safety, upgrade a card or build process"
+map.type.platform.tip,安全评估：生命 +%d（安全风险 -%d）；或者升级一张卡、梳理流程,Safety Review: +%d HP (safety risk -%d); or upgrade a card or build process
 map.type.fast_track,加速通道,Fast Track
 map.type.fast_track.tip,本阶段后续节点不耗时，但 Boss 更强,"Later nodes cost no time this stage, but the boss is stronger"
 map.type.milestone,里程碑,Milestone
 map.type.milestone.tip,继续、重做或终止,"Go, redo or stop"
 ui.efficacy_value,%d（终审门槛 %d）,%d (final bar %d)
-ui.safety_value,%d（终审需 < %d，100 即叫停）,%d (final needs < %d; 100 halts)
+ui.safety_value,%d · 生命 %d/100（终审需 < %d）,%d · HP %d/100 (final needs < %d)
 ui.view_deck,查看牌库,View Deck
 ui.company_intro,公司已做过 %d 个项目（获批 %d 个），累计数据 %d，流程等级 Lv%d。,"The company has run %d projects (%d approved), banked %d data, process level Lv%d."
 ui.map_progress,前期研究 %d / %d（每点削弱 Boss 1%% 生命）,Research %d / %d (each point cuts boss HP by 1%%)
@@ -804,3 +804,5 @@ route.event_tag,立项决策,Launch decision
 chain.final_decision,LM-001 二期决策：%s,LM-001 Phase II decision: %s
 final.data_study,补充分层数据分析,Extra Stratification Analysis
 final.data_study.desc,再做一轮分析补足数据要求（只在数据不够时出现）。,One more analysis round to meet the data requirement (only offered when data falls short).
+ui.hp_value,生命 %d/100,HP %d/100
+ui.hp_tip,生命 = 100 − 安全风险。战斗中挨的打会变成安全风险，普通战斗打完不回血；生命归零（风险到 100）项目就被叫停。\n回血：打赢阶段 Boss、地图上的「平台建设」安全评估、部分事件和研发能力。,"HP = 100 − safety risk. Damage taken in battle becomes safety risk and normal fights don't heal; at 0 HP (risk 100) the program is halted.\nHeal: beat a stage boss, Safety Review at a Platform node, some events and abilities."
