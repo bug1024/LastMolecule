@@ -1,6 +1,8 @@
 class_name CreatureView
 extends Control
 ## 程序绘制的敌人形象：细胞 / 团块 / 尖刺 / 晶体 / 毒云五种形态，带呼吸、眨眼、受击闪白与死亡消散。
+## 另有最终 Boss 专用的 molecule 形态：就是标题页上那颗 LM-001 分子（多环结构 + 金色光环 + 核心里的脸），
+## 受伤时外圈原子逐个熄灭，生命低于一半时转得更快并泛红。
 ## 眼睛朝向左侧（玩家方向）；精英与 Boss 额外画怒眉和獠牙。
 
 var shape := "blob"
@@ -13,6 +15,10 @@ var _time := 0.0
 var _seed := 0.0
 var _blink := 0.0
 var _next_blink := 2.0
+var hp_ratio := 1.0                 # 当前生命比例（molecule 形态用来熄灭原子）
+var _mol_atoms: Array[Vector2] = []  # molecule 形态：单位半径内的原子坐标（外圈在后）
+var _mol_bonds: Array[Vector2i] = []
+var _mol_colors: Array[int] = []
 
 
 func setup(def: Dictionary, boss := false, elite := false) -> void:
@@ -22,6 +28,8 @@ func setup(def: Dictionary, boss := false, elite := false) -> void:
 	menace = 2 if boss else (1 if elite else 0)
 	_seed = float(hash(String(def.get("id", ""))) % 1000) / 100.0
 	custom_minimum_size = Vector2(radius * 2.8, radius * 2.6)
+	if shape == "molecule":
+		_build_molecule()
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
@@ -60,9 +68,14 @@ func _draw() -> void:
 			_draw_cloud(c, r, body, alpha)
 		"cell":
 			_draw_cell(c, r, body, alpha)
+		"molecule":
+			_draw_molecule(c, r, body, alpha)
 		_:
 			_draw_blob(c, r, body, alpha)
-	_draw_face(c + Vector2(-r * 0.12, -r * 0.08), r, alpha)
+	if shape == "molecule":
+		_draw_face(c + Vector2(0, -r * 0.06), r * 0.72, alpha)   # 脸缩小放进分子核心
+	else:
+		_draw_face(c + Vector2(-r * 0.12, -r * 0.08), r, alpha)
 
 
 func _wobble_points(c: Vector2, r: float, amp: float, lobes: int, speed: float) -> PackedVector2Array:
@@ -148,6 +161,75 @@ func _draw_cloud(c: Vector2, r: float, body: Color, alpha: float) -> void:
 		var a := i * 2.4 + _seed
 		var p := c + Vector2(cos(a), sin(a)) * r * (0.6 + t * 0.9) + Vector2(0, -t * r * 0.6)
 		draw_circle(p, r * 0.05 * (1.0 - t), Color(body.lightened(0.4), (1.0 - t) * 0.8 * alpha))
+
+
+## 与标题页 / 总览的 MoleculeArt 同一套多环结构（6 个苯环 + 侧链），归一化到单位半径
+func _build_molecule() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1024
+	var centers := [Vector2.ZERO, Vector2(1.732, 0), Vector2(0.866, 1.5), Vector2(-0.866, 1.5), Vector2(-1.732, 0), Vector2(0.866, -1.5)]
+	var index_of := {}
+	var pts: Array[Vector2] = []
+	for ring in centers:
+		var ids: Array[int] = []
+		for k in 6:
+			var a := PI / 6 + k * TAU / 6
+			var p: Vector2 = ring + Vector2(cos(a), sin(a))
+			var key := Vector2i(roundi(p.x * 100), roundi(p.y * 100))
+			if not index_of.has(key):
+				index_of[key] = pts.size()
+				pts.append(p)
+				_mol_colors.append(0 if rng.randf() < 0.65 else rng.randi_range(1, 4))
+			ids.append(index_of[key])
+		for k in 6:
+			var b := Vector2i(mini(ids[k], ids[(k + 1) % 6]), maxi(ids[k], ids[(k + 1) % 6]))
+			if not _mol_bonds.has(b):
+				_mol_bonds.append(b)
+	var centroid := Vector2.ZERO
+	for p in pts:
+		centroid += p
+	centroid /= pts.size()
+	var extent := 0.0
+	for p in pts:
+		extent = maxf(extent, (p - centroid).length())
+	for p in pts:
+		_mol_atoms.append((p - centroid) / extent)
+
+
+func _draw_molecule(c: Vector2, r: float, body: Color, alpha: float) -> void:
+	var hurt := clampf(1.0 - hp_ratio, 0.0, 1.0)
+	var spin := _time * (0.25 if hp_ratio > 0.5 else 0.6)
+	var tone := body.lerp(Color(1.0, 0.35, 0.35), (0.5 + 0.5 * sin(_time * 5.0)) * 0.6 if hp_ratio <= 0.5 else 0.0)
+	var span := r * 1.25
+	# 金色光环
+	for i in 12:
+		var a := -spin * 0.6 + i * TAU / 12.0
+		draw_arc(c, span * 1.12, a, a + TAU / 24.0, 6, Color(1.0, 0.85, 0.4, 0.6 * alpha), 3.0, true)
+	var pts: Array[Vector2] = []
+	for p in _mol_atoms:
+		pts.append(c + p.rotated(spin) * span * Vector2(1.0, 0.9))
+	# 熄灭顺序：离中心越远越先熄灭
+	var order := range(_mol_atoms.size())
+	order.sort_custom(func(a: int, b: int) -> bool: return _mol_atoms[a].length() > _mol_atoms[b].length())
+	var dark := {}
+	for k in int(round(hurt * order.size() * 0.85)):
+		dark[order[k]] = true
+	for b in _mol_bonds:
+		var lit := not dark.has(b.x) and not dark.has(b.y)
+		draw_line(pts[b.x], pts[b.y], Color(tone, (0.3 if lit else 0.1) * alpha), 10.0, true)
+		draw_line(pts[b.x], pts[b.y], Color(tone.lightened(0.35), (0.9 if lit else 0.25) * alpha), 3.5, true)
+	var palette := [Color(0.95, 0.97, 1.0), Color(0.45, 0.75, 1.0), Color(0.6, 0.48, 0.95), Color(0.95, 0.72, 0.35), Color(0.93, 0.45, 0.45)]
+	for i in pts.size():
+		var col: Color = palette[_mol_colors[i]]
+		if dark.has(i):
+			draw_circle(pts[i], r * 0.07, Color(0.25, 0.27, 0.3, 0.8 * alpha))
+		else:
+			draw_circle(pts[i], r * 0.13, Color(col, 0.2 * alpha))
+			draw_circle(pts[i], r * 0.08, Color(col.lerp(Color.WHITE, flash * 0.8), alpha))
+	# 核心（脸画在这里）
+	draw_circle(c, r * 0.5, Color(0.05, 0.06, 0.09, 0.9 * alpha))
+	draw_circle(c, r * 0.46, Color(tone.darkened(0.35).lerp(Color.WHITE, flash * 0.6), alpha))
+	draw_arc(c, r * 0.5, 0, TAU, 40, Color(1.0, 0.85, 0.4, 0.9 * alpha), 3.0, true)
 
 
 func _draw_face(c: Vector2, r: float, alpha: float) -> void:

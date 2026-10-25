@@ -239,29 +239,62 @@ def write(x, path, peak=0.8):
     print("wrote", os.path.relpath(path), "%.1fs" % (x.shape[1] / SR))
 
 
+# ---------- LM-001 主题 ----------
+# 一段 8 小节的固定旋律（A 小调），不随机生成：标题、最终 Boss、主线结局都用它，只换配器、速度与调式。
+# 每项 (MIDI 音高, 拍数)；每小节 4 拍。
+THEME = [
+    (69, 2), (72, 1), (76, 1),            # 1  A  C  E
+    (74, 3), (72, 1),                     # 2  D— C
+    (71, 1), (72, 1), (74, 1), (76, 1),   # 3  B C D E
+    (69, 4),                              # 4  A———
+    (69, 1), (72, 1), (76, 1), (81, 1),   # 5  A C E A'
+    (79, 2), (76, 1), (74, 1),            # 6  G— E D
+    (72, 1), (74, 1), (71, 2),            # 7  C D B—
+    (69, 4),                              # 8  A———
+]
+# 每小节的和弦（根音, 和弦音）
+THEME_CHORDS = [
+    (45, [57, 60, 64]), (50, [57, 62, 65]), (43, [55, 59, 62]), (45, [57, 60, 64]),
+    (45, [57, 60, 64]), (40, [55, 59, 64]), (41, [57, 60, 65]), (45, [57, 60, 64]),
+]
+
+
+def to_major(m):
+    """A 小调 → A 大调：C→C#、F→F#、G→G#（获批结局用）"""
+    return m + 1 if m % 12 in (0, 5, 7) else m
+
+
+def theme_notes(bars=8, major=False):
+    """返回 [(起始拍, 音高, 拍数)]，只取前 bars 小节"""
+    out, t = [], 0.0
+    for note, beats in THEME:
+        if t >= bars * 4:
+            break
+        out.append((t, to_major(note) if major else note, beats))
+        t += beats
+    return out
+
+
 # ---------- 音乐 ----------
 
 def music_title():
-    """标题：68 BPM，A 小调氛围铺底 + 稀疏钟声"""
+    """标题：68 BPM。LM-001 主题第一次出现——缓慢的电钢琴旋律 + 长音铺底，后半段只剩铺底与零星钟声（循环 16 小节）"""
     beat = 60 / 68
     bar = beat * 4
-    chords = [
-        ([57, 60, 64, 71], 33), ([53, 57, 60, 64], 29), ([55, 60, 64, 71], 31), ([52, 55, 59, 62], 28),
-        ([57, 60, 64, 69], 33), ([50, 57, 60, 64], 26), ([53, 57, 64, 71], 29), ([52, 57, 59, 64], 28),
-    ]
     mix = Mix(bar * 16)
-    hits = [1, 0, 1, 1, 0, 1, 0, 1]
-    for i, (notes, root) in enumerate(chords):
-        start = i * bar * 2
-        mix.add(start, pad(notes, bar * 2, attack=1.4, release=2.0), 0.55, 0.0, 0.5)
-        mix.add(start, bass(root, bar * 2 - 0.1) * 0.6, 0.35, 0.0, 0.1)
-        for b in range(8):
-            if hits[b] and rng.random() < 0.8:
-                note = int(rng.choice(notes)) + 12 * int(rng.choice([1, 1, 2]))
-                mix.add(start + b * beat, bell(note, 0.5 + 0.3 * rng.random()), 0.22, rng.uniform(-0.6, 0.6), 0.7)
-        if i % 2 == 1:
-            mix.add(start + bar + beat * 1.5, bell(notes[-1] + 24, 0.4, 4.0, 4.1), 0.12, 0.7, 0.9)
-    write(mix.render(wet_gain=0.8, rt=3.2), os.path.join(ROOT, "music", "title.ogg"))
+    for rep_i in range(2):
+        for i, (root, notes) in enumerate(THEME_CHORDS):
+            start = (rep_i * 8 + i) * bar
+            mix.add(start, pad(notes, bar, attack=1.2, release=1.8), 0.5, 0.0, 0.5)
+            mix.add(start, bass(root, bar - 0.1) * 0.6, 0.32, 0.0, 0.1)
+    for t, note, beats in theme_notes():
+        mix.add(t * beat, epiano(note, beats * beat * 0.95, 0.85), 0.34, -0.15, 0.55)
+        mix.add(t * beat, bell(note + 12, 0.35, 3.0), 0.08, 0.4, 0.8)
+    # 后 8 小节：主题的回声，只在每小节第一拍敲一下钟
+    for i, (t, note, beats) in enumerate(theme_notes()):
+        if t % 4 == 0:
+            mix.add(bar * 8 + t * beat + beat, bell(note + 12, 0.45, 4.0, 4.1), 0.16, 0.5 - (i % 2), 0.8)
+    write(mix.render(wet_gain=0.85, rt=3.4), os.path.join(ROOT, "music", "title.ogg"))
 
 
 def music_lab():
@@ -271,10 +304,15 @@ def music_lab():
     cycle = [
         ([53, 57, 60, 64], 38), ([53, 57, 59, 62], 43), ([53, 57, 58, 62], 34), ([55, 57, 62, 64], 33),
     ]
-    scale = [62, 65, 67, 69, 72, 74, 77]
     mix = Mix(bar * 16)
     swing = 0.07 * beat
-    melody_idx = 3
+    # 编排好的旋律（D 多利亚，八分音符；None 为休止），后 8 小节循环出现
+    phrase = [
+        [69, None, 72, 74, None, 72, 69, None], [67, None, 69, None, 65, 67, None, None],
+        [69, None, 72, 74, 77, None, 74, 72], [74, None, None, 72, 69, None, None, None],
+        [65, 67, 69, None, 72, None, 69, None], [67, None, 65, None, 62, 65, None, None],
+        [69, 72, None, 74, None, 72, 74, 77], [74, None, None, None, None, None, None, None],
+    ]
     for b in range(16):
         notes, root = cycle[b % 4]
         start = b * bar
@@ -290,11 +328,10 @@ def music_lab():
         for e in range(8):
             mix.add(start + e * beat / 2 + (swing if e % 2 else 0), HAT, 0.12 if e % 2 else 0.08, 0.35, 0.1)
         if b >= 8:
-            for e in range(8):
-                if rng.random() < 0.38:
-                    melody_idx = int(np.clip(melody_idx + rng.choice([-2, -1, 1, 2]), 0, len(scale) - 1))
+            for e, note in enumerate(phrase[b - 8]):
+                if note is not None:
                     mix.add(start + e * beat / 2 + (swing if e % 2 else 0),
-                            pluck(scale[melody_idx], beat * 0.45, 0.9, 1.4), 0.2, rng.uniform(-0.4, 0.4), 0.55)
+                            pluck(note, beat * 0.45, 0.9, 1.4), 0.2, -0.3 + 0.08 * e, 0.55)
     write(mix.render(wet_gain=0.55, rt=2.0), os.path.join(ROOT, "music", "lab.ogg"))
 
 
@@ -360,10 +397,34 @@ def music_boss():
     write(mix.render(wet_gain=0.4, rt=1.4), os.path.join(ROOT, "music", "boss.ogg"))
 
 
+def music_boss_final():
+    """最终 Boss（LM-001）：128 BPM，A 小调。前 8 小节是推进的低音与太鼓，后 8 小节钟声与拨弦齐奏 LM-001 主题"""
+    beat = 60 / 128
+    bar = beat * 4
+    mix = Mix(bar * 16)
+    for rep_i in range(2):
+        for i, (root, notes) in enumerate(THEME_CHORDS):
+            start = (rep_i * 8 + i) * bar
+            mix.add(start, pad([n - 12 for n in notes] + [notes[0]], bar, attack=0.12, release=0.5, bright=7.0), 0.3, 0, 0.35)
+            for e in range(16):
+                if e % 4 != 3:
+                    mix.add(start + e * beat / 4, bass(root + (12 if e % 8 == 6 else 0), beat * 0.2, 1.0), 0.42, 0, 0.03)
+            for q in range(4):
+                mix.add(start + q * beat, KICK, 0.75, 0, 0.05)
+                mix.add(start + q * beat + beat / 2, HAT, 0.12, 0.4, 0.05)
+                mix.add(start + q * beat, SNARE if q % 2 else TAIKO, 0.4 if q % 2 else 0.55, 0, 0.4)
+    for t, note, beats in theme_notes():
+        at = bar * 8 + t * beat
+        mix.add(at, bell(note + 12, 0.85, 2.0, 1.41, 3.5), 0.2, 0.3, 0.55)
+        for k in range(int(beats * 2)):
+            mix.add(at + k * beat / 2, pluck(note, 0.12, 0.85, 2.2), 0.14, -0.3, 0.3)
+    write(mix.render(wet_gain=0.4, rt=1.4), os.path.join(ROOT, "music", "boss_final.ogg"))
+
+
 # ---------- 短乐句 ----------
 
-def sting(name, build):
-    mix = Mix(0.1, tail=9.0)
+def sting(name, build, tail=9.0):
+    mix = Mix(0.1, tail=tail)
     build(mix)
     write(mix.render(loop=False, wet_gain=0.7, rt=2.2), os.path.join(ROOT, "music", name + ".ogg"), 0.75)
 
@@ -396,6 +457,31 @@ def _failed(mix):
     mix.add(0, bass(33, 4.5), 0.4)
     for i, n in enumerate([72, 69, 67, 64, 60]):
         mix.add(0.4 + i * 0.35, bell(n, 0.6, 3.0, 2.0, 1.2), 0.2, 0.4 - i * 0.2, 0.7)
+
+
+def _campaign_approved(mix):
+    """主线获批：LM-001 主题转大调完整奏出（8 小节，90 BPM），结束在 A 大三和弦"""
+    beat = 60 / 90
+    bar = beat * 4
+    major_chords = [(45, [57, 61, 64]), (50, [57, 62, 66]), (40, [56, 59, 64]), (45, [57, 61, 64]),
+                    (45, [57, 61, 64]), (42, [54, 61, 64]), (50, [57, 62, 66]), (45, [57, 61, 64, 69])]
+    for i, (root, notes) in enumerate(major_chords):
+        mix.add(i * bar, pad(notes, bar * (1.6 if i == 7 else 1.0), attack=0.5, release=2.0, bright=6.0), 0.45, 0, 0.55)
+        mix.add(i * bar, bass(root, bar - 0.1), 0.35, 0, 0.1)
+    for t, note, beats in theme_notes(major=True):
+        mix.add(t * beat, epiano(note, beats * beat * 0.95, 0.95), 0.36, -0.1, 0.5)
+        mix.add(t * beat, bell(note + 12, 0.55, 3.0), 0.12, 0.3, 0.7)
+    for i, n in enumerate([81, 85, 88, 93]):
+        mix.add(bar * 7 + beat * 2 + i * 0.12, bell(n, 0.8, 4.0), 0.2, -0.4 + i * 0.25, 0.7)
+
+
+def _campaign_archive(mix):
+    """把答案留下：只用单音钟声安静地奏出主题前 4 小节，停在不解决的 E 上"""
+    beat = 60 / 62
+    mix.add(0, pad([45, 52, 57], beat * 16, attack=2.0, release=3.0, bright=2.5), 0.35, 0, 0.6)
+    for t, note, beats in theme_notes(bars=3):
+        mix.add(t * beat, bell(note, 0.55, 4.0, 2.0, 1.2), 0.24, -0.2, 0.8)
+    mix.add(12 * beat, bell(76, 0.5, 6.0, 2.0, 1.2), 0.22, 0.2, 0.85)
 
 
 def _terminated(mix):
@@ -540,13 +626,18 @@ def make_combat_sfx():
 
 
 if __name__ == "__main__":
+    import sys
     music_title()
     music_lab()
     music_battle()
     music_boss()
+    music_boss_final()
     sting("win", _win)
     sting("lose", _lose)
     sting("approved", _approved)
     sting("failed", _failed)
     sting("terminated", _terminated)
-    make_sfx()
+    sting("campaign_approved", _campaign_approved, tail=27.0)
+    sting("campaign_archive", _campaign_archive, tail=21.0)
+    if "--music-only" not in sys.argv:   # 只改音乐时加 --music-only，音效保持不变
+        make_sfx()

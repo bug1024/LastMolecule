@@ -122,6 +122,7 @@ func _intent_tooltip(enemy: Enemy, damage: int) -> String:
 
 func refresh(enemy: Enemy) -> void:
 	bar.set_values(enemy.hp, enemy.max_hp, enemy.block)
+	creature.hp_ratio = float(enemy.hp) / maxf(1.0, enemy.max_hp)
 	statuses.set_statuses(enemy.statuses)
 
 

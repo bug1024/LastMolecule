@@ -323,6 +323,7 @@ func _on_battle_started(encounter: Dictionary) -> void:
 	_is_boss = kind == "boss"
 	_pending_level = 0
 	_player.form = _game.get_player_level()
+	_player.set_mood("")
 	_player_tag.text = tr("player.tag") % [_game.get_player_level(), tr("player.level.%d" % _game.get_player_level())]
 	_shown_player_hp = _manager.player.hp
 	_title.text = tr("encounter." + String(encounter.get("id", kind))) if kind == "boss" else tr("enemy." + String(_manager.enemies[0].id))
@@ -343,7 +344,8 @@ func _on_battle_started(encounter: Dictionary) -> void:
 	create_tween().tween_property(self, "modulate:a", 1.0, 0.3)
 	_layout()
 	_refresh_all(true)
-	GameAudio.music("boss" if kind == "boss" else "battle")
+	# 最终 Boss（LM-001）用专属曲：LM-001 主题的战斗版
+	GameAudio.music("boss_final" if String(encounter.get("id", "")) == "boss_final" else ("boss" if kind == "boss" else "battle"))
 	await _intro_banner(kind)
 	if token != _battle_token:
 		return
@@ -526,6 +528,8 @@ func _set_bar(side: String, index: int, hp: int, block: int) -> void:
 	elif index < _enemy_widgets.size():
 		var bar := _enemy_widgets[index].bar
 		bar.set_values(hp if hp >= 0 else bar.value, _manager.enemies[index].max_hp, block)
+		if hp >= 0:
+			_enemy_widgets[index].creature.hp_ratio = float(hp) / maxf(1.0, _manager.enemies[index].max_hp)
 
 
 func _play_enemy_move(index: int, move: Dictionary) -> void:
@@ -719,6 +723,8 @@ func _cancel_target() -> void:
 
 
 func _set_targeting(on: bool) -> void:
+	if _player and _player.mood != "sad":
+		_player.set_mood("focus" if on else "")   # 选目标时烧瓶专注地看着
 	for ew in _enemy_widgets:
 		ew.targetable = on and _manager.enemies[ew.index].is_alive()
 	_arrow.queue_redraw()
@@ -917,6 +923,8 @@ func _show_end() -> void:
 	_hand_cards.clear()
 	if _victory:
 		GameAudio.sting("win")
+		_player.set_mood("")
+		_player.react("happy", 3.0)
 		await _show_banner(tr("battle.banner.victory"), tr("battle.banner.victory_sub"), Color(0.5, 1.0, 0.7), 0.0, true)
 		if _pending_level > 0:
 			await _wait(0.6)
@@ -924,6 +932,7 @@ func _show_end() -> void:
 		_continue.text = tr("battle.claim")
 	else:
 		GameAudio.sting("lose")
+		_player.set_mood("sad")
 		await _show_banner(tr("battle.banner.defeat"), tr("battle.banner.defeat_sub"), Color(1.0, 0.45, 0.45), 0.0, true)
 		_continue.text = tr("battle.continue")
 	_continue.visible = true

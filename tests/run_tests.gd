@@ -57,6 +57,7 @@ func _run() -> void:
 	_test_build_cards()
 	_test_final_checklist()
 	await _test_status_wording()
+	_test_avatar_faces()
 	_test_upgrade_preview()
 	_test_run_save()
 	_test_card_roles()
@@ -532,6 +533,24 @@ func _test_campaign_end_to_end() -> void:
 		"E2E: the second ending's chain uses the second run's route")
 	co.reset()
 	Company.default_save_path = ""
+
+
+## 烧瓶表情优先级：短暂反应 > 持续状态 > 按生命自动（低于 30% 担心）
+func _test_avatar_faces() -> void:
+	var a := PlayerAvatar.new()
+	a.ratio = 0.9
+	_expect(a.face() == "idle", "Healthy flask looks calm")
+	a.ratio = 0.2
+	_expect(a.face() == "worried", "Low HP makes the flask worried")
+	a.set_mood("focus")
+	_expect(a.face() == "focus", "A mood overrides the automatic face")
+	a.hit()
+	_expect(a.face() == "hurt", "A hit reaction overrides the mood")
+	a.free()
+	var c := CreatureView.new()
+	c.setup({"id": "last_molecule", "shape": "molecule", "size": 1.7}, true)
+	_expect(c._mol_atoms.size() >= 20 and c._mol_bonds.size() > c._mol_atoms.size(), "The final boss is built from the LM-001 ring structure")
+	c.free()
 
 
 ## 状态文案归因：门槛提高按来源描述；主动终止的主线结局在标题页不显示为获批

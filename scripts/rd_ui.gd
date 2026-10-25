@@ -362,5 +362,7 @@ func _on_run_ended(outcome: String, reason_key: String, summary: Dictionary) -> 
 	# 战斗中落败时，先让玩家看完战斗结果，点「继续」后再显示结局
 	_show_or_queue(func() -> void:
 		GameAudio.music("")
-		GameAudio.sting(outcome)
+		# 主线结局用 LM-001 主题：获批是大调完整版，「把答案留下」是安静的单音版
+		var campaign := String(summary.get("campaign_ending", ""))
+		GameAudio.sting(outcome if campaign.is_empty() else ("campaign_archive" if campaign == "leave_answer" else "campaign_approved"))
 		_ending.show_ending(outcome, reason_key, summary, _game_logic.get_state()))

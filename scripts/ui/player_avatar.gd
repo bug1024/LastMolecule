@@ -4,6 +4,8 @@ extends Control
 ##   1 小烧瓶 → 2 锥形瓶 → 3 反应装置（铁架台 + 侧管）→ 4 自动化工作站（机械臂）→ 5 智能实验室（光环 + 环绕分子）
 ## 液面高度 = 生命比例，颜色随生命从绿到红；带气泡、液面波动、受击闪白与升级闪光。
 ## 脚下是绿色光圈，与敌人的红色调区分。
+## 表情与反应：平时会眨眼；受击皱眉后缩（hurt）；打赢开心跳跃（happy）；生命低于 30% 担心冒汗（worried）；
+## 选目标时专注（focus）；失败垂头流泪（sad）。react() 是短暂反应，set_mood() 是持续状态。
 
 var ratio := 1.0
 var flash := 0.0
@@ -13,6 +15,11 @@ var form := 1:
 		form = clampi(value, 1, 5)
 		queue_redraw()
 var glow_burst := 0.0     # 升级闪光 0..1
+var mood := ""            # 持续表情：focus / sad；空为按生命自动（idle / worried）
+var _react := ""          # 短暂反应：hurt / happy
+var _react_t := 0.0
+var _blink := 0.0
+var _next_blink := 2.5
 var _time := 0.0
 var _bubbles: Array = []
 
@@ -28,16 +35,43 @@ func _ready() -> void:
 
 func hit() -> void:
 	flash = 1.0
+	react("hurt", 0.7)
 
 
 func level_up() -> void:
 	glow_burst = 1.0
+	react("happy", 1.8)
+
+
+## 短暂表情反应（会自动恢复）
+func react(kind: String, duration := 0.8) -> void:
+	_react = kind
+	_react_t = duration
+
+
+func set_mood(kind: String) -> void:
+	mood = kind
+
+
+## 当前表情：短暂反应 > 持续状态 > 按生命自动
+func face() -> String:
+	if _react_t > 0.0:
+		return _react
+	if not mood.is_empty():
+		return mood
+	return "worried" if ratio < 0.3 else "idle"
 
 
 func _process(delta: float) -> void:
 	_time += delta
 	flash = maxf(0.0, flash - delta * 4.0)
 	glow_burst = maxf(0.0, glow_burst - delta * 0.6)
+	_react_t = maxf(0.0, _react_t - delta)
+	_next_blink -= delta
+	if _next_blink <= 0.0:
+		_blink = 1.0
+		_next_blink = randf_range(2.2, 4.5)
+	_blink = maxf(0.0, _blink - delta * 7.0)
 	for i in _bubbles.size():
 		var b: Vector3 = _bubbles[i]
 		b.y -= delta * b.z
@@ -57,6 +91,9 @@ func _draw() -> void:
 	var base := Vector2(size.x * 0.5, size.y * 0.88)
 	var r := minf(size.x, size.y) * 0.3 * grow
 	var liquid := _liquid_color()
+	if face() == "sad":
+		liquid = liquid.lerp(Color(0.45, 0.5, 0.6), 0.5)
+	_apply_pose(base)
 	var glass := Color(0.78, 0.95, 1.0, 0.9).lerp(Color.WHITE, flash)
 	if form >= 5:
 		glass = glass.lerp(Color(1.0, 0.88, 0.5), 0.35)
@@ -86,6 +123,27 @@ func _draw() -> void:
 	if form >= 3:
 		_draw_side_tube(base, r, glass, liquid)
 	_draw_face(base + Vector2(0, -r * 0.62), r)
+	draw_set_transform(Vector2.ZERO)
+
+
+## 整体姿态：受击后缩抖动、开心跳跃、失败下沉、担心发抖（以脚底为基点缩放）
+func _apply_pose(base: Vector2) -> void:
+	var offset := Vector2.ZERO
+	var scale_v := Vector2.ONE
+	match face():
+		"hurt":
+			var k := clampf(_react_t / 0.7, 0.0, 1.0)
+			offset = Vector2(sin(_time * 55.0) * 5.0 * k - 6.0 * k, 0)
+			scale_v = Vector2(1.0 + 0.08 * k, 1.0 - 0.08 * k)
+		"happy":
+			offset = Vector2(0, -absf(sin(_time * 7.0)) * 12.0)
+			scale_v = Vector2(1.0 - 0.03 * absf(cos(_time * 7.0)), 1.0 + 0.03 * absf(cos(_time * 7.0)))
+		"sad":
+			offset = Vector2(0, 4)
+			scale_v = Vector2(1.03, 0.95)
+		"worried":
+			offset = Vector2(sin(_time * 30.0) * 1.2, 0)
+	draw_set_transform(base * (Vector2.ONE - scale_v) + offset, 0.0, scale_v)
 
 
 ## 瓶身轮廓：1 圆底烧瓶，2+ 锥形瓶（越高级越宽）
@@ -143,18 +201,59 @@ func _draw_liquid(body: PackedVector2Array, base: Vector2, r: float, liquid: Col
 
 func _draw_face(c: Vector2, r: float) -> void:
 	var ink := Color(0.06, 0.08, 0.1)
+	var f := face()
+	var eye_dx := r * 0.24
+	var look := Vector2(r * 0.04, -r * 0.05) if f == "focus" else Vector2.ZERO
 	for side in [-1, 1]:
-		var e := c + Vector2(side * r * 0.24, 0)
-		draw_circle(e, r * 0.09, ink)
-		draw_circle(e + Vector2(r * 0.03, -r * 0.03), r * 0.035, Color.WHITE)
-		if form >= 4:
+		var e := c + Vector2(side * eye_dx, 0)
+		match f:
+			"hurt":   # 「> <」紧闭
+				draw_polyline(PackedVector2Array([e + Vector2(side * r * 0.08, -r * 0.07), e + Vector2(-side * r * 0.06, 0), e + Vector2(side * r * 0.08, r * 0.07)]), ink, 3.0, true)
+			"happy":  # 「^ ^」眯眼笑
+				draw_arc(e + Vector2(0, r * 0.04), r * 0.09, PI * 1.1, PI * 1.9, 8, ink, 3.0, true)
+			_:
+				if _blink > 0.5 and f != "sad":
+					draw_line(e - Vector2(r * 0.08, 0), e + Vector2(r * 0.08, 0), ink, 3.0, true)
+				else:
+					var drop := Vector2(0, r * 0.05) if f == "sad" else Vector2.ZERO
+					draw_circle(e + drop + look, r * 0.09, ink)
+					draw_circle(e + drop + look + Vector2(r * 0.03, -r * 0.03), r * 0.035, Color.WHITE)
+		if f in ["worried", "sad"]:   # 八字眉
+			draw_line(e + Vector2(-side * r * 0.1, -r * 0.21), e + Vector2(side * r * 0.1, -r * 0.13), ink, 2.5, true)   # 内侧高、外侧低
+		elif f == "focus":            # 认真的平眉
+			draw_line(e + Vector2(-r * 0.1, -r * 0.17), e + Vector2(r * 0.1, -r * 0.17), ink, 2.5, true)
+		if form >= 4 and f != "hurt" and f != "happy":
 			draw_arc(e, r * 0.14, PI * 1.1, PI * 1.9, 8, Color(0.4, 0.9, 1.0, 0.8), 2.0, true)
-	if ratio > 0.4:
-		draw_arc(c + Vector2(0, r * 0.1), r * 0.14, PI * 0.15, PI * 0.85, 12, ink, 3.0, true)
-	else:
-		draw_arc(c + Vector2(0, r * 0.28), r * 0.14, PI * 1.15, PI * 1.85, 12, ink, 3.0, true)
-	draw_circle(c + Vector2(-r * 0.4, r * 0.08), r * 0.06, Color(1.0, 0.5, 0.55, 0.45))
-	draw_circle(c + Vector2(r * 0.4, r * 0.08), r * 0.06, Color(1.0, 0.5, 0.55, 0.45))
+	var mouth := c + Vector2(0, r * 0.18)
+	match f:
+		"happy":
+			var pts := PackedVector2Array()
+			for i in 13:
+				var a := PI * i / 12.0
+				pts.append(mouth + Vector2(cos(a) * r * 0.17, sin(a) * r * 0.14 - r * 0.04))
+			draw_colored_polygon(pts, ink)
+			draw_circle(mouth + Vector2(0, r * 0.05), r * 0.06, Color(1.0, 0.5, 0.55))
+		"hurt":
+			var wave := PackedVector2Array()
+			for i in 7:
+				wave.append(mouth + Vector2(-r * 0.14 + i * r * 0.047, (r * 0.03 if i % 2 == 0 else -r * 0.03)))
+			draw_polyline(wave, ink, 2.5, true)
+		"sad":
+			draw_arc(mouth + Vector2(0, r * 0.12), r * 0.13, PI * 1.15, PI * 1.85, 12, ink, 3.0, true)
+			var tear := c + Vector2(-eye_dx, r * 0.16 + fmod(_time * 0.6, 1.0) * r * 0.3)
+			draw_circle(tear, r * 0.045, Color(0.55, 0.8, 1.0, 0.85))
+		"worried":
+			draw_circle(mouth, r * 0.06, ink)
+			var sweat := c + Vector2(r * 0.52, -r * 0.18 + fmod(_time * 0.5, 1.0) * r * 0.25)
+			draw_colored_polygon(PackedVector2Array([sweat + Vector2(0, -r * 0.09), sweat + Vector2(r * 0.05, 0), sweat + Vector2(-r * 0.05, 0)]), Color(0.6, 0.85, 1.0, 0.9))
+			draw_circle(sweat + Vector2(0, r * 0.01), r * 0.05, Color(0.6, 0.85, 1.0, 0.9))
+		"focus":
+			draw_line(mouth + Vector2(-r * 0.08, 0), mouth + Vector2(r * 0.08, 0), ink, 3.0, true)
+		_:
+			draw_arc(mouth + Vector2(0, -r * 0.08), r * 0.14, PI * 0.15, PI * 0.85, 12, ink, 3.0, true)
+	if f != "sad":
+		draw_circle(c + Vector2(-r * 0.4, r * 0.08), r * 0.06, Color(1.0, 0.5, 0.55, 0.45 if f != "happy" else 0.7))
+		draw_circle(c + Vector2(r * 0.4, r * 0.08), r * 0.06, Color(1.0, 0.5, 0.55, 0.45 if f != "happy" else 0.7))
 
 
 ## Lv3+：铁架台
