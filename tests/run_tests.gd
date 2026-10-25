@@ -55,6 +55,7 @@ func _run() -> void:
 	_test_evidence_and_campaign()
 	_test_campaign_end_to_end()
 	_test_build_cards()
+	_test_final_checklist()
 	_test_upgrade_preview()
 	_test_run_save()
 	_test_card_roles()
@@ -530,6 +531,27 @@ func _test_campaign_end_to_end() -> void:
 		"E2E: the second ending's chain uses the second run's route")
 	co.reset()
 	Company.default_save_path = ""
+
+
+## 终审目标清单：与终审提交条件一致，数据要求出现时多一行
+func _test_final_checklist() -> void:
+	var g := _new_game(31)
+	g.state.efficacy = 72
+	g.state.safety_risk = 42
+	var items: Array = g.get_final_checklist()
+	_expect(items.size() == 2 and bool(items[0].ok) and bool(items[1].ok), "Checklist: efficacy and safety met, no data row without a requirement")
+	g.run_flags["final_data_min"] = 60
+	g.state.data = 48
+	items = g.get_final_checklist()
+	_expect(items.size() == 3 and String(items[2].id) == "data" and not bool(items[2].ok) and int(items[2].gap) == 12,
+		"Checklist: a data requirement adds a row with the gap")
+	g.state.safety_risk = 70
+	_expect(not bool(g.get_final_checklist()[1].ok) and int(g.get_final_checklist()[1].gap) == 1, "Checklist: safety must be strictly below the limit")
+	var card := InfoCard.new("outcome_approved", "goal.title", UIKit.ACCENT)
+	HubView.fill_goal_card(card, g.get_final_checklist())
+	_expect(card._name_label.text.contains("1/3"), "Goal card title summarizes how many conditions are met")
+	card.free()
+	g.free()
 
 
 ## v0.4 构筑卡：防守反击 / 护盾翻倍 / 护盾保留 / 数据驱动伤害 / 数据增幅；阶段卡池；牌组套路判断

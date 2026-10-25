@@ -194,7 +194,7 @@ func _on_state_synced(state) -> void:
 	_pipeline.set_stages(stages, maxi(stages.find(state.stage), 0))
 	var company: Company = _game_logic.company
 	_company_label.text = tr("ui.hub_company") % [company.runs + 1, company.process_level()]
-	_hub.refresh(_game_logic, _map_screen.competition_text())
+	_hub.refresh(_game_logic, _map_screen.competition_summary(), _map_screen.competition_text())
 
 
 func _on_state_changed(deltas: Dictionary) -> void:

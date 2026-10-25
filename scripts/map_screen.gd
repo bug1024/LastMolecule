@@ -20,6 +20,7 @@ signal close_requested()
 
 var _game = null
 var _canvas: MapCanvas = null
+var _goal_card: InfoCard = null
 var _competition_card: InfoCard = null
 var _ai_card: InfoCard = null
 var _boss_box: HBoxContainer = null
@@ -50,6 +51,9 @@ func bind(game) -> void:
 	boss_panel.add_child(_boss_box)
 	side.add_child(boss_panel)
 	side.custom_minimum_size = Vector2(320, 0)
+	_goal_card = InfoCard.new("outcome_approved", "goal.title", UIKit.ACCENT)
+	_goal_card.pin()
+	side.add_child(_goal_card)
 	_competition_card = InfoCard.new("node_event", "ui.competition_title", UIKit.GOLD)
 	_ai_card = InfoCard.new("type_ai", "ui.ai_title", UIKit.ACCENT_BLUE)
 	side.add_child(_competition_card)
@@ -143,7 +147,8 @@ func refresh() -> void:
 	var boss_title := tr("encounter." + String(boss.get("id", "")))
 	_canvas.set_map(map.get_layers(), map.path, map.get_choices(), _game.is_idle(), boss_title)
 	_fill_boss(boss, boss_title)
-	_competition_card.set_content(tr("ui.final_bar") % [_game.get_final_efficacy_bar(), _game.get_final_safety_limit()], competition_text())
+	_competition_card.set_content(competition_summary(), competition_text())
+	HubView.fill_goal_card(_goal_card, _game.get_final_checklist())
 	var ai: Dictionary = _game.get_ai_info()
 	_ai_card.set_content(tr("hub.ai_summary") % [tr("tier." + String(ai.tier)), ai.multiplier, ai.deviation], _ai_text(ai))
 
@@ -183,6 +188,33 @@ func _ai_text(ai: Dictionary) -> String:
 
 
 ## 竞品状态、终审门槛与最新动态（BBCode），主界面右栏也复用
+## 竞争格局一行摘要：有竞品获批时说明门槛被抬高；否则是跑得最快的在研竞品
+func competition_summary() -> String:
+	if _game == null:
+		return ""
+	var comp: Competition = _game.competition
+	if comp.efficacy_bar_bonus > 0:
+		var approved := comp.competitors.filter(func(c: Dictionary) -> bool: return String(c.status) == "approved")
+		var rival: String = _short_name(String(approved[0].name_key)) if not approved.is_empty() else ""
+		return tr("comp.approved") % [rival, comp.efficacy_bar_bonus]
+	var leader: Dictionary = {}
+	for c in comp.competitors:
+		if String(c.status) == "active" and (leader.is_empty() or int(c.stage) > int(leader.stage)):
+			leader = c
+	if leader.is_empty():
+		return tr("comp.none")
+	return tr("comp.leader") % [_short_name(String(leader.name_key)), tr("stage_index." + str(leader.stage))]
+
+
+## 摘要里用短名「竞品 A」（去掉括号里的类型说明，展开后再看全名）
+func _short_name(key: String) -> String:
+	var full := tr(key)
+	for mark in ["（", " ("]:
+		if full.contains(mark):
+			return full.left(full.find(mark))
+	return full
+
+
 func competition_text() -> String:
 	if _game == null:
 		return ""
@@ -194,7 +226,6 @@ func competition_text() -> String:
 		if comp.intel_revealed and status == "active":
 			text += tr("ui.competitor_forecast") % comp.forecast_years(c)
 		lines.append("· " + text)
-	lines.append(tr("ui.final_bar") % [_game.get_final_efficacy_bar(), _game.get_final_safety_limit()])
 	if comp.finance_mod != 0:
 		lines.append(tr("ui.finance_mod") % comp.finance_mod)
 	if not comp.news.is_empty():

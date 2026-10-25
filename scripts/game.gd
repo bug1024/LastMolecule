@@ -437,6 +437,21 @@ func get_final_safety_limit() -> int:
 	return int(_project.get("final_review", {}).get("safety_risk_below", 70)) + int(run_flags.get("final_safety_bonus", 0))
 
 
+## 终审目标清单（总览与地图常驻显示，和终审弹窗的提交条件一致）：
+## [{id: efficacy / safety / data, current, need, ok, gap}]；安全风险是「低于 need」，其余是「达到 need」
+func get_final_checklist() -> Array:
+	var items: Array = []
+	var bar := get_final_efficacy_bar()
+	items.append({"id": "efficacy", "current": state.efficacy, "need": bar, "ok": state.efficacy >= bar, "gap": maxi(0, bar - state.efficacy)})
+	var limit := get_final_safety_limit()
+	items.append({"id": "safety", "current": state.safety_risk, "need": limit, "ok": state.safety_risk < limit,
+		"gap": maxi(0, state.safety_risk - limit + 1)})
+	if get_final_data_min() > 0:
+		var need := get_final_data_min()
+		items.append({"id": "data", "current": state.data, "need": need, "ok": state.data >= need, "gap": maxi(0, need - state.data)})
+	return items
+
+
 ## 终审额外要求的本局数据（精准分层等决策带来，0 表示没有）
 func get_final_data_min() -> int:
 	return int(run_flags.get("final_data_min", 0))

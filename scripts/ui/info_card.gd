@@ -2,6 +2,7 @@ class_name InfoCard
 extends PanelContainer
 ## 研发总览右侧的可展开小卡片：平时只显示「图标 + 标题 + 一行摘要」，点一下展开完整说明。
 ## detail 支持 BBCode（竞争格局里有新闻配色）。
+## pinned 模式（终审目标用）：不能折叠，正文常驻显示，标题后可加汇总（如「2/3 达标」）。
 
 var expanded := false
 var _summary: Label
@@ -10,6 +11,8 @@ var _arrow: Label
 var _accent := UIKit.ACCENT
 var _title_key := ""
 var _name_label: Label
+var _suffix := ""
+var pinned := false
 
 
 ## title_key 为标题的翻译键（切换语言后 set_content 会重新翻译）
@@ -23,11 +26,11 @@ func _init(icon_name: String, title_key: String, accent: Color) -> void:
 	for side in ["left", "right"]:
 		margin.add_theme_constant_override("margin_" + side, 12)
 	for side in ["top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 8)
+		margin.add_theme_constant_override("margin_" + side, 5)
 	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(margin)
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 4)
+	box.add_theme_constant_override("separation", 2)
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	margin.add_child(box)
 	var head := HBoxContainer.new()
@@ -49,7 +52,7 @@ func _init(icon_name: String, title_key: String, accent: Color) -> void:
 	for node in [_name_label, _arrow, _summary, _detail]:
 		node.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	gui_input.connect(func(event: InputEvent) -> void:
-		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		if not pinned and event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			GameAudio.sfx("click")
 			set_expanded(not expanded))
 	mouse_entered.connect(func() -> void: _restyle(true))
@@ -57,9 +60,22 @@ func _init(icon_name: String, title_key: String, accent: Color) -> void:
 
 
 func set_content(summary: String, detail: String) -> void:
-	_name_label.text = tr(_title_key)
+	_name_label.text = tr(_title_key) + (" · " + _suffix if not _suffix.is_empty() else "")
 	_summary.text = summary
+	_summary.visible = not summary.is_empty()
 	_detail.text = detail
+
+
+## 固定展开的卡片：没有折叠箭头，正文（BBCode）常驻
+func pin() -> void:
+	pinned = true
+	mouse_default_cursor_shape = Control.CURSOR_ARROW
+	_arrow.visible = false
+	set_expanded(true)
+
+
+func set_title_suffix(text: String) -> void:
+	_suffix = text
 
 
 func set_expanded(on: bool) -> void:

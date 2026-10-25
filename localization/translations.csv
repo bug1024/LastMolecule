@@ -843,3 +843,12 @@ hub.abilities_empty,暂无,None yet
 hero.shelved,搁置中 · 研究证据 %d / %d,Shelved · research evidence %d / %d
 hero.unlocked,证据已集齐：可以重启它了,Evidence complete: it can be restarted
 hero.done,已获批 · %s,Approved · %s
+goal.title,终审目标,Final Review
+goal.summary,%d/%d 达标,%d/%d met
+goal.efficacy,疗效,Efficacy
+goal.safety,安全风险,Safety risk
+goal.data,本局数据,Run data
+goal.gap,差 %d,short %d
+comp.leader,领先：%s · %s,Leader: %s · %s
+comp.approved,%s 已获批，终审疗效门槛 +%d,%s approved: efficacy bar +%d
+comp.none,暂无在研竞品,No active rivals

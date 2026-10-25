@@ -22,6 +22,7 @@ var progress_bar: ProgressBar
 var event_label: Label
 var advance_button: Button
 var challenge_button: Button
+var goal_card: InfoCard
 var ai_card: InfoCard
 var abilities_card: InfoCard
 var competition_card: InfoCard
@@ -101,8 +102,11 @@ func _build() -> void:
 	progress_bar = prog[1]
 
 	_cards = VBoxContainer.new()
-	_cards.add_theme_constant_override("separation", 8)
+	_cards.add_theme_constant_override("separation", 6)
 	add_child(_cards)
+	goal_card = InfoCard.new("outcome_approved", "goal.title", UIKit.ACCENT)
+	goal_card.pin()
+	_cards.add_child(goal_card)
 	ai_card = InfoCard.new("type_ai", "ui.hub_ai", UIKit.ACCENT_BLUE)
 	abilities_card = InfoCard.new("role_power", "ui.hub_abilities", Color(0.75, 0.55, 1.0))
 	competition_card = InfoCard.new("node_event", "ui.competition_title", UIKit.GOLD)
@@ -168,7 +172,7 @@ func _layout() -> void:
 	var plate: Control = _bench_panel.get_node("Plate")
 	plate.position = Vector2(w * 0.3 - 110, 6)
 	plate.size = Vector2(220, 0)
-	var msg_w := w - (w * 0.3 + 130) - CARDS_W * 0.3
+	var msg_w := (w - CARDS_W - 28) - (w * 0.3 + 130)   # 右侧卡片列可能伸到台面，消息不压到它
 	var msg: Control = _bench_panel.get_node("Message")
 	event_label.custom_minimum_size = Vector2(msg_w, 0)
 	msg.position = Vector2(w * 0.3 + 130, 4)
@@ -180,8 +184,23 @@ func _layout() -> void:
 	queue_redraw()
 
 
-## 状态全部从 game 读：rd_ui 在状态同步时调用（竞争格局全文由地图界面生成后传入）
-func refresh(game, competition_text: String) -> void:
+## 终审目标卡：每个条件一行，达标打勾、不达标写差多少；标题后汇总「n/m 达标」
+static func fill_goal_card(card: InfoCard, items: Array) -> void:
+	var t := TranslationServer
+	var lines: Array[String] = []
+	var met := 0
+	for item in items:
+		var ok := bool(item.ok)
+		met += 1 if ok else 0
+		var need := ("< %d" % int(item.need)) if item.id == "safety" else str(int(item.need))
+		var mark := "[color=#5ad99a]✓[/color]" if ok else "[color=#ff8a80]%s[/color]" % (t.translate("goal.gap") % int(item.gap))
+		lines.append("%s　[b]%d[/b] / %s　%s" % [t.translate("goal." + String(item.id)), int(item.current), need, mark])
+	card.set_title_suffix(t.translate("goal.summary") % [met, items.size()])
+	card.set_content("", "\n".join(lines))
+
+
+## 状态全部从 game 读：rd_ui 在状态同步时调用（竞争格局的摘要与全文由地图界面生成后传入）
+func refresh(game, competition_summary: String, competition_text: String) -> void:
 	var state: ProjectState = game.get_state()
 	stage_label.text = tr("stage." + state.stage)
 	_tint = BattleView.STAGE_TINT.get(state.stage, Color(0.2, 0.5, 0.5))
@@ -227,8 +246,8 @@ func refresh(game, competition_text: String) -> void:
 		names.append("· " + tr(String(game.get_ability_by_id(String(ability_id)).get("name_key", String(ability_id)))))
 	abilities_card.set_content(tr("hub.abilities_summary") % names.size() if not names.is_empty() else tr("hub.abilities_empty"),
 		"\n".join(names) if not names.is_empty() else tr("ui.hub_abilities_none"))
-	competition_card.set_content(tr("ui.final_bar") % [game.get_final_efficacy_bar(), game.get_final_safety_limit()],
-		competition_text)
+	competition_card.set_content(competition_summary, competition_text)
+	fill_goal_card(goal_card, game.get_final_checklist())
 	queue_redraw()
 
 
