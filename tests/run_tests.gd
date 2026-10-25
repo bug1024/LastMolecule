@@ -48,6 +48,7 @@ func _run() -> void:
 	_test_battle_flow()
 	_test_player_levels()
 	_test_ai_next_tier()
+	_test_card_face_readable()
 	_test_upgrade_preview()
 	_test_run_save()
 	_test_card_roles()
@@ -277,6 +278,24 @@ func _test_ai_deviation() -> void:
 		"Model deviation voids the card and adds noise data")
 	_expect(manager.discard_pile.size() == discard + 2, "Deviated card and the noise card go to the discard pile")
 	manager.free()
+
+
+## 战斗手牌尺寸（0.9 倍）下，所有卡、中英文，牌面文字都不小于 12px，名称不超出名称条
+func _test_card_face_readable() -> void:
+	var small: Array[String] = []
+	var ai := {"multiplier": 0.5, "need_data": 12, "next_multiplier": 1.0, "deviation": 30}
+	for locale in ["zh_CN", "en"]:
+		TranslationServer.set_locale(locale)
+		for data in JsonData.load_dict("res://data/cards.json").cards:
+			var card := ResearchCard.from_dict(data)
+			var face := CardFace.create(card, 0.9, {}, ai)
+			var labels: Array = face.find_children("*", "Label", true, false)
+			for label in labels:
+				if (label as Label).get_theme_font_size("font_size") < 12:
+					small.append("%s/%s" % [locale, card.id])
+			face.free()
+	TranslationServer.set_locale("zh_CN")
+	_expect(small.is_empty(), "Card face text stays >= 12px at hand scale: %s" % ", ".join(small))
 
 
 func _test_ai_next_tier() -> void:

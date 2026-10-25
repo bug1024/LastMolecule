@@ -32,6 +32,7 @@ func show_cards(cards: Array, purpose: String, cost: int, funding: int, ai_info:
 		_hint_label.text = tr("ui.pick.view.hint") % cards.size()
 	else:
 		_hint_label.text = tr("ui.pick.%s.hint" % purpose) + (tr("ui.pick.cost") % cost if cost > 0 else "")
+	_hint_label.text += "  ·  " + tr("ui.card_detail.tip")
 	_skip_button.text = tr("ui.pick.%s.skip" % purpose)
 	for child in _card_row.get_children():
 		child.queue_free()
@@ -60,7 +61,8 @@ func _upgrade_option(card: ResearchCard, card_scale: float, ai_info: Dictionary)
 	var mods := {"compare_to": card}
 	if card.is_ai():
 		mods["ai_multiplier"] = 1.0
-	var face := CardFace.create(card.upgrade_preview, card_scale, mods, ai_info)
+	# AI 卡按基础数值比较，所以不显示当前倍率小牌子
+	var face := CardFace.create(card.upgrade_preview, card_scale, mods, {} if card.is_ai() else ai_info)
 	face.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	face.mouse_entered.connect(func() -> void: face.set_state(true, false, face.dimmed))
 	face.mouse_exited.connect(func() -> void: face.set_state(false, false, face.dimmed))

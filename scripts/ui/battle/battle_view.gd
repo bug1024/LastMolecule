@@ -611,13 +611,13 @@ func _layout_hand(instant := false) -> void:
 	var card_w := CardFace.BASE.x * CARD_SCALE
 	var spacing := minf(card_w * 0.95, 820.0 / n)
 	var center_x := size.x * 0.5
-	var base_y := size.y - CardFace.BASE.y * CARD_SCALE - 6
+	var base_y := size.y - CardFace.BASE.y * CARD_SCALE - 14   # 留出余量，扇形两端的牌底部关键词也不出屏
 	var hover_i := cards.find(_hover_card if _selected == null else _selected)
 	for i in n:
 		var face: CardFace = _faces[cards[i]]
 		var offset := i - (n - 1) * 0.5
 		var x := center_x + offset * spacing - card_w * 0.5
-		var y := base_y + absf(offset) * absf(offset) * 3.0
+		var y := base_y + absf(offset) * absf(offset) * 2.0
 		var rot := deg_to_rad(offset * 3.0)
 		var s := Vector2.ONE
 		if hover_i >= 0 and i != hover_i:
@@ -655,7 +655,10 @@ func _on_card_input(event: InputEvent, card: ResearchCard) -> void:
 	if not (event is InputEventMouseButton and event.pressed):
 		return
 	if event.button_index == MOUSE_BUTTON_RIGHT:
-		_cancel_target()
+		# 有选中目标时右键是取消；否则交给牌面打开大图说明
+		if _selected != null:
+			_cancel_target()
+			accept_event()
 		return
 	if event.button_index == MOUSE_BUTTON_LEFT:
 		accept_event()
