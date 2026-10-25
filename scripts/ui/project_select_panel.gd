@@ -17,6 +17,9 @@ var _evidence: Label
 func _init() -> void:
 	super._init()
 	title_key = "project.select.title"
+	icon_name = "node_research"
+	accent = UIKit.ACCENT
+	subtitle_key = "project.select.subtitle"
 	panel_width = 860
 
 

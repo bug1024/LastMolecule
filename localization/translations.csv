@@ -857,3 +857,23 @@ comp.src_approved,%s 已获批：门槛 +%d,%s approved: bar +%d
 comp.src_mechanism,新机制出现：门槛 +%d,New mechanism: bar +%d
 comp.src_total,（终审疗效门槛共 +%d）, (efficacy bar +%d in total)
 hero.archived,研究已归档 · %s,Research archived · %s
+archive.subtitle,每一次尝试都会留下数据与证据,Every attempt leaves data and evidence behind
+help.subtitle,从一个分子，到一颗新药,From a molecule to a medicine
+settings.subtitle,声音、画面与语言,"Sound, display and language"
+project.select.subtitle,不同项目，需要不同打法,"Different programs, different plans"
+archive.level_short,流程等级,Process level
+archive.ai_short,开局 AI：%s · 失误 %d%%,AI start: %s · miss %d%%
+archive.runs_short,项目,Programs
+archive.approved_short,获批（%d%%）,Approved (%d%%)
+archive.evidence_locked,尚未获得,Not yet earned
+credits.role.design,策划与开发,Design & Development
+credits.name.design,bug1024,bug1024
+credits.role.codev,协作开发,Co-development
+credits.name.codev,Claude（Anthropic）\nCodex（OpenAI）,Claude (Anthropic)\nCodex (OpenAI)
+credits.role.engine,引擎,Engine
+credits.name.engine,Godot Engine 4.7,Godot Engine 4.7
+credits.role.art,美术,Art
+credits.name.art,手写 SVG 图标\n程序绘制的分子、角色与场景,"Hand-written SVG icons\nProcedurally drawn molecules, characters and scenes"
+credits.role.music,音乐与音效,Music & SFX
+credits.name.music,tools/gen_audio.py 程序合成，无外部素材\nLM-001 主题为编排的固定旋律,"Synthesized by tools/gen_audio.py, no external assets\nThe LM-001 theme is a composed melody"
+credits.dedication,谨以此献给每一位做新药的人。,Dedicated to everyone who makes new medicines.

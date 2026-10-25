@@ -11,6 +11,9 @@ var _confirm: ConfirmDialog
 func _init() -> void:
 	super._init()
 	title_key = "settings.title"
+	icon_name = "type_process"
+	accent = UIKit.ACCENT_BLUE
+	subtitle_key = "settings.subtitle"
 	panel_width = 620
 	closed.connect(GameSettings.save)
 

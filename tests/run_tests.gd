@@ -1091,7 +1091,7 @@ func _test_ending_and_menu() -> void:
 	await process_frame
 	_expect(scene._pause_menu.visible, "Esc opens the in-game menu")
 	scene._pause_menu.help_requested.emit()
-	_expect(scene._help.visible and scene._help.find_children("*", "TabContainer", true, false)[0].get_tab_count() == HelpPanel.PAGES.size(),
+	_expect(scene._help.visible and scene._help._nav.get_child_count() == HelpPanel.PAGES.size(),
 		"Help opens from the menu with every page")
 	scene._help.close()
 	scene._pause_menu.close()

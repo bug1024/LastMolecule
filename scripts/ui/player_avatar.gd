@@ -27,7 +27,8 @@ const GREEN := Color(0.35, 0.95, 0.6)
 
 
 func _ready() -> void:
-	custom_minimum_size = Vector2(200, 240)
+	if custom_minimum_size == Vector2.ZERO:   # 外部（如公司档案）先设了尺寸就不覆盖
+		custom_minimum_size = Vector2(200, 240)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	for i in 12:
 		_bubbles.append(Vector3(randf_range(-0.6, 0.6), randf(), randf_range(0.2, 0.5)))
