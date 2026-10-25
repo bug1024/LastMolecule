@@ -852,3 +852,5 @@ goal.gap,差 %d,short %d
 comp.leader,领先：%s · %s,Leader: %s · %s
 comp.approved,%s 已获批，终审疗效门槛 +%d,%s approved: efficacy bar +%d
 comp.none,暂无在研竞品,No active rivals
+title.company_short,公司：已做 %d 个项目 · 获批 %d · 流程 Lv%d · 开局 AI %s,Company: %d programs · %d approved · Process Lv%d · AI starts %s
+title.company_new_short,新公司 · 第一次玩建议先看「玩法说明」,New company · first time? Check How to Play

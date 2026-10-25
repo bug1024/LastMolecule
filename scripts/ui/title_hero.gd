@@ -32,6 +32,7 @@ func _ready() -> void:
 	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(_status)
 	resized.connect(_layout)
+	_layout.call_deferred()   # 锚点尺寸可能在 _ready 之前就算好了，错过 resized 信号
 	refresh()
 
 
