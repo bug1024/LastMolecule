@@ -584,6 +584,25 @@ def metal(freqs, dur, tau):
     return sum(np.sin(2 * np.pi * f * t) * np.exp(-t / (tau * (1.0 - 0.15 * i))) for i, f in enumerate(freqs)) / len(freqs)
 
 
+def sfx_end_turn():
+    """结束回合：低沉的「咚」（像按下实验台上的大按钮）+ 一阵风声 + 两音上行的钟声，交出回合的确认感。
+    用独立随机数，单独生成时不影响其他音效。"""
+    local = np.random.default_rng(42)
+    n = int(0.9 * SR)
+    t = ts(n)
+    thump = np.sin(np.cumsum(2 * np.pi * (140 * np.exp(-t / 0.08) + 55) / SR)) * np.exp(-t / 0.12)
+    whoosh = np.zeros(n)
+    noise = local.standard_normal(n)
+    env = np.sin(np.pi * np.minimum(t / 0.5, 1.0)) * np.exp(-np.maximum(t - 0.5, 0) / 0.1)
+    whoosh[:] = lowpass(noise, 1800) * env
+    chime = np.zeros(n)
+    for i, note in enumerate([76, 83]):
+        b = bell(note, 0.7, 0.9, 2.0, 1.5)
+        st = int((0.06 + i * 0.09) * SR)
+        chime[st:st + len(b)] += b[:n - st]
+    sfx("end_turn", layer((thump, 1.0, 0), (whoosh, 0.25, 0), (chime, 0.35, 0)), 0.6)
+
+
 def make_combat_sfx():
     # 出牌挥击：高频风声快速下扫
     sfx("slash", layer((noise_sweep(0.18, 7000, 1500, 0.06), 1.0, 0), (metal([2400, 3700], 0.15, 0.03), 0.25, 0.02)), 0.55)
@@ -627,6 +646,9 @@ def make_combat_sfx():
 
 if __name__ == "__main__":
     import sys
+    if "--only-end-turn" in sys.argv:   # 只生成结束回合音效
+        sfx_end_turn()
+        sys.exit(0)
     music_title()
     music_lab()
     music_battle()
@@ -641,3 +663,4 @@ if __name__ == "__main__":
     sting("campaign_archive", _campaign_archive, tail=21.0)
     if "--music-only" not in sys.argv:   # 只改音乐时加 --music-only，音效保持不变
         make_sfx()
+    sfx_end_turn()

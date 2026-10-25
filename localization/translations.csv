@@ -877,3 +877,5 @@ credits.name.art,手写 SVG 图标\n程序绘制的分子、角色与场景,"Han
 credits.role.music,音乐与音效,Music & SFX
 credits.name.music,tools/gen_audio.py 程序合成，无外部素材\nLM-001 主题为编排的固定旋律,"Synthesized by tools/gen_audio.py, no external assets\nThe LM-001 theme is a composed melody"
 credits.dedication,谨以此献给每一位做新药的人。,Dedicated to everyone who makes new medicines.
+battle.turn_word,回合,Turn
+battle.ai_miss,失误 %d%%,Miss %d%%

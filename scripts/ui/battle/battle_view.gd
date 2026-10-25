@@ -46,13 +46,12 @@ var _energy_orb: Control
 var _rule_label: Label               # 脱靶反噬：本回合还能放心打几张攻击牌 / 当前这张牌的反噬预告
 var _draw_button: Button
 var _discard_button: Button
-var _end_button: Button
+var _end_button: BattleHud.EndTurnButton
 var _dose_button: Button
 var _title: Label
 var _kind_tag: Label
-var _turn_label: Label
-var _ai_label: Label
-var _ai_next_label: Label
+var _turn_badge: BattleHud.TurnBadge
+var _ai_chip: BattleHud.AiChip
 var _mechanic: RichTextLabel
 var _fx: Control
 var _arrow: Control
@@ -124,14 +123,10 @@ func _build() -> void:
 	add_child(_title)
 	_kind_tag = UIKit.label("", UIKit.GOLD, 14)
 	add_child(_kind_tag)
-	_turn_label = UIKit.header("", 18, UIKit.TEXT_DIM)
-	add_child(_turn_label)
-	_ai_label = UIKit.label("", UIKit.ACCENT_BLUE, 14)
-	_ai_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	add_child(_ai_label)
-	_ai_next_label = UIKit.label("", Color(0.75, 0.88, 1.0), 13)
-	_ai_next_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	add_child(_ai_next_label)
+	_turn_badge = BattleHud.TurnBadge.new()
+	add_child(_turn_badge)
+	_ai_chip = BattleHud.AiChip.new()
+	add_child(_ai_chip)
 	_mechanic = UIKit.rich("", 14)
 	_mechanic.custom_minimum_size = Vector2(560, 0)
 	_mechanic.position = Vector2(24, 50)
@@ -163,9 +158,7 @@ func _build() -> void:
 	_discard_button = UIKit.button("", "ui_discard_pile", "normal", Vector2(110, 44))
 	_discard_button.pressed.connect(func() -> void: pile_requested.emit(_manager.discard_pile.duplicate(), "battle.pile.discard"))
 	add_child(_discard_button)
-	_end_button = UIKit.button(tr("ui.end_turn"), "", "primary", Vector2(180, 60))
-	_end_button.add_theme_font_size_override("font_size", 20)
-	_end_button.set_meta("sfx", "turn")
+	_end_button = BattleHud.EndTurnButton.new()
 	_end_button.pressed.connect(_on_end_turn)
 	add_child(_end_button)
 
@@ -243,16 +236,14 @@ func _layout() -> void:
 	_player_status.position = Vector2(w * 0.1 + 14, 418)
 	_dose_button.position = Vector2(w * 0.1 - 6, 102)
 	_kind_tag.position = Vector2(24 + _title.get_combined_minimum_size().x + 14, 20)
-	_turn_label.position = Vector2(w * 0.5 - 60, 16)
-	_ai_label.position = Vector2(w - 424, 18)
-	_ai_label.size = Vector2(400, 20)
-	_ai_next_label.position = Vector2(w - 424, 40)
-	_ai_next_label.size = Vector2(400, 18)
+	_turn_badge.position = Vector2(w * 0.5 - 75, 8)
+	_turn_badge.size = _turn_badge.custom_minimum_size
+	_ai_chip.position = Vector2(w - _ai_chip.custom_minimum_size.x - 20, 12)
 	_energy_orb.position = Vector2(34, h - 250)
 	_rule_label.position = Vector2(4, h - 156)
 	_draw_button.position = Vector2(24, h - 70)
 	_discard_button.position = Vector2(w - 134, h - 70)
-	_end_button.position = Vector2(w - 214, h - 250)
+	_end_button.position = Vector2(w - 168, h - 290)
 	_continue.position = Vector2(w * 0.5 - 120, h * 0.5 + 70)
 	var n := _enemy_widgets.size()
 	var span := w * 0.52
@@ -752,6 +743,8 @@ func _process(delta: float) -> void:
 	if not visible:
 		return
 	_time += delta
+	# 没牌可打（能量用完或手里都打不出）时，结束回合按钮呼吸发光提示
+	_end_button.prompt = _should_prompt_end()
 	if _selected != null:
 		_arrow.queue_redraw()
 	var max_hp := _manager.player.max_hp if _manager and _manager.player else 100
@@ -787,6 +780,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		var key := (event as InputEventKey).keycode
 		if key == KEY_E:
+			if not _end_button.disabled:
+				GameAudio.sfx("end_turn")   # 键盘结束回合也有和按钮一样的音效
 			_on_end_turn()
 			get_viewport().set_input_as_handled()
 		elif key >= KEY_1 and key <= KEY_9:
@@ -870,12 +865,18 @@ static func ai_next_text(tier: Dictionary) -> String:
 	return t.translate(key) % [need, String.num(float(tier.get("next_multiplier", 1.0)), 2)]
 
 
+func _should_prompt_end() -> bool:
+	if _manager == null or _busy or _ended or not _manager.is_battle_active() or _end_button.disabled:
+		return false
+	for card in _manager.hand:
+		if _manager.can_play(card):
+			return false
+	return true
+
+
 func _refresh_top() -> void:
-	_turn_label.text = tr("battle.turn") % maxi(1, _manager.turn)
-	var tier := _manager.get_ai_tier()
-	_ai_label.text = tr("battle.ai_chip") % [int(tier.get("effective", 0)), tr("tier." + String(tier.get("id", "mid"))),
-		float(tier.get("multiplier", 1.0)), _manager.deviation_chance()]
-	_ai_next_label.text = ai_next_text(tier)
+	_turn_badge.set_turn(maxi(1, _manager.turn))
+	_ai_chip.refresh(_manager.get_ai_tier(), _manager.deviation_chance())
 	_draw_button.text = str(_manager.draw_pile.size())
 	_discard_button.text = str(_manager.discard_pile.size())
 	_player.ratio = float(_manager.player.hp) / _manager.player.max_hp
