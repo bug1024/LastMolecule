@@ -10,6 +10,7 @@ const VERSION := 1
 
 static var save_path := DEFAULT_SAVE_PATH   # 测试可改为空串以禁用读写
 static var resume_requested := false
+static var new_project_type := ""   # 标题界面选择的新项目类型（空为默认）
 
 
 static func exists() -> bool:
@@ -45,4 +46,5 @@ static func summary() -> Dictionary:
 	if data.is_empty():
 		return {}
 	var state: Dictionary = data.get("state", {})
-	return {"stage": String(state.get("stage", "")), "year": int(state.get("year", 1)), "funding": int(state.get("funding", 0))}
+	return {"stage": String(state.get("stage", "")), "year": int(state.get("year", 1)), "funding": int(state.get("funding", 0)),
+		"project_type": String(data.get("project_type", "standard")), "project_code": String(data.get("project_code", ""))}

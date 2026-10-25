@@ -111,7 +111,9 @@ func _build_overlays() -> void:
 	_pause_menu.help_requested.connect(func() -> void: _help.open())
 	_pause_menu.settings_requested.connect(func() -> void: _settings.open())
 	_ending = EndingPanel.new()
-	_ending.restart_requested.connect(SceneRouter.restart_scene)
+	_ending.restart_requested.connect(func() -> void:
+		RunSave.new_project_type = _game_logic.project_type   # 「再来一局」沿用同类项目，换类型回标题选
+		SceneRouter.restart_scene())
 	for overlay in [_ending, _pause_menu, _help, _settings]:
 		add_child(overlay)
 	_help_button.pressed.connect(func() -> void: _help.open())

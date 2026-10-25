@@ -13,6 +13,9 @@ extends Node
 ##   enemy_turn / enemy_move {index, move} / turn {turn} / death {side, index}
 ##   mechanic {key, args} / end {victory}
 ## AI 卡：威力取决于有效数据所在档位（倍率 + 偏差概率），偏差时改为结算卡牌的 deviation 效果。
+## 项目规则 rules（由项目类型决定，见 data/projects.json battle_rules）：
+##   offtarget_limit / offtarget_damage：一回合超过 limit 张攻击牌，每多 1 张掉 damage 血（选择性项目）；
+##   precise_free：攻击带「破绽」的目标不计入。
 
 signal battle_started(encounter: Dictionary)
 signal turn_started(turn: int)
@@ -50,6 +53,8 @@ var intel := false
 var dose := 0
 var dose_max := 4
 var attacks_this_turn := 0
+var rules: Dictionary = {}           # 项目规则，见文件头
+var rule_attacks := 0                # 本回合计入项目规则的攻击牌数
 var last_deviation := false
 
 var _enemy_defs := {}
@@ -84,6 +89,7 @@ func start_battle(enc: Dictionary, deck: Array, abilities: Array, ctx: Dictionar
 	player.max_hp = int(ctx.get("max_hp", 100))
 	player.hp = clampi(int(ctx.get("hp", player.max_hp)), 1, player.max_hp)
 	_start_hp = player.hp
+	rules = ctx.get("rules", {})
 	if int(ctx.get("strength", 0)) > 0:
 		player.add_status("strength", int(ctx.strength))
 	if int(ctx.get("dexterity", 0)) > 0:
@@ -131,6 +137,7 @@ func play_card(card: ResearchCard, target_index := -1) -> bool:
 	energy -= card.cost
 	hand.erase(card)
 	_emit({"t": "card", "card": card, "target": target})
+	var precise := target >= 0 and target < enemies.size() and enemies[target].get_status("vulnerable") > 0
 	var effects := card.effects
 	last_deviation = false
 	if card.can_deviate() and rng.randi_range(1, 100) <= deviation_chance():
@@ -145,6 +152,9 @@ func play_card(card: ResearchCard, target_index := -1) -> bool:
 	if card.kind == "attack":
 		attacks_this_turn += 1
 		_check_offtarget()
+		if _active and not (precise and bool(rules.get("precise_free", false))):
+			rule_attacks += 1
+			_check_rule_offtarget()
 	_on_type_played(card)
 	if card.kind == "power":
 		pass   # 能力牌打出后本场生效，不再回到牌堆
@@ -243,6 +253,8 @@ func deviation_chance() -> int:
 ## Boss 机制说明 [{key, args}]
 func get_mechanic_lines() -> Array:
 	var lines: Array = []
+	if int(rules.get("offtarget_limit", 0)) > 0:
+		lines.append({"key": "mechanic.selective", "args": [int(rules.offtarget_limit), int(rules.get("offtarget_damage", 3))]})
 	var seen := {}
 	for e in enemies:
 		if e.mechanic.is_empty() or seen.has(e.mechanic):
@@ -298,6 +310,7 @@ func get_outcome() -> Dictionary:
 func _begin_turn() -> void:
 	turn += 1
 	attacks_this_turn = 0
+	rule_attacks = 0
 	_dosed_this_turn = false
 	player.block = 0
 	_emit({"t": "turn", "turn": turn})
@@ -505,6 +518,22 @@ func _check_offtarget() -> void:
 			_emit({"t": "mechanic", "key": "mechanic.offtarget.trigger", "args": [OFFTARGET_DAMAGE]})
 			_hurt(player, "player", 0, OFFTARGET_DAMAGE, true)
 			return
+
+
+## 选择性项目：本回合计入的攻击牌超过上限，每多 1 张反噬一次
+func _check_rule_offtarget() -> void:
+	var limit := int(rules.get("offtarget_limit", 0))
+	if limit <= 0 or rule_attacks <= limit:
+		return
+	var damage := int(rules.get("offtarget_damage", 3))
+	_emit({"t": "mechanic", "key": "mechanic.selective.trigger", "args": [damage]})
+	_hurt(player, "player", 0, damage, true)
+
+
+## 本回合还能放心打出几张不带破绽目标的攻击牌（没有规则时为 -1）
+func rule_attacks_left() -> int:
+	var limit := int(rules.get("offtarget_limit", 0))
+	return maxi(0, limit - rule_attacks) if limit > 0 else -1
 
 
 func _on_type_played(card: ResearchCard) -> void:

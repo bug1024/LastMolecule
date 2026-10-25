@@ -89,7 +89,10 @@ func _history_row(entry: Dictionary) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 	row.add_child(UIKit.icon_rect("outcome_" + outcome, 22, color))
-	row.add_child(UIKit.label(tr("archive.run_no") % int(entry.get("index", 0)), UIKit.TEXT_DIM, 14))
+	var code := String(entry.get("project_code", ""))
+	var run_name := tr("project.title") % [code, tr("project.type." + String(entry.get("project_type", "standard")))] \
+		if not code.is_empty() else tr("archive.run_no") % int(entry.get("index", 0))
+	row.add_child(UIKit.label(run_name, UIKit.TEXT_DIM, 14))
 	var outcome_label := UIKit.label(tr("ending." + outcome), color, 15)
 	outcome_label.custom_minimum_size = Vector2(110, 0)
 	row.add_child(outcome_label)

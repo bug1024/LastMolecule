@@ -128,6 +128,9 @@ static func _choose_card(game: Node) -> void:
 
 
 ## 打完一个回合（公开给测试用）
+static var respect_rules := true   # false 时无视项目规则一味猛攻（模拟「攻击最高的牌全拿」）
+
+
 static func play_turn(manager: BattleManager) -> void:
 	for action in manager.get_actions():
 		if action.id == "dose" and action.enabled and manager.player.hp > 45 and manager.dose < 3:
@@ -136,9 +139,10 @@ static func play_turn(manager: BattleManager) -> void:
 	while manager.is_battle_active() and guard < 20:
 		guard += 1
 		var card := _pick_card(manager)
-		if card == null:
+		if card == null or (respect_rules and card.kind == "attack" and manager.rule_attacks_left() == 0 \
+				and not _precise(manager, card)):
 			break
-		manager.play_card(card, _weakest(manager))
+		manager.play_card(card, _target(manager))
 	if manager.is_battle_active():
 		manager.end_turn()
 
@@ -164,9 +168,39 @@ static func _pick_card(manager: BattleManager) -> ResearchCard:
 				score = 6 if blocks and need_block else 4
 		if card.cost == 0:
 			score += 1
+		if respect_rules and manager.rule_attacks_left() >= 0 and _vulnerable_target(manager) < 0 \
+				and card.effects.any(func(e: Dictionary) -> bool: return e.op == "status" and e.get("id", "") == "vulnerable"):
+			score += 3   # 选择性项目：先打出破绽，后面的攻击就不算脱靶
+		if respect_rules and card.kind == "attack" and manager.rule_attacks_left() == 0:
+			var t := _target(manager)
+			if card.target != "enemy" or t < 0 or manager.enemies[t].get_status("vulnerable") <= 0:
+				score = -1 if manager.player.hp > 30 else 0   # 会脱靶：留到下回合
 		if score > best_score:
 			best_score = score
 			best = card
+	return best
+
+
+static func _precise(manager: BattleManager, card: ResearchCard) -> bool:
+	var t := _target(manager)
+	return card.target == "enemy" and t >= 0 and manager.enemies[t].get_status("vulnerable") > 0
+
+
+## 遵守项目规则时优先打带破绽的敌人
+static func _target(manager: BattleManager) -> int:
+	if respect_rules and manager.rule_attacks_left() >= 0:
+		var v := _vulnerable_target(manager)
+		if v >= 0:
+			return v
+	return _weakest(manager)
+
+
+static func _vulnerable_target(manager: BattleManager) -> int:
+	var best := -1
+	for i in manager.enemies.size():
+		var e: Enemy = manager.enemies[i]
+		if e.is_alive() and e.get_status("vulnerable") > 0 and (best < 0 or e.hp < manager.enemies[best].hp):
+			best = i
 	return best
 
 

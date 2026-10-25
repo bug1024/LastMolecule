@@ -9,6 +9,7 @@ var _archive: ArchivePanel
 var _credits: CreditsPanel
 var _logo: TextureRect
 var _confirm: ConfirmDialog
+var _project_select: ProjectSelectPanel
 
 
 func _ready() -> void:
@@ -73,7 +74,8 @@ func _build() -> void:
 	var saved := RunSave.summary()
 	if not saved.is_empty():
 		_menu_button("title.continue", "ui_play", "primary", _on_continue)
-		var line := UIKit.label(tr("title.continue_line") % [tr("stage." + String(saved.stage)), int(saved.year), int(saved.funding)], UIKit.ACCENT, 14)
+		var project := tr("project.title") % [String(saved.project_code), tr("project.type." + String(saved.project_type))]
+		var line := UIKit.label(tr("title.continue_line") % [project, tr("stage." + String(saved.stage)), int(saved.year), int(saved.funding)], UIKit.ACCENT, 14)
 		_menu.add_child(line)
 	_menu_button("title.start", "ui_plus" if not saved.is_empty() else "ui_play", "normal" if not saved.is_empty() else "primary", _on_start)
 	_menu_button("title.archive", "ui_archive", "normal", func() -> void: _archive.open())
@@ -107,8 +109,10 @@ func _build() -> void:
 	_help = HelpPanel.new()
 	_archive = ArchivePanel.new()
 	_credits = CreditsPanel.new()
+	_project_select = ProjectSelectPanel.new()
+	_project_select.project_chosen.connect(_start_new)
 	_confirm = null
-	for panel in [_settings, _help, _archive, _credits]:
+	for panel in [_settings, _help, _archive, _credits, _project_select]:
 		add_child(panel)
 	_intro()
 
@@ -155,13 +159,14 @@ func _on_start() -> void:
 		if _confirm == null:
 			_confirm = ConfirmDialog.new()
 			add_child(_confirm)
-		_confirm.ask(tr("title.start"), tr("title.start_overwrite"), _start_new)
+		_confirm.ask(tr("title.start"), tr("title.start_overwrite"), _project_select.open)
 		return
-	_start_new()
+	_project_select.open()
 
 
-func _start_new() -> void:
+func _start_new(type_id: String) -> void:
 	RunSave.resume_requested = false
+	RunSave.new_project_type = type_id
 	GameAudio.sfx("stage")
 	SceneRouter.goto(SceneRouter.GAME)
 

@@ -13,6 +13,7 @@ extends Node
 ##     Boss     → 阶段试验，各阶段有专属机制；胜利后进入里程碑
 ##     里程碑   → 继续 / 主动终止
 ## 战斗中玩家生命 = 100 - 安全风险，疗效换算成开局效力，数据决定 AI 卡档位。
+## 项目类型（ProjectTypes / data/projects.json）在开局时改变起始牌组、终审要求与部分阶段的战斗规则。
 ## 项目状态统一由 ProjectState 持有，通过信号向 UI 广播。
 
 signal state_changed(deltas: Dictionary)
@@ -76,6 +77,9 @@ var _battle_kind := ""               # 当前 / 刚结束的战斗类型 fight /
 var player_xp := 0                   # 研发团队经验：打赢战斗获得，升级后形象变化并自带基础能力
 var battles_fought := 0
 var resumed := false                 # 本局是从存档继续的
+var project_type := "standard"       # 项目类型 id
+var project_code := ""               # 项目编号，如 LM-002
+var _type_cfg: Dictionary = {}
 var _event_is_gate := false
 
 
@@ -89,13 +93,21 @@ func _ready() -> void:
 	company.load_save()
 	competition = Competition.new()
 	competition.setup(rng)
-	state = ProjectState.from_data(_project)
-	_map = ResearchMap.new()
 	var saved := RunSave.read() if RunSave.resume_requested else {}
 	RunSave.resume_requested = false
+	if saved.is_empty():
+		_apply_project_type(RunSave.new_project_type, ProjectTypes.code_for_run(company.runs))
+	else:
+		_apply_project_type(String(saved.get("project_type", "")), String(saved.get("project_code", "")))
+	RunSave.new_project_type = ""
+	state = ProjectState.from_data(_project)
+	_map = ResearchMap.new()
 	if not saved.is_empty() and _load_run(saved):
 		resumed = true
 	else:
+		if not saved.is_empty():
+			_apply_project_type("", ProjectTypes.code_for_run(company.runs))
+			state = ProjectState.from_data(_project)
 		RunSave.clear()
 		var bonus := company.take_start_bonus()
 		if bonus > 0:
@@ -110,6 +122,16 @@ func _ready() -> void:
 	_battle_manager.battle_ended.connect(_on_battle_ended)
 	state_synced.emit(state)
 	map_updated.emit()
+
+
+## 开局套用项目类型：合并配置覆盖、替换起始牌组
+func _apply_project_type(type_id: String, code: String) -> void:
+	_type_cfg = ProjectTypes.find(type_id if not type_id.is_empty() else ProjectTypes.default_id())
+	project_type = String(_type_cfg.get("id", "standard"))
+	project_code = code if not code.is_empty() else ProjectTypes.code_for_run(company.runs)
+	_project = ProjectTypes.apply_overrides(JsonData.load_dict(PROJECT_DATA_PATH), _type_cfg)
+	var starter: Array = _type_cfg.get("starter_cards", [])
+	deck = (starter if not starter.is_empty() else JsonData.load_dict(CARDS_DATA_PATH).get("starter_cards", [])).duplicate()
 
 
 ## 读档后由 UI 在连好信号后调用：重新弹出存档时正在进行的事件 / 选卡 / 奖励，或重开那场战斗
@@ -150,6 +172,7 @@ func to_save() -> Dictionary:
 		"deck": deck.duplicate(), "upgraded": upgraded.keys(), "run_process": run_process, "rp2d": rp2d,
 		"fast_track": fast_track, "months": months, "battle_kind": _battle_kind,
 		"player_xp": player_xp, "battles_fought": battles_fought,
+		"project_type": project_type, "project_code": project_code,
 	}
 
 
@@ -301,8 +324,22 @@ func get_state() -> ProjectState:
 	return state
 
 
+## 界面显示用的项目名，如「LM-003 · 选择性项目」
 func get_project_name() -> String:
-	return String(_project.get("project_name_key", "project.name"))
+	return tr("project.title") % [project_code, tr("project.type." + project_type)]
+
+
+## 当前项目类型配置（见 data/projects.json）
+func get_project_type() -> Dictionary:
+	return _type_cfg
+
+
+## 本阶段生效的项目战斗规则（不在规则阶段时为空）
+func get_battle_rules() -> Dictionary:
+	var rules: Dictionary = _type_cfg.get("battle_rules", {})
+	if rules.is_empty() or not (rules.get("stages", []) as Array).has(state.stage):
+		return {}
+	return rules
 
 
 ## 前期研究最多削弱 Boss 的百分比（阶段进度条的上限）
@@ -541,6 +578,7 @@ func _start_battle(kind: String) -> void:
 		"start_block": int(bonus.get("start_block", 0)),
 		"first_draw": int(bonus.get("first_draw", 0)),
 		"dexterity": int(bonus.get("dexterity", 0)),
+		"rules": get_battle_rules(),
 	})
 
 
@@ -735,7 +773,8 @@ func _finish(outcome: String, reason_key: String) -> void:
 	_phase = RoundPhase.FINISHED
 	RunSave.clear()
 	var summary := company.settle_run(state.data, outcome, state.funding,
-		{"stage": state.stage, "year": state.year, "efficacy": state.efficacy, "safety_risk": state.safety_risk})
+		{"stage": state.stage, "year": state.year, "efficacy": state.efficacy, "safety_risk": state.safety_risk,
+			"project_type": project_type, "project_code": project_code})
 	run_ended.emit(outcome, reason_key, summary)
 
 
@@ -790,16 +829,18 @@ func _make_card(data: Dictionary, upgrade := false) -> ResearchCard:
 	return card
 
 
-## 从可获取卡池（非起始专属 / 状态牌、流程等级已解锁）按稀有度加权抽取 count 张不重复的卡
+## 从可获取卡池（非起始专属 / 状态牌、流程等级已解锁；项目类型的 card_pool_bonus 加权）按稀有度加权抽取 count 张不重复的卡
 ## rare_boost 时稀有与史诗权重翻倍（精英与 Boss 奖励）
 func _sample_cards(count: int, rare_boost := false) -> Array:
 	var level := company.process_level()
+	var pool_bonus: Dictionary = _type_cfg.get("card_pool_bonus", {})   # 项目类型偏好的卡（可含起始专属卡）
 	var pool: Array = []
 	for data in _cards_data:
-		if bool(data.get("starter_only", false)) or bool(data.get("token", false)) or int(data.get("requires_process", 0)) > level:
+		var bonus := int(pool_bonus.get(String(data.get("id", "")), 0))
+		if (bool(data.get("starter_only", false)) and bonus <= 0) or bool(data.get("token", false)) or int(data.get("requires_process", 0)) > level:
 			continue
 		var rarity := String(data.get("rarity", "common"))
-		var weight := int(_rarity_weights.get(rarity, 5)) * (2 if rare_boost and rarity != "common" else 1)
+		var weight := int(_rarity_weights.get(rarity, 5)) * (2 if rare_boost and rarity != "common" else 1) * maxi(1, bonus)
 		pool.append({"data": data, "weight": weight})
 	var picked: Array = []
 	while picked.size() < count and not pool.is_empty():
@@ -858,7 +899,7 @@ func _tr_stage(stage: String) -> String:
 
 
 func _load_data() -> void:
-	_project = JsonData.load_dict(PROJECT_DATA_PATH)
+	_project = JsonData.load_dict(PROJECT_DATA_PATH)   # 开局时由 _apply_project_type 按项目类型重新合并
 	_random_events = JsonData.load_dict(EVENTS_DATA_PATH).get("random_events", [])
 	for event in _random_events:
 		var event_id := String(event.get("id", ""))

@@ -1,0 +1,114 @@
+class_name ProjectSelectPanel
+extends ModalPanel
+## 立项选择：列出 data/projects.json 的项目类型（名称、难度、一句话打法、规则说明），点选后「立项」。
+
+signal project_chosen(type_id: String)
+
+var _list: VBoxContainer
+var _desc: Label
+var _start: Button
+var _hint: Label
+var _picked := ""
+var _rows := {}   # type id → PanelContainer
+
+
+func _init() -> void:
+	super._init()
+	title_key = "project.select.title"
+	panel_width = 860
+
+
+func _build(box: VBoxContainer) -> void:
+	_hint = UIKit.label("", UIKit.TEXT_DIM, 15, true)
+	box.add_child(_hint)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 16)
+	box.add_child(row)
+	_list = VBoxContainer.new()
+	_list.add_theme_constant_override("separation", 10)
+	_list.custom_minimum_size = Vector2(380, 0)
+	row.add_child(_list)
+	var detail := PanelContainer.new()
+	detail.add_theme_stylebox_override("panel", UIKit.panel_style(Color(0.05, 0.065, 0.09, 0.9), Color(0.22, 0.29, 0.37), 12))
+	detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	detail.custom_minimum_size = Vector2(0, 260)
+	row.add_child(detail)
+	var margin := MarginContainer.new()
+	for side in ["left", "right", "top", "bottom"]:
+		margin.add_theme_constant_override("margin_" + side, 16)
+	detail.add_child(margin)
+	_desc = UIKit.label("", UIKit.TEXT, 16, true)
+	_desc.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	margin.add_child(_desc)
+	_start = UIKit.button("", "ui_play", "primary", Vector2(0, 50))
+	_start.add_theme_font_size_override("font_size", 19)
+	_start.pressed.connect(func() -> void:
+		close()
+		project_chosen.emit(_picked))
+	box.add_child(_start)
+
+
+func _refresh() -> void:
+	var company := Company.new()
+	company.load_save()
+	_hint.text = tr("project.select.hint") % ProjectTypes.code_for_run(company.runs)
+	for child in _list.get_children():
+		child.queue_free()
+	_rows.clear()
+	for t in ProjectTypes.all():
+		var id := String(t.get("id", ""))
+		var panel := _type_row(t, company.runs == 0 and id == ProjectTypes.default_id())
+		_rows[id] = panel
+		_list.add_child(panel)
+	_select(ProjectTypes.default_id())
+
+
+func _type_row(t: Dictionary, recommended: bool) -> PanelContainer:
+	var id := String(t.get("id", ""))
+	var panel := PanelContainer.new()
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	panel.gui_input.connect(func(event: InputEvent) -> void:
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			GameAudio.sfx("click")
+			_select(id))
+	var margin := MarginContainer.new()
+	for side in ["left", "right", "top", "bottom"]:
+		margin.add_theme_constant_override("margin_" + side, 12)
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(margin)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	margin.add_child(row)
+	row.add_child(UIKit.icon_rect(String(t.get("icon", "type_molecular")), 40, UIKit.ACCENT_BLUE))
+	var text := VBoxContainer.new()
+	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(text)
+	var name_row := HBoxContainer.new()
+	name_row.add_theme_constant_override("separation", 8)
+	name_row.add_child(UIKit.header(tr("project.type." + id), 20))
+	if recommended:
+		name_row.add_child(UIKit.label(tr("project.recommended"), UIKit.ACCENT, 14))
+	text.add_child(name_row)
+	text.add_child(UIKit.label(tr("project.type.%s.tag" % id), UIKit.TEXT_DIM, 15, true))
+	var stars := "★".repeat(int(t.get("difficulty", 1))) + "☆".repeat(maxi(0, 3 - int(t.get("difficulty", 1))))
+	text.add_child(UIKit.label("%s %s" % [tr("project.difficulty"), stars], UIKit.GOLD, 14))
+	for child in text.get_children():
+		child.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		for sub in child.get_children():
+			sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return panel
+
+
+func _select(id: String) -> void:
+	_picked = id
+	for type_id in _rows:
+		var on: bool = type_id == id
+		var sb := UIKit.panel_style(Color(0.09, 0.16, 0.14, 0.95) if on else Color(0.07, 0.09, 0.12, 0.9),
+			UIKit.ACCENT if on else Color(0.22, 0.29, 0.37), 12)
+		sb.set_border_width_all(3 if on else 1)
+		(_rows[type_id] as PanelContainer).add_theme_stylebox_override("panel", sb)
+	_desc.text = tr("project.type.%s.desc" % id)
+	_start.text = tr("project.select.start") % tr("project.type." + id)

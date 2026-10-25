@@ -1,0 +1,35 @@
+{
+  "_comment": "项目类型：在 project.json 基础上覆盖。overrides 按键合并（字典逐层合并）；starter_cards 替换起始牌组；card_pool_bonus 为奖励卡池权重倍数（可把起始专属卡放进卡池）；battle_rules 为本类项目在指定阶段所有战斗中生效的规则。项目编号 LM-001 保留给主线最终分子，普通项目从 LM-002 起按公司项目次数递增。",
+  "default": "standard",
+  "code_format": "LM-%03d",
+  "code_start": 2,
+  "types": [
+    {
+      "id": "standard",
+      "difficulty": 1,
+      "icon": "type_molecular",
+      "evidence": ""
+    },
+    {
+      "id": "selective",
+      "difficulty": 2,
+      "icon": "status_vulnerable",
+      "evidence": "selectivity",
+      "overrides": {
+        "initial_safety_risk": 15,
+        "final_review": { "safety_risk_below": 65 }
+      },
+      "starter_cards": [
+        "mol_hit", "mol_hit", "mol_hit", "mol_target", "mol_target",
+        "exp_assay", "exp_assay", "exp_assay", "exp_biomarker", "ai_screen"
+      ],
+      "card_pool_bonus": { "mol_target": 4, "exp_biomarker": 3, "ai_structure": 3 },
+      "battle_rules": {
+        "stages": ["候选化合物发现", "临床前研究"],
+        "offtarget_limit": 2,
+        "offtarget_damage": 5,
+        "precise_free": true
+      }
+    }
+  ]
+}

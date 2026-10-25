@@ -43,6 +43,7 @@ var _selected: ResearchCard = null
 var _hover_enemy := -1
 var _energy_label: Label
 var _energy_orb: Control
+var _rule_label: Label               # 选择性项目：本回合还能放心打几张攻击牌
 var _draw_button: Button
 var _discard_button: Button
 var _end_button: Button
@@ -150,6 +151,12 @@ func _build() -> void:
 	_energy_label.add_theme_constant_override("outline_size", 6)
 	_energy_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
 	_energy_orb.add_child(_energy_label)
+	_rule_label = UIKit.label("", UIKit.GOLD, 14, true)
+	_rule_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_rule_label.size = Vector2(150, 40)
+	_rule_label.tooltip_text = tr("battle.rule_tip")
+	_rule_label.mouse_filter = Control.MOUSE_FILTER_PASS
+	add_child(_rule_label)
 	_draw_button = UIKit.button("", "ui_draw_pile", "normal", Vector2(110, 44))
 	_draw_button.pressed.connect(func() -> void: pile_requested.emit(_sorted(_manager.draw_pile), "battle.pile.draw"))
 	add_child(_draw_button)
@@ -242,6 +249,7 @@ func _layout() -> void:
 	_ai_next_label.position = Vector2(w - 424, 40)
 	_ai_next_label.size = Vector2(400, 18)
 	_energy_orb.position = Vector2(34, h - 250)
+	_rule_label.position = Vector2(4, h - 156)
 	_draw_button.position = Vector2(24, h - 70)
 	_discard_button.position = Vector2(w - 134, h - 70)
 	_end_button.position = Vector2(w - 214, h - 250)
@@ -817,6 +825,10 @@ func _refresh_intents() -> void:
 func _refresh_energy() -> void:
 	_energy_label.text = "%d/%d" % [_manager.energy, _manager.max_energy]
 	_energy_orb.queue_redraw()
+	var left := _manager.rule_attacks_left()
+	_rule_label.visible = left >= 0
+	_rule_label.text = tr("battle.rule_left") % left if left > 0 else tr("battle.rule_none")
+	_rule_label.add_theme_color_override("font_color", UIKit.GOLD if left > 0 else UIKit.DANGER.lightened(0.15))
 
 
 ## 「再 +6 数据（或 +1 流程）→ AI 威力 ×1」/「AI 已满档」

@@ -49,6 +49,7 @@ func _run() -> void:
 	_test_player_levels()
 	_test_ai_next_tier()
 	_test_card_face_readable()
+	_test_project_types()
 	_test_upgrade_preview()
 	_test_run_save()
 	_test_card_roles()
@@ -278,6 +279,48 @@ func _test_ai_deviation() -> void:
 		"Model deviation voids the card and adds noise data")
 	_expect(manager.discard_pile.size() == discard + 2, "Deviated card and the noise card go to the discard pile")
 	manager.free()
+
+
+## 项目类型：起始牌组 / 配置覆盖 / 战斗规则 / 存档
+func _test_project_types() -> void:
+	var merged := ProjectTypes.apply_overrides({"a": 1, "final_review": {"efficacy_min": 60, "safety_risk_below": 70}},
+		{"overrides": {"final_review": {"safety_risk_below": 60}}})
+	_expect(int(merged.final_review.efficacy_min) == 60 and int(merged.final_review.safety_risk_below) == 60,
+		"Project type overrides merge nested dictionaries")
+	_expect(ProjectTypes.code_for_run(0) == "LM-002" and ProjectTypes.code_for_run(5) == "LM-007",
+		"Program codes start at LM-002 (LM-001 is reserved)")
+	var standard := _new_game()
+	_expect(standard.project_type == "standard" and standard.project_code == "LM-002" and standard.get_final_safety_limit() == 70,
+		"A new game defaults to the standard program")
+	_expect(standard.get_battle_rules().is_empty(), "Standard programs have no battle rules")
+	standard.free()
+	RunSave.new_project_type = "selective"
+	var sel := _new_game()
+	_expect(sel.project_type == "selective" and RunSave.new_project_type.is_empty(), "The chosen program type is applied once")
+	_expect(sel.deck.count("mol_target") == 2 and sel.deck.size() == 10, "Selective programs swap in an extra Target Lock")
+	_expect(sel.state.safety_risk == 15 and sel.get_final_safety_limit() == 65, "Selective programs start safer but need a cleaner final review")
+	_expect(int(sel.get_battle_rules().get("offtarget_limit", 0)) == 2, "Selective rules apply in Discovery")
+	_expect(String(sel.to_save().project_type) == "selective" and sel.get_project_name().contains("LM-002"),
+		"Program type and code are saved and shown")
+	sel.free()
+	# 战斗规则：第 3 张非精准攻击牌起反噬；攻击带破绽的目标不计数
+	var m := _manager(["poor_solubility"], ["mol_hit", "mol_hit", "mol_hit", "mol_hit", "mol_hit"],
+		{"rules": {"offtarget_limit": 2, "offtarget_damage": 3, "precise_free": true}})
+	m.energy = 5
+	var enemy: Enemy = m.enemies[0]
+	enemy.max_hp = 999
+	enemy.hp = 999
+	var hp := m.player.hp
+	m.play_card(m.hand[0], 0)
+	m.play_card(m.hand[0], 0)
+	_expect(m.player.hp == hp and m.rule_attacks_left() == 0, "Two attacks a turn are safe in a selective program")
+	m.play_card(m.hand[0], 0)
+	_expect(m.player.hp == hp - 3, "The third attack backfires for 3")
+	enemy.add_status("vulnerable", 2)
+	m.play_card(m.hand[0], 0)
+	_expect(m.player.hp == hp - 3, "Attacks on a Weak Spot target don't count toward the limit")
+	_expect(m.get_mechanic_lines()[0].key == "mechanic.selective", "The selectivity rule is listed in the battle banner")
+	m.free()
 
 
 ## 战斗手牌尺寸（0.9 倍）下，所有卡、中英文，牌面文字都不小于 12px，名称不超出名称条
@@ -545,7 +588,14 @@ func _simulate(runs: int) -> void:
 	var battles := {}
 	var years := 0
 	var ends := {}
+	var type_arg := ""
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--type="):
+			type_arg = arg.trim_prefix("--type=")
+	Bot.respect_rules = _arg_int("--naive=") == 0
+	print("project type: %s, respect rules: %s" % [type_arg if not type_arg.is_empty() else "standard", Bot.respect_rules])
 	for s in runs:
+		RunSave.new_project_type = type_arg
 		var game := _new_game(10000 + s)
 		var result: Dictionary = Bot.play(game, 600)
 		outcomes[result.outcome] = int(outcomes.get(result.outcome, 0)) + 1

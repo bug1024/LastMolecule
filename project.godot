@@ -12,23 +12,32 @@ config_version=5
 
 config/name="LastMolecule"
 config/description="最后的分子：AI 驱动创新药研发策略卡牌"
+run/main_scene="res://title.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
-run/main_scene="res://title.tscn"
+
+[autoload]
+
+Sound="*res://scripts/core/game_audio.gd"
+Router="*res://scripts/core/scene_router.gd"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/size/window_width_override=1280
+window/size/window_height_override=720
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+[gui]
+
+theme/custom="res://assets/theme/main_theme.tres"
 
 [internationalization]
 
 locale/translations=PackedStringArray("res://localization/translations.zh_CN.translation", "res://localization/translations.en.translation")
 locale/fallback="zh_CN"
-
-[display]
-
-window/stretch/mode="canvas_items"
-window/stretch/aspect="expand"
-window/size/viewport_width=1280
-window/size/viewport_height=720
-window/size/window_width_override=1280
-window/size/window_height_override=720
 
 [physics]
 
@@ -39,12 +48,3 @@ window/size/window_height_override=720
 rendering_device/driver.windows="d3d12"
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
-
-[autoload]
-
-Sound="*res://scripts/core/game_audio.gd"
-Router="*res://scripts/core/scene_router.gd"
-
-[gui]
-
-theme/custom="res://assets/theme/main_theme.tres"
