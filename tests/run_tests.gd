@@ -56,6 +56,7 @@ func _run() -> void:
 	_test_campaign_end_to_end()
 	_test_build_cards()
 	_test_final_checklist()
+	await _test_status_wording()
 	_test_upgrade_preview()
 	_test_run_save()
 	_test_card_roles()
@@ -529,6 +530,42 @@ func _test_campaign_end_to_end() -> void:
 	var chain2 := EndingPanel.chain_lines(co, String(sd.route), sd.decisions)
 	_expect(chain2.back().contains(tr("route.route_standard")) and not chain2.any(func(l: String) -> bool: return l.begins_with("★")),
 		"E2E: the second ending's chain uses the second run's route")
+	co.reset()
+	Company.default_save_path = ""
+
+
+## 状态文案归因：门槛提高按来源描述；主动终止的主线结局在标题页不显示为获批
+func _test_status_wording() -> void:
+	var scene := load("res://main.tscn").instantiate() as Control
+	root.add_child(scene)
+	await process_frame
+	var game: Node = scene.get_node("GameLogic")
+	var map_screen = scene.get_node("MapScreen")
+	var comp: Competition = game.competition
+	for c in comp.competitors:
+		c.status = "active"
+	comp._new_mechanism = true
+	comp.efficacy_bar_bonus = 5
+	var text: String = map_screen.competition_summary()
+	_expect(text == tr("comp.src_mechanism") % 5, "A new mechanism alone is not reported as a rival approval")
+	comp.competitors[0].status = "approved"
+	comp.efficacy_bar_bonus = 15
+	text = map_screen.competition_summary()
+	_expect(text.contains(tr("comp.src_mechanism") % 5) and text.contains("+15"), "Multiple bar sources are listed with a total")
+	scene.free()
+	Company.default_save_path = "user://test_company.json"
+	var co := Company.new()
+	co.reset()
+	co.campaign = {"ending": "leave_answer", "route": "", "code": "LM-001", "run": 3}
+	co.save()
+	var hero := TitleHero.new()
+	root.add_child(hero)
+	_expect(hero._status.text.begins_with(tr("hero.archived").split("%")[0]), "Leave the Answer shows as archived, not approved")
+	co.campaign = {"ending": "approved_route_standard", "route": "route_standard", "code": "LM-001", "run": 3}
+	co.save()
+	hero.refresh()
+	_expect(hero._status.text.begins_with(tr("hero.done").split("%")[0]), "Campaign approvals show as approved")
+	hero.free()
 	co.reset()
 	Company.default_save_path = ""
 

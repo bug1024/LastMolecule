@@ -4,7 +4,7 @@ extends Control
 ## 跟主线进度联动：
 ##   未解锁 → 分子偏红、暗淡，标注「搁置中 · 研究证据 n / 2」；
 ##   已解锁 → 分子亮起，标注「可以重启了」；
-##   主线完成 → 分子转绿，标注首次主线结局。
+##   主线完成 → 分子转绿，标注首次主线结局（获批路线为「已获批」，把答案留下为「研究已归档」）。
 ## 烧瓶形态随公司获批数进化（1 + 获批数，最多 5 级）。
 
 var _molecule: MoleculeArt
@@ -41,10 +41,13 @@ func refresh() -> void:
 	company.load_save()
 	var need := int(ProjectTypes.config().get("final_unlock_evidence", 2))
 	if company.is_campaign_done():
-		_glow = UIKit.ACCENT
-		_molecule.health = 1.0
-		_status.text = tr("hero.done") % tr("campaign.%s.title" % String(company.campaign.get("ending", "")))
-		_status.add_theme_color_override("font_color", UIKit.ACCENT.lightened(0.2))
+		var ending := String(company.campaign.get("ending", ""))
+		var archived := ending == "leave_answer"
+		_glow = UIKit.ACCENT_BLUE if archived else UIKit.ACCENT   # 归档用冷静的蓝色，获批用绿色
+		_molecule.health = 0.55 if archived else 1.0
+		# 主动终止的主线结局（把答案留下）不是获批：显示为研究已归档
+		_status.text = tr("hero.archived" if ending == "leave_answer" else "hero.done") % tr("campaign.%s.title" % ending)
+		_status.add_theme_color_override("font_color", _glow.lightened(0.2))
 	elif company.final_unlocked():
 		_glow = UIKit.GOLD
 		_molecule.health = 0.6

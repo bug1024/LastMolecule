@@ -95,6 +95,17 @@ func tick_year(rng: RandomNumberGenerator) -> Array:
 	return fresh
 
 
+## 终审疗效门槛被抬高的来源：[{kind: approved / mechanism, name_key, amount}]（竞品获批与新机制分别列出）
+func bar_sources() -> Array:
+	var sources: Array = []
+	for c in competitors:
+		if String(c.status) == "approved":
+			sources.append({"kind": "approved", "name_key": String(c.name_key), "amount": int(_config.get("approval_efficacy_bar", 10))})
+	if _new_mechanism:
+		sources.append({"kind": "mechanism", "name_key": "", "amount": int(_config.get("new_mechanism_efficacy_bar", 5))})
+	return sources
+
+
 ## 预计还需几年上市（情报可见时显示）
 func forecast_years(c: Dictionary) -> int:
 	if String(c.status) != "active":

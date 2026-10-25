@@ -188,15 +188,24 @@ func _ai_text(ai: Dictionary) -> String:
 
 
 ## 竞品状态、终审门槛与最新动态（BBCode），主界面右栏也复用
-## 竞争格局一行摘要：有竞品获批时说明门槛被抬高；否则是跑得最快的在研竞品
+## 竞争格局一行摘要：终审门槛被抬高时按来源说明（竞品获批 / 新机制，多个来源再给出合计）；
+## 否则是跑得最快的在研竞品
 func competition_summary() -> String:
 	if _game == null:
 		return ""
 	var comp: Competition = _game.competition
-	if comp.efficacy_bar_bonus > 0:
-		var approved := comp.competitors.filter(func(c: Dictionary) -> bool: return String(c.status) == "approved")
-		var rival: String = _short_name(String(approved[0].name_key)) if not approved.is_empty() else ""
-		return tr("comp.approved") % [rival, comp.efficacy_bar_bonus]
+	var sources: Array = comp.bar_sources()
+	if not sources.is_empty():
+		var parts: Array[String] = []
+		for src in sources:
+			if String(src.kind) == "approved":
+				parts.append(tr("comp.src_approved") % [_short_name(String(src.name_key)), int(src.amount)])
+			else:
+				parts.append(tr("comp.src_mechanism") % int(src.amount))
+		var text := " · ".join(parts)
+		if sources.size() > 1:
+			text += tr("comp.src_total") % comp.efficacy_bar_bonus
+		return text
 	var leader: Dictionary = {}
 	for c in comp.competitors:
 		if String(c.status) == "active" and (leader.is_empty() or int(c.stage) > int(leader.stage)):
