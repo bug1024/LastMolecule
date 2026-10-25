@@ -747,7 +747,7 @@ milestone.opt.chr_longtox.desc,多花 6 个月：之后进入新阶段不再累�
 milestone.opt.chr_push,先推进，边做边看,"Push On, Monitor as You Go"
 milestone.opt.chr_push.desc,疗效 +6，但之后每进入新阶段残留风险再 +4。,"Efficacy +6, but each later stage adds 4 more residual risk."
 milestone.opt.chr_lowdose,改用低剂量方案,Switch to a Low-Dose Regimen
-milestone.opt.chr_lowdose.desc,之后战斗开局力量 -1，但终审的安全线放宽 5。,"-1 Strength in later battles, but the final safety limit rises by 5."
+milestone.opt.chr_lowdose.desc,安全风险立刻 -8，终审的安全线放宽 5；代价是疗效 -6。,Safety risk -8 now and the final safety limit rises by 5; costs 6 efficacy.
 milestone.final.desc,「%s」阶段试验已攻克（终审门槛 %d，当前疗效 %d）。二期结果让团队分成两派：,"The %s trial is beaten (bar %d, efficacy %d). The Phase II readout splits the team:"
 milestone.opt.fin_broad,扩大适应症,Broaden the Indication
 milestone.opt.fin_broad.desc,疗效 +10，但终审需要本局数据 ≥ 60 证明更多人群获益。,"Efficacy +10, but the final review needs 60+ run data to show benefit in more patients."
@@ -760,7 +760,7 @@ route.route_standard.desc,不做额外改造，正面迎接所有难题。,No ex
 route.route_selective,提高选择性路线,Selectivity Route
 route.route_selective.desc,用选择性证据改造分子：发现到一期不再有脱靶规则。改造花费 8 亿。,Redesign the molecule with your selectivity evidence: no off-target rule from Discovery to Phase I. Costs 8.
 route.route_stable,提高稳定性路线,Stability Route
-route.route_stable.desc,用长期安全性证据优化代谢：二期、三期敌人不再越打越强。起步疗效 -8。,Optimize metabolism with your long-term safety evidence: Phase II/III enemies no longer ramp up. Starting efficacy -8.
+route.route_stable.desc,用长期安全性证据优化代谢：去掉二期、三期「每 2 回合敌人力量 +1」的项目规则（Boss 自身能力不变）。起步疗效 -8。,"Optimize metabolism with your long-term safety evidence: removes the program rule ""enemies +1 Strength every 2 turns"" in Phase II/III (bosses keep their own abilities). Starting efficacy -8."
 route.tag.none,无需证据,No evidence needed
 route.tag.selectivity,选择性证据,Selectivity evidence
 route.tag.long_safety,长期安全性证据,Long-term safety evidence
@@ -773,7 +773,7 @@ battle.backfire.project,项目脱靶 -%d,Off-target -%d
 battle.backfire.boss,Boss 反噬 -%d,Boss backfire -%d
 enemy.last_molecule,最后的分子,The Last Molecule
 encounter.boss_final,最后的分子 LM-001,The Last Molecule LM-001
-encounter.boss_final.desc,LM-001 本身：一回合超过 3 张攻击牌会反噬，而且每回合越来越强。,"LM-001 itself: more than 3 attacks in a turn backfires, and it grows stronger every turn."
+encounter.boss_final.desc,LM-001 本身：一回合超过 3 张攻击牌会反噬，而且它自己每回合都会变强（任何路线都去不掉）。,"LM-001 itself: more than 3 attacks in a turn backfires, and it grows stronger every turn on its own (no route removes this)."
 move.cliff,活性悬崖,Activity Cliff
 move.narrow_window,窄安全窗,Narrow Window
 move.rebind,重新结合,Rebind
@@ -799,5 +799,8 @@ campaign.leave_answer.flavor,你决定停下 LM-001，并把所有数据整理�
 campaign.free_play,主线已完成。你可以继续做自由项目，也可以再挑战 LM-001。,"The campaign is complete. Keep running free programs, or take on LM-001 again."
 archive.evidence,研究证据,Research Evidence
 archive.evidence_line,%s：来自 %s（%s）,%s: from %s (%s)
-archive.campaign_done,主线结局：%s,Campaign ending: %s
+archive.campaign_done,首次主线结局：%s,First campaign ending: %s
 route.event_tag,立项决策,Launch decision
+chain.final_decision,LM-001 二期决策：%s,LM-001 Phase II decision: %s
+final.data_study,补充分层数据分析,Extra Stratification Analysis
+final.data_study.desc,再做一轮分析补足数据要求（只在数据不够时出现）。,One more analysis round to meet the data requirement (only offered when data falls short).

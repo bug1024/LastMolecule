@@ -8,6 +8,11 @@
   "final_review": {
     "efficacy_min": 60,
     "safety_risk_below": 70,
+    "data_study": {
+      "funding": -3,
+      "year": 1,
+      "data": 12
+    },
     "extra_study": {
       "funding": -3,
       "year": 1,

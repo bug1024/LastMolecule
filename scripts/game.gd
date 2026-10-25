@@ -772,13 +772,19 @@ func _offer_final_review() -> void:
 		submit_req["data_min"] = get_final_data_min()
 		desc_key = "final.desc_data"
 		desc_args.append_array([state.data, get_final_data_min()])
+	var choices: Array = [
+		{"label_key": "final.submit", "requires": submit_req, "effects": {}, "action": "submit"},
+		{"label_key": "final.extra_study", "requires": {"funding_min": -int(extra.get("funding", -3)) + 1},
+			"effects": extra, "action": "final_review"},
+	]
+	# 决策带来了数据要求却没达标：给一个补数据的办法（花钱花时间），否则只能干等终止
+	var data_study: Dictionary = review.get("data_study", {})
+	if get_final_data_min() > state.data and not data_study.is_empty():
+		choices.append({"label_key": "final.data_study", "desc_key": "final.data_study.desc",
+			"requires": {"funding_min": -int(data_study.get("funding", -3)) + 1}, "effects": data_study, "action": "final_review"})
+	choices.append({"label_key": "milestone.terminate", "effects": {}, "action": "terminate"})
 	_offer_event({"id": "final_review", "title_key": "node.final_review", "desc_key": desc_key,
-		"desc_args": desc_args, "choices": [
-			{"label_key": "final.submit", "requires": submit_req, "effects": {}, "action": "submit"},
-			{"label_key": "final.extra_study", "requires": {"funding_min": -int(extra.get("funding", -3)) + 1},
-				"effects": extra, "action": "final_review"},
-			{"label_key": "milestone.terminate", "effects": {}, "action": "terminate"},
-		]}, true)
+		"desc_args": desc_args, "choices": choices}, true)
 
 
 func _run_action(action: String, choice: Dictionary) -> void:
@@ -913,11 +919,13 @@ func _finish(outcome: String, reason_key: String) -> void:
 		"outcome": outcome, "run": company.runs + 1, "decisions": decisions.duplicate()})
 	var ending := _campaign_ending(outcome)
 	if not ending.is_empty() and not company.is_campaign_done():
-		company.campaign = {"ending": ending, "route": route, "code": project_code, "run": company.runs + 1}
+		company.campaign = {"ending": ending, "route": route, "code": project_code, "run": company.runs + 1}   # 只记首次完成
 	var summary := company.settle_run(state.data, outcome, state.funding, record)
 	summary["evidence"] = evidence_id
 	summary["evidence_new"] = evidence_new
 	summary["campaign_ending"] = ending
+	summary["route"] = route                    # 结局画面用本次的路线与决策（不是首次通关的记录）
+	summary["decisions"] = decisions.duplicate()
 	run_ended.emit(outcome, reason_key, summary)
 
 

@@ -13,6 +13,8 @@ const OUTCOME_COLOR := {
 
 var _panel: PanelContainer
 var _box: VBoxContainer
+var _mid: VBoxContainer          # 统计 / 结算 / 证据 / 因果链：内容多时在这里滚动，标题与按钮固定
+var _scroll: ScrollContainer
 
 
 func _ready() -> void:
@@ -70,6 +72,13 @@ func show_ending(outcome: String, reason_key: String, summary: Dictionary, state
 	flavor.custom_minimum_size = Vector2(560, 0)
 	_box.add_child(flavor)
 	_box.add_child(HSeparator.new())
+	_scroll = ScrollContainer.new()
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_box.add_child(_scroll)
+	_mid = VBoxContainer.new()
+	_mid.add_theme_constant_override("separation", 12)
+	_mid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_scroll.add_child(_mid)
 
 	var grid := GridContainer.new()
 	grid.columns = 3
@@ -82,8 +91,8 @@ func show_ending(outcome: String, reason_key: String, summary: Dictionary, state
 	_cell(grid, "stat_efficacy", tr("ending.efficacy"), str(state.efficacy))
 	_cell(grid, "stat_safety", tr("ending.safety"), str(state.safety_risk))
 	_cell(grid, "stat_data", tr("ending.data"), str(state.data))
-	_box.add_child(grid)
-	_box.add_child(HSeparator.new())
+	_mid.add_child(grid)
+	_mid.add_child(HSeparator.new())
 
 	var settle := tr("ui.run_summary") % [summary.data_saved, summary.level_before, summary.level_after]
 	if int(summary.funding_carry) > 0:
@@ -91,14 +100,14 @@ func show_ending(outcome: String, reason_key: String, summary: Dictionary, state
 	var settle_label := UIKit.label(settle, UIKit.ACCENT_BLUE, 15, true)
 	settle_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	settle_label.custom_minimum_size = Vector2(560, 0)
-	_box.add_child(settle_label)
+	_mid.add_child(settle_label)
 	if int(summary.level_after) > int(summary.level_before):
 		var up := UIKit.header(tr("ending.level_up") % summary.level_after, 18, UIKit.GOLD)
 		up.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		_box.add_child(up)
+		_mid.add_child(up)
 	_add_evidence(summary)
 	if not campaign.is_empty():
-		_add_chain()
+		_add_chain(String(summary.get("route", "")), summary.get("decisions", []))
 
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -113,11 +122,22 @@ func show_ending(outcome: String, reason_key: String, summary: Dictionary, state
 
 	visible = true
 	modulate.a = 0.0
+	_fit_scroll()
+	_fit_scroll.call_deferred()   # 自动换行的文字要排版一帧后高度才准
 	_panel.pivot_offset = _panel.get_combined_minimum_size() * 0.5
 	_panel.scale = Vector2(0.9, 0.9)
 	var tween := create_tween().set_parallel(true)
 	tween.tween_property(self, "modulate:a", 1.0, 0.4)
 	tween.tween_property(_panel, "scale", Vector2.ONE, 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+## 中间区域尽量完整显示；整个面板会超出窗口时，只让中间区域滚动
+func _fit_scroll() -> void:
+	_scroll.custom_minimum_size.y = 0
+	var content := _mid.get_combined_minimum_size().y
+	var without := _panel.get_combined_minimum_size().y
+	var room := get_viewport_rect().size.y - 24.0 - without
+	_scroll.custom_minimum_size.y = clampf(room, 120.0, content)
 
 
 ## 研究证据与本局统计；还没解锁 LM-001 时显示进度
@@ -140,38 +160,47 @@ func _add_evidence(summary: Dictionary) -> void:
 		var label := UIKit.label(String(line[0]), line[1], 15, true)
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		label.custom_minimum_size = Vector2(560, 0)
-		_box.add_child(label)
+		_mid.add_child(label)
 
 
-## 主线结局的因果链：每项证据来自哪个项目、那次做过的决策，以及 LM-001 选的路线
-func _add_chain() -> void:
+## 主线结局的因果链：每项证据来自哪个项目、那次做过的决策，以及本次 LM-001 的路线与决策
+func _add_chain(run_route: String, run_decisions: Array) -> void:
 	var company := Company.new()
 	company.load_save()
-	_box.add_child(HSeparator.new())
+	_mid.add_child(HSeparator.new())
 	var head := UIKit.header(tr("ending.chain_title"), 18, UIKit.GOLD)
 	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_box.add_child(head)
-	for line in chain_lines(company):
+	_mid.add_child(head)
+	for line in chain_lines(company, run_route, run_decisions):
 		var label := UIKit.label(line, UIKit.TEXT, 15, true)
 		label.custom_minimum_size = Vector2(560, 0)
-		_box.add_child(label)
+		_mid.add_child(label)
 
 
-static func chain_lines(company: Company) -> Array[String]:
+## run_route / run_decisions 是本次 LM-001 的路线与决策（重复通关时以本次为准）；
+## 本次路线用到的那项证据标上「★」
+static func chain_lines(company: Company, run_route: String, run_decisions: Array) -> Array[String]:
+	var used := ""
+	for r in ProjectTypes.find("final").get("routes", []):
+		if String(r.get("id", "")) == run_route:
+			used = String(r.get("requires", ""))
 	var t := TranslationServer
 	var lines: Array[String] = []
 	var ids: Array = company.evidence.keys()
 	ids.sort_custom(func(a: String, b: String) -> bool: return int(company.evidence[a].get("run", 0)) < int(company.evidence[b].get("run", 0)))
 	for id in ids:
 		var src: Dictionary = company.evidence[id]
-		lines.append(t.translate("chain.evidence") % [String(src.get("code", "")), t.translate("project.type." + String(src.get("project_type", ""))),
+		lines.append(("★ " if String(id) == used else "") + t.translate("chain.evidence") % [String(src.get("code", "")),
+			t.translate("project.type." + String(src.get("project_type", ""))),
 			t.translate("ending." + String(src.get("outcome", ""))), t.translate("evidence." + String(id))])
 		for d in src.get("decisions", []):
 			if not String(d).begins_with("route:"):
 				lines.append(t.translate("chain.decision") % t.translate("milestone.opt." + String(d)))
-	var route := String(company.campaign.get("route", ""))
-	if not route.is_empty():
-		lines.append(t.translate("chain.route") % t.translate("route." + route))
+	if not run_route.is_empty():
+		lines.append(t.translate("chain.route") % t.translate("route." + run_route))
+	for d in run_decisions:
+		if not String(d).begins_with("route:"):
+			lines.append(t.translate("chain.final_decision") % t.translate("milestone.opt." + String(d)))
 	return lines
 
 

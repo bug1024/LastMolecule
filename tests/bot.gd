@@ -90,7 +90,11 @@ static func _choose_event(game: Node) -> void:
 		"milestone":
 			preferred = mini(decision_index, choices.size() - 2) if choices.size() > 2 else 0
 		"final_review":
-			preferred = 0 if state.can_meet(choices[0].get("requires", {})) else (1 if state.funding > 4 else 2)
+			preferred = 0 if state.can_meet(choices[0].get("requires", {})) else (1 if state.funding > 4 else choices.size() - 1)
+			if preferred == 1 and state.data < game.get_final_data_min():
+				for i in choices.size():
+					if String(choices[i].get("label_key", "")) == "final.data_study":
+						preferred = i
 	if preferred >= 0 and preferred < choices.size() and state.can_meet(choices[preferred].get("requires", {})):
 		game.resolve_event_choice(event_id, preferred)
 		return

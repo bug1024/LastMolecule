@@ -53,6 +53,7 @@ func _run() -> void:
 	_test_backfire_preview()
 	_test_program_decisions()
 	_test_evidence_and_campaign()
+	_test_campaign_end_to_end()
 	_test_upgrade_preview()
 	_test_run_save()
 	_test_card_roles()
@@ -184,6 +185,14 @@ func _manager(enemy_ids: Array, deck_ids: Array, context := {}, kind := "fight")
 	ctx.merge(context, true)
 	manager.start_battle({"id": "test", "kind": kind, "enemies": enemy_ids}, deck, [], ctx)
 	return manager
+
+
+## 不依赖随机手牌：塞一张普通攻击牌进手牌并打出
+func _play_finisher(manager: BattleManager) -> void:
+	var finisher := _card("mol_hit")
+	manager.hand.append(finisher)
+	manager.energy = maxi(manager.energy, finisher.cost)
+	manager.play_card(finisher, 0)
 
 
 func _hand_card(manager: BattleManager, card_id: String) -> ResearchCard:
@@ -435,6 +444,86 @@ func _test_evidence_and_campaign() -> void:
 	f.free()
 
 
+## 把一局直接推到三期里程碑并走完终审（数据不够就做补充分析），返回 run_ended 的 summary
+func _approve_via_review(g: Node) -> Dictionary:
+	var ended: Array = []
+	g.run_ended.connect(func(_o: String, _r: String, summary: Dictionary) -> void: ended.append(summary))
+	g.state.stage = "三期临床试验"
+	g.state.stage_battle_won = true
+	g.state.efficacy = 95
+	g.state.safety_risk = 10
+	g.state.funding = 40
+	g._offer_milestone()
+	g.resolve_event_choice("milestone", 0)
+	var guard := 0
+	while ended.is_empty() and guard < 10:
+		guard += 1
+		var choices: Array = g._current_event.get("choices", [])
+		var pick := 0
+		if not g.state.can_meet(choices[0].get("requires", {})):
+			pick = choices.find(choices.filter(func(c: Dictionary) -> bool: return c.label_key == "final.data_study").front())
+		g.resolve_event_choice("final_review", pick)
+	return ended[0] if not ended.is_empty() else {}
+
+
+## 完整主线回归：两类项目获批得证据 → 解锁 LM-001 → 选路线 → 二期决策 → 补数据 → 获批 → 重开再通关
+func _test_campaign_end_to_end() -> void:
+	Company.default_save_path = "user://test_company.json"
+	var co := Company.new()
+	co.reset()
+	var a := _new_game(11)
+	var sa := _approve_via_review(a)
+	_expect(String(sa.get("evidence", "")) == "foundation" and bool(sa.evidence_new), "E2E: standard approval earns foundation evidence")
+	a.free()
+	RunSave.new_project_type = "selective"
+	var b := _new_game(12)
+	b.state.stage = "临床前研究"
+	b.state.stage_battle_won = true
+	b._offer_milestone()
+	b.resolve_event_choice("milestone", 0)
+	var sb := _approve_via_review(b)
+	_expect(String(sb.get("evidence", "")) == "selectivity", "E2E: selective approval earns selectivity evidence")
+	_expect(b.project_code == "LM-003", "E2E: program codes advance with company runs")
+	b.free()
+	co.load_save()
+	_expect(co.final_unlocked() and co.evidence.selectivity.decisions == ["sel_refine"], "E2E: two kinds of evidence unlock LM-001 and keep their decisions")
+	RunSave.new_project_type = "final"
+	var c := _new_game(13)
+	var routes: Array = c._current_event.choices.map(func(ch: Dictionary) -> String: return String(ch.route))
+	_expect(routes == ["route_standard", "route_selective"], "E2E: LM-001 offers the routes the evidence allows")
+	c.resolve_event_choice("route", 1)
+	c.state.stage = "二期临床试验"
+	c.state.stage_battle_won = true
+	c.state.data = 20
+	c._offer_milestone()
+	c.resolve_event_choice("milestone", 0)
+	_expect(c.get_final_data_min() == 60 and c.state.stage == "三期临床试验", "E2E: broadening the indication adds a data requirement")
+	var sc := _approve_via_review(c)
+	_expect(String(sc.get("campaign_ending", "")) == "approved_route_selective" and c.state.data >= 60,
+		"E2E: data analysis makes the review passable and LM-001 approval ends the campaign")
+	_expect(sc.route == "route_selective" and sc.decisions.has("fin_broad"), "E2E: the ending gets this run's route and decisions")
+	c.free()
+	co.load_save()
+	_expect(co.is_campaign_done() and String(co.campaign.route) == "route_selective" and String(co.history[0].project_code) == "LM-001",
+		"E2E: the company remembers the first campaign ending")
+	var chain := EndingPanel.chain_lines(co, "route_selective", ["route:route_selective", "fin_broad"])
+	_expect(chain.size() == 5 and chain[1].begins_with("★") and chain[4].contains(tr("milestone.opt.fin_broad")),
+		"E2E: the cause-and-effect chain marks the evidence this route used and lists the LM-001 decision")
+	RunSave.new_project_type = "final"
+	var d := _new_game(14)
+	d.resolve_event_choice("route", 0)
+	var sd := _approve_via_review(d)
+	d.free()
+	co.load_save()
+	_expect(String(sd.campaign_ending) == "approved_route_standard" and String(co.campaign.route) == "route_selective",
+		"E2E: a second clear reports its own route without overwriting the first campaign record")
+	var chain2 := EndingPanel.chain_lines(co, String(sd.route), sd.decisions)
+	_expect(chain2.back().contains(tr("route.route_standard")) and not chain2.any(func(l: String) -> bool: return l.begins_with("★")),
+		"E2E: the second ending's chain uses the second run's route")
+	co.reset()
+	Company.default_save_path = ""
+
+
 ## 战斗手牌尺寸（0.9 倍）下，所有卡、中英文，牌面文字都不小于 12px，名称不超出名称条
 func _test_card_face_readable() -> void:
 	var small: Array[String] = []
@@ -586,7 +675,7 @@ func _test_battle_flow() -> void:
 	for i in range(1, manager.enemies.size()):
 		manager.enemies[i].hp = 0
 	var funding: int = game.state.funding
-	manager.play_card(manager.hand.filter(func(c: ResearchCard) -> bool: return c.kind == "attack" and not c.is_ai())[0], 0)
+	_play_finisher(manager)
 	_expect(game._phase == Game.RoundPhase.REWARD and game._pending_reward.abilities.is_empty()
 		and game.state.funding == funding + 2, "A normal fight pays funding and offers cards only")
 	var reward: Dictionary = game._pending_reward
@@ -602,7 +691,7 @@ func _test_battle_flow() -> void:
 	manager.enemies[0].hp = 1
 	var efficacy: int = game.state.efficacy
 	manager.player.add_status("strength", 5)
-	manager.play_card(manager.hand.filter(func(c: ResearchCard) -> bool: return c.kind == "attack" and not c.is_ai())[0], 0)
+	_play_finisher(manager)
 	_expect(game._phase == Game.RoundPhase.REWARD and game._pending_reward.abilities.size() == 2
 		and game.state.efficacy == efficacy + 12, "Beating a boss raises efficacy and offers abilities")
 	reward = game._pending_reward
@@ -700,6 +789,7 @@ func _simulate(runs: int) -> void:
 	var battles := {}
 	var years := 0
 	var data_sum := 0
+	var saved_by_bonus := 0   # 靠决策放宽的安全线才获批的局数
 	var ends := {}
 	var type_arg := ""
 	for arg in OS.get_cmdline_user_args():
@@ -722,6 +812,9 @@ func _simulate(runs: int) -> void:
 			battles[battle_key] = entry
 		years += game.state.year
 		data_sum += game.state.data
+		var bonus := int(game.run_flags.get("final_safety_bonus", 0))
+		if result.outcome == "approved" and bonus > 0 and game.state.safety_risk >= game.get_final_safety_limit() - bonus:
+			saved_by_bonus += 1
 		var end_key := "%s eff=%d" % [game.state.stage, game.state.efficacy / 10 * 10]
 		ends[end_key] = int(ends.get(end_key, 0)) + 1
 		game.free()
@@ -734,6 +827,7 @@ func _simulate(runs: int) -> void:
 		print("battle %s: %d wins / %d fights" % [key, battles[key][0], battles[key][1]])
 	print("avg year: %.1f" % (float(years) / runs))
 	print("avg data: %.1f" % (float(data_sum) / runs))
+	print("approved only thanks to a looser safety limit: %d" % saved_by_bonus)
 	var keys := ends.keys()
 	keys.sort()
 	for k in keys:

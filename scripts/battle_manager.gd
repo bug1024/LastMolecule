@@ -115,7 +115,7 @@ func start_battle(enc: Dictionary, deck: Array, abilities: Array, ctx: Dictionar
 	discard_pile.clear()
 	exhaust_pile.clear()
 	draw_pile = deck.duplicate()
-	draw_pile.shuffle()
+	_shuffle(draw_pile)
 	data_gained = 0
 	process_gained = 0
 	calibrate = 0
@@ -629,6 +629,15 @@ func _alive_indices() -> Array:
 	return result
 
 
+## 用本场的 rng 洗牌（Array.shuffle 走全局随机数，测试与模拟无法复现）
+func _shuffle(cards: Array) -> void:
+	for i in range(cards.size() - 1, 0, -1):
+		var j := rng.randi_range(0, i)
+		var tmp = cards[i]
+		cards[i] = cards[j]
+		cards[j] = tmp
+
+
 func _resolve_target(index: int) -> int:
 	if index >= 0 and index < enemies.size() and enemies[index].is_alive():
 		return index
@@ -652,7 +661,7 @@ func _draw(count: int) -> void:
 			if discard_pile.is_empty():
 				break
 			draw_pile = discard_pile.duplicate()
-			draw_pile.shuffle()
+			_shuffle(draw_pile)
 			discard_pile.clear()
 		hand.append(draw_pile.pop_back())
 		drawn += 1

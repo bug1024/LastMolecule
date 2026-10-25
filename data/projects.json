@@ -64,7 +64,7 @@
         "一期临床试验": [
           { "id": "chr_longtox", "effects": { "funding": -3 }, "months": 6, "flags": { "drift_off": true } },
           { "id": "chr_push", "effects": { "efficacy": 6 }, "flags": { "drift_extra": 4 } },
-          { "id": "chr_lowdose", "effects": {}, "flags": { "strength": -1, "final_safety_bonus": 5 } }
+          { "id": "chr_lowdose", "effects": { "safety_risk": -8, "efficacy": -6 }, "flags": { "final_safety_bonus": 5 } }
         ]
       }
     },
