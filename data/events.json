@@ -1,0 +1,29 @@
+{
+  "random_events": [
+    { "id": "funding_strain", "weight": 10, "choices": [
+      { "effects": { "funding": 3, "research_progress": -3 } },
+      { "effects": { "funding": 4, "efficacy": -3 } },
+      { "effects": {} } ] },
+    { "id": "talent_bid", "weight": 8, "choices": [
+      { "requires": { "funding_min": 3 }, "effects": { "funding": -3, "efficacy": 4, "data": 2 } },
+      { "effects": { "research_progress": -4 } } ] },
+    { "id": "data_quality", "weight": 8, "choices": [
+      { "requires": { "funding_min": 2 }, "effects": { "funding": -2, "data": 4 } },
+      { "effects": { "safety_risk": 4, "data": -2 } } ] },
+    { "id": "regulatory_hint", "weight": 7, "choices": [
+      { "effects": { "year": 1, "safety_risk": -6 } },
+      { "effects": { "research_progress": 4, "safety_risk": 3 } } ] },
+    { "id": "partnership", "weight": 7, "choices": [
+      { "effects": { "funding": 5, "efficacy": -2 } },
+      { "effects": { "research_progress": 4 } } ] },
+    { "id": "unexpected_signal", "weight": 6, "choices": [
+      { "requires": { "funding_min": 2 }, "effects": { "funding": -2, "safety_risk": -5, "data": 2 } },
+      { "effects": { "safety_risk": 6 } } ] },
+    { "id": "conference", "weight": 6, "choices": [
+      { "effects": { "funding": 2, "data": -1 } },
+      { "effects": { "data": 2 } } ] },
+    { "id": "biomarker_found", "weight": 5, "choices": [
+      { "requires": { "funding_min": 2 }, "effects": { "funding": -2, "efficacy": 5 } },
+      { "effects": { "data": 1 } } ] }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "xp_per_battle": { "fight": 1, "elite": 2, "boss": 3 },
+  "levels": [
+    { "xp": 0, "bonus": {} },
+    { "xp": 3, "bonus": { "start_block": 3 } },
+    { "xp": 8, "bonus": { "start_block": 4, "strength": 1 } },
+    { "xp": 14, "bonus": { "start_block": 5, "strength": 1, "first_draw": 1 } },
+    { "xp": 22, "bonus": { "start_block": 6, "strength": 1, "first_draw": 1, "dexterity": 1 } }
+  ]
+}

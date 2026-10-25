@@ -1,0 +1,28 @@
+{
+  "count": [
+    2,
+    3
+  ],
+  "names": [
+    "competitor.a",
+    "competitor.b",
+    "competitor.c",
+    "competitor.d"
+  ],
+  "start_stage": [
+    0,
+    2
+  ],
+  "advance_chance": [
+    12,
+    22
+  ],
+  "fail_chance": 6,
+  "new_mechanism_chance": 4,
+  "approval_efficacy_bar": 6,
+  "approval_boss_strength": 1,
+  "new_mechanism_efficacy_bar": 5,
+  "readout_finance": -1,
+  "fail_finance": 1,
+  "new_mechanism_finance": -1
+}

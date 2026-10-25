@@ -1,0 +1,22 @@
+{
+  "node_types": {
+    "fight": { "months": 4 },
+    "elite": { "months": 4 },
+    "research": { "months": 4 },
+    "event": { "months": 3 },
+    "partner": { "months": 3 },
+    "platform": { "months": 4 },
+    "fast_track": { "months": 2 },
+    "boss": { "months": 6 },
+    "milestone": { "months": 0 }
+  },
+  "layers": 5,
+  "width": [2, 4],
+  "first_layer": "fight",
+  "last_layer": "platform",
+  "elite_from_layer": 2,
+  "weights": { "fight": 5, "elite": 2, "research": 3, "event": 3, "partner": 2, "platform": 1, "fast_track": 1 },
+  "stage_weights": {
+    "候选化合物发现": { "fast_track": 0 }
+  }
+}

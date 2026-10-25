@@ -1,0 +1,791 @@
+{
+ "enemies": [
+  {
+   "id": "off_target",
+   "hp": [
+    22,
+    26
+   ],
+   "shape": "spiky",
+   "color": "#b07cf0",
+   "size": 0.8,
+   "pattern": "random",
+   "moves": [
+    {
+     "id": "bind",
+     "intent": "attack",
+     "damage": 6,
+     "weight": 3
+    },
+    {
+     "id": "spray",
+     "intent": "attack",
+     "damage": 3,
+     "hits": 2,
+     "weight": 2
+    },
+    {
+     "id": "drift",
+     "intent": "buff",
+     "self_status": {
+      "strength": 2
+     },
+     "weight": 1
+    }
+   ]
+  },
+  {
+   "id": "poor_solubility",
+   "hp": [
+    28,
+    32
+   ],
+   "shape": "blob",
+   "color": "#6fb7d8",
+   "size": 0.9,
+   "pattern": "random",
+   "moves": [
+    {
+     "id": "clump",
+     "intent": "attack_defend",
+     "damage": 5,
+     "block": 6,
+     "weight": 2
+    },
+    {
+     "id": "precipitate",
+     "intent": "attack",
+     "damage": 8,
+     "weight": 2
+    }
+   ]
+  },
+  {
+   "id": "metabolite",
+   "hp": [
+    12,
+    15
+   ],
+   "shape": "cell",
+   "color": "#e3a85b",
+   "size": 0.6,
+   "pattern": "random",
+   "moves": [
+    {
+     "id": "nibble",
+     "intent": "attack",
+     "damage": 4,
+     "weight": 3
+    },
+    {
+     "id": "inhibit",
+     "intent": "debuff",
+     "status": {
+      "weak": 1
+     },
+     "weight": 1
+    }
+   ]
+  },
+  {
+   "id": "herg",
+   "hp": [
+    54,
+    58
+   ],
+   "shape": "crystal",
+   "color": "#ef5d6c",
+   "size": 1.1,
+   "pattern": "cycle",
+   "elite": true,
+   "moves": [
+    {
+     "id": "arrhythmia",
+     "intent": "attack",
+     "damage": 13
+    },
+    {
+     "id": "qt_prolong",
+     "intent": "attack_debuff",
+     "damage": 6,
+     "status": {
+      "vulnerable": 2
+     }
+    },
+    {
+     "id": "channel_block",
+     "intent": "buff",
+     "self_status": {
+      "strength": 3
+     },
+     "block": 6
+    }
+   ]
+  },
+  {
+   "id": "activity_cliff",
+   "hp": [
+    100,
+    100
+   ],
+   "shape": "crystal",
+   "color": "#9b6cf2",
+   "size": 1.45,
+   "pattern": "cycle",
+   "boss": true,
+   "mechanic": "offtarget",
+   "mechanic_value": 3,
+   "moves": [
+    {
+     "id": "cliff_strike",
+     "intent": "attack",
+     "damage": 9
+    },
+    {
+     "id": "rebalance",
+     "intent": "buff",
+     "block": 10,
+     "self_status": {
+      "strength": 2
+     }
+    },
+    {
+     "id": "scatter",
+     "intent": "attack",
+     "damage": 4,
+     "hits": 3
+    },
+    {
+     "id": "selectivity_loss",
+     "intent": "attack_debuff",
+     "damage": 7,
+     "status": {
+      "weak": 2
+     }
+    }
+   ]
+  },
+  {
+   "id": "hepatotox",
+   "hp": [
+    32,
+    36
+   ],
+   "shape": "blob",
+   "color": "#9bc43c",
+   "size": 0.95,
+   "pattern": "random",
+   "moves": [
+    {
+     "id": "enzyme_spike",
+     "intent": "attack_debuff",
+     "damage": 6,
+     "status": {
+      "poison": 3
+     },
+     "weight": 2
+    },
+    {
+     "id": "inflame",
+     "intent": "attack",
+     "damage": 9,
+     "weight": 2
+    }
+   ]
+  },
+  {
+   "id": "animal_bias",
+   "hp": [
+    34,
+    38
+   ],
+   "shape": "cell",
+   "color": "#d6a24b",
+   "size": 0.95,
+   "pattern": "random",
+   "moves": [
+    {
+     "id": "mislead",
+     "intent": "debuff",
+     "status": {
+      "weak": 2,
+      "vulnerable": 1
+     },
+     "weight": 1
+    },
+    {
+     "id": "species_gap",
+     "intent": "attack",
+     "damage": 10,
+     "weight": 2
+    },
+    {
+     "id": "replicate",
+     "intent": "defend",
+     "block": 10,
+     "weight": 1
+    }
+   ]
+  },
+  {
+   "id": "free_radical",
+   "hp": [
+    16,
+    20
+   ],
+   "shape": "spiky",
+   "color": "#f0c64e",
+   "size": 0.6,
+   "pattern": "random",
+   "moves": [
+    {
+     "id": "oxidize",
+     "intent": "attack",
+     "damage": 5,
+     "hits": 2,
+     "weight": 2
+    },
+    {
+     "id": "chain",
+     "intent": "buff",
+     "self_status": {
+      "strength": 2
+     },
+     "weight": 1
+    }
+   ]
+  },
+  {
+   "id": "genotox",
+   "hp": [
+    66,
+    70
+   ],
+   "shape": "spiky",
+   "color": "#c25ad6",
+   "size": 1.15,
+   "pattern": "cycle",
+   "elite": true,
+   "start_status": {
+    "thorns": 2
+   },
+   "moves": [
+    {
+     "id": "mutate",
+     "intent": "attack",
+     "damage": 13
+    },
+    {
+     "id": "strand_break",
+     "intent": "attack_debuff",
+     "damage": 8,
+     "status": {
+      "vulnerable": 2
+     }
+    },
+    {
+     "id": "repair",
+     "intent": "defend",
+     "block": 14,
+     "self_status": {
+      "strength": 2
+     }
+    }
+   ]
+  },
+  {
+   "id": "tox_storm",
+   "hp": [
+    112,
+    112
+   ],
+   "shape": "cloud",
+   "color": "#8ed14a",
+   "size": 1.5,
+   "pattern": "cycle",
+   "boss": true,
+   "mechanic": "toxic",
+   "start_status": {
+    "metallicize": 2
+   },
+   "moves": [
+    {
+     "id": "toxic_mist",
+     "intent": "attack_debuff",
+     "damage": 6,
+     "status": {
+      "poison": 3
+     }
+    },
+    {
+     "id": "accumulate",
+     "intent": "attack_defend",
+     "damage": 9,
+     "block": 9
+    },
+    {
+     "id": "organ_tox",
+     "intent": "attack",
+     "damage": 20
+    }
+   ]
+  },
+  {
+   "id": "infusion_reaction",
+   "hp": [
+    36,
+    40
+   ],
+   "shape": "blob",
+   "color": "#ef7b6a",
+   "size": 1.0,
+   "pattern": "random",
+   "moves": [
+    {
+     "id": "flush",
+     "intent": "attack",
+     "damage": 10,
+     "weight": 2
+    },
+    {
+     "id": "fever",
+     "intent": "attack_debuff",
+     "damage": 7,
+     "status": {
+      "weak": 1
+     },
+     "weight": 2
+    }
+   ]
+  },
+  {
+   "id": "pk_variance",
+   "hp": [
+    24,
+    28
+   ],
+   "shape": "cell",
+   "color": "#e8a0c8",
+   "size": 0.7,
+   "pattern": "random",
+   "moves": [
+    {
+     "id": "spike",
+     "intent": "attack",
+     "damage": 6,
+     "hits": 2,
+     "weight": 2
+    },
+    {
+     "id": "trough",
+     "intent": "defend",
+     "block": 9,
+     "weight": 1
+    }
+   ]
+  },
+  {
+   "id": "cytokine_storm",
+   "hp": [
+    82,
+    86
+   ],
+   "shape": "cloud",
+   "color": "#f25f4c",
+   "size": 1.2,
+   "pattern": "cycle",
+   "elite": true,
+   "moves": [
+    {
+     "id": "release",
+     "intent": "buff",
+     "self_status": {
+      "strength": 3
+     },
+     "block": 8
+    },
+    {
+     "id": "cascade",
+     "intent": "attack",
+     "damage": 6,
+     "hits": 3
+    },
+    {
+     "id": "shock",
+     "intent": "attack",
+     "damage": 16
+    }
+   ]
+  },
+  {
+   "id": "dlt",
+   "hp": [
+    138,
+    138
+   ],
+   "shape": "spiky",
+   "color": "#ee4a4a",
+   "size": 1.5,
+   "pattern": "cycle",
+   "boss": true,
+   "mechanic": "dose",
+   "moves": [
+    {
+     "id": "toxic_peak",
+     "intent": "attack",
+     "damage": 10
+    },
+    {
+     "id": "double_dose",
+     "intent": "attack",
+     "damage": 7,
+     "hits": 2
+    },
+    {
+     "id": "tolerate",
+     "intent": "buff",
+     "block": 12,
+     "self_status": {
+      "strength": 3
+     }
+    },
+    {
+     "id": "limit",
+     "intent": "attack_debuff",
+     "damage": 13,
+     "status": {
+      "vulnerable": 1
+     }
+    }
+   ]
+  },
+  {
+   "id": "placebo",
+   "hp": [
+    46,
+    50
+   ],
+   "shape": "blob",
+   "color": "#9fb4c8",
+   "size": 1.0,
+   "pattern": "random",
+   "moves": [
+    {
+     "id": "mask",
+     "intent": "defend",
+     "block": 14,
+     "self_status": {
+      "strength": 1
+     },
+     "weight": 1
+    },
+    {
+     "id": "noise_effect",
+     "intent": "attack",
+     "damage": 12,
+     "weight": 2
+    }
+   ]
+  },
+  {
+   "id": "enroll_drag",
+   "hp": [
+    30,
+    34
+   ],
+   "shape": "cell",
+   "color": "#7aa6e8",
+   "size": 0.75,
+   "pattern": "random",
+   "moves": [
+    {
+     "id": "screen_fail",
+     "intent": "attack_debuff",
+     "damage": 8,
+     "status": {
+      "weak": 1
+     },
+     "weight": 2
+    },
+    {
+     "id": "delay",
+     "intent": "attack",
+     "damage": 5,
+     "hits": 2,
+     "weight": 2
+    }
+   ]
+  },
+  {
+   "id": "resistant_clone",
+   "hp": [
+    98,
+    104
+   ],
+   "shape": "cell",
+   "color": "#5b7cf0",
+   "size": 1.2,
+   "pattern": "cycle",
+   "elite": true,
+   "start_status": {
+    "ritual": 1
+   },
+   "moves": [
+    {
+     "id": "evade",
+     "intent": "defend",
+     "block": 16
+    },
+    {
+     "id": "expand",
+     "intent": "attack",
+     "damage": 10,
+     "hits": 2
+    },
+    {
+     "id": "overgrow",
+     "intent": "attack",
+     "damage": 18
+    }
+   ]
+  },
+  {
+   "id": "progression",
+   "hp": [
+    158,
+    158
+   ],
+   "shape": "cell",
+   "color": "#4a8df0",
+   "size": 1.55,
+   "pattern": "cycle",
+   "boss": true,
+   "mechanic": "progression",
+   "start_status": {
+    "ritual": 1
+   },
+   "moves": [
+    {
+     "id": "invade",
+     "intent": "attack_debuff",
+     "damage": 9,
+     "add_card": {
+      "id": "ae_card",
+      "value": 2
+     }
+    },
+    {
+     "id": "metastasis",
+     "intent": "attack",
+     "damage": 5,
+     "hits": 3
+    },
+    {
+     "id": "shield",
+     "intent": "defend",
+     "block": 18
+    },
+    {
+     "id": "surge",
+     "intent": "attack",
+     "damage": 14
+    }
+   ]
+  },
+  {
+   "id": "endpoint_miss",
+   "hp": [
+    48,
+    52
+   ],
+   "shape": "crystal",
+   "color": "#58c9b9",
+   "size": 1.0,
+   "pattern": "random",
+   "moves": [
+    {
+     "id": "miss",
+     "intent": "attack",
+     "damage": 12,
+     "weight": 2
+    },
+    {
+     "id": "noise",
+     "intent": "attack_debuff",
+     "damage": 9,
+     "status": {
+      "vulnerable": 1
+     },
+     "weight": 2
+    }
+   ]
+  },
+  {
+   "id": "protocol_dev",
+   "hp": [
+    30,
+    34
+   ],
+   "shape": "spiky",
+   "color": "#e3b45b",
+   "size": 0.8,
+   "pattern": "random",
+   "moves": [
+    {
+     "id": "deviate",
+     "intent": "attack",
+     "damage": 7,
+     "hits": 2,
+     "weight": 2
+    },
+    {
+     "id": "audit",
+     "intent": "debuff",
+     "status": {
+      "weak": 2
+     },
+     "block": 8,
+     "weight": 1
+    }
+   ]
+  },
+  {
+   "id": "safety_signal",
+   "hp": [
+    100,
+    106
+   ],
+   "shape": "crystal",
+   "color": "#ff6b8b",
+   "size": 1.25,
+   "pattern": "cycle",
+   "elite": true,
+   "start_status": {
+    "metallicize": 4
+   },
+   "moves": [
+    {
+     "id": "alert",
+     "intent": "attack_debuff",
+     "damage": 12,
+     "status": {
+      "poison": 4
+     }
+    },
+    {
+     "id": "hold",
+     "intent": "attack",
+     "damage": 9,
+     "hits": 2
+    },
+    {
+     "id": "suspend",
+     "intent": "attack",
+     "damage": 20
+    }
+   ]
+  },
+  {
+   "id": "center_pd",
+   "hp": [
+    52,
+    52
+   ],
+   "shape": "cell",
+   "color": "#4a8df0",
+   "size": 1.05,
+   "pattern": "cycle",
+   "boss": true,
+   "mechanic": "dropout",
+   "moves": [
+    {
+     "id": "progress",
+     "intent": "attack",
+     "damage": 9
+    },
+    {
+     "id": "spread",
+     "intent": "attack",
+     "damage": 5,
+     "hits": 2
+    },
+    {
+     "id": "grow",
+     "intent": "buff",
+     "self_status": {
+      "strength": 3
+     }
+    }
+   ]
+  },
+  {
+   "id": "center_ae",
+   "hp": [
+    48,
+    48
+   ],
+   "shape": "cloud",
+   "color": "#ef6a6a",
+   "size": 1.0,
+   "pattern": "cycle",
+   "boss": true,
+   "mechanic": "dropout",
+   "moves": [
+    {
+     "id": "reaction",
+     "intent": "attack_debuff",
+     "damage": 6,
+     "status": {
+      "poison": 2
+     }
+    },
+    {
+     "id": "flare",
+     "intent": "debuff",
+     "status": {
+      "weak": 2,
+      "vulnerable": 2
+     }
+    },
+    {
+     "id": "sae",
+     "intent": "attack",
+     "damage": 11
+    }
+   ]
+  },
+  {
+   "id": "center_drop",
+   "hp": [
+    46,
+    46
+   ],
+   "shape": "blob",
+   "color": "#e8c35a",
+   "size": 0.95,
+   "pattern": "cycle",
+   "boss": true,
+   "mechanic": "dropout",
+   "moves": [
+    {
+     "id": "withdraw",
+     "intent": "defend",
+     "block": 10,
+     "ally_block": 6
+    },
+    {
+     "id": "lost",
+     "intent": "attack",
+     "damage": 8
+    },
+    {
+     "id": "rally",
+     "intent": "buff",
+     "ally_status": {
+      "strength": 2
+     }
+    }
+   ]
+  }
+ ]
+}

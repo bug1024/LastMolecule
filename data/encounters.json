@@ -1,0 +1,158 @@
+{
+ "stages": {
+  "候选化合物发现": {
+   "normal": [
+    [
+     "off_target"
+    ],
+    [
+     "poor_solubility"
+    ],
+    [
+     "metabolite",
+     "metabolite"
+    ]
+   ],
+   "elite": [
+    [
+     "herg"
+    ]
+   ],
+   "boss": {
+    "id": "boss_discovery",
+    "enemies": [
+     "activity_cliff"
+    ]
+   }
+  },
+  "临床前研究": {
+   "normal": [
+    [
+     "hepatotox"
+    ],
+    [
+     "animal_bias"
+    ],
+    [
+     "free_radical",
+     "free_radical"
+    ]
+   ],
+   "elite": [
+    [
+     "genotox"
+    ]
+   ],
+   "boss": {
+    "id": "boss_preclinical",
+    "enemies": [
+     "tox_storm"
+    ]
+   }
+  },
+  "一期临床试验": {
+   "normal": [
+    [
+     "infusion_reaction"
+    ],
+    [
+     "pk_variance",
+     "pk_variance"
+    ],
+    [
+     "infusion_reaction",
+     "pk_variance"
+    ]
+   ],
+   "elite": [
+    [
+     "cytokine_storm"
+    ]
+   ],
+   "boss": {
+    "id": "boss_phase1",
+    "enemies": [
+     "dlt"
+    ]
+   }
+  },
+  "二期临床试验": {
+   "normal": [
+    [
+     "placebo"
+    ],
+    [
+     "enroll_drag",
+     "enroll_drag"
+    ],
+    [
+     "placebo",
+     "enroll_drag"
+    ]
+   ],
+   "elite": [
+    [
+     "resistant_clone"
+    ]
+   ],
+   "boss": {
+    "id": "boss_phase2",
+    "enemies": [
+     "progression"
+    ]
+   }
+  },
+  "三期临床试验": {
+   "normal": [
+    [
+     "endpoint_miss"
+    ],
+    [
+     "protocol_dev",
+     "protocol_dev"
+    ],
+    [
+     "endpoint_miss",
+     "protocol_dev"
+    ]
+   ],
+   "elite": [
+    [
+     "safety_signal"
+    ]
+   ],
+   "boss": {
+    "id": "boss_phase3",
+    "enemies": [
+     "center_pd",
+     "center_ae",
+     "center_drop"
+    ]
+   }
+  }
+ },
+ "rewards": {
+  "elite": {
+   "funding": 4,
+   "card_choices": 3,
+   "ability_choices": 2,
+   "efficacy": 4
+  },
+  "boss": {
+   "funding": 5,
+   "card_choices": 3,
+   "ability_choices": 2,
+   "efficacy": 12,
+   "safety_risk": -25
+  },
+  "fight": {
+   "funding": 2,
+   "card_choices": 3,
+   "ability_choices": 0,
+   "efficacy": 1
+  }
+ },
+ "boss_research_cut_max": 30,
+ "fast_track_boss_hp": 15,
+ "dose_max": 4
+}

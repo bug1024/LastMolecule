@@ -1,0 +1,68 @@
+{
+  "plans": [
+    {
+      "id": "parallel",
+      "style": "fast",
+      "effects": {
+        "research_progress": 15,
+        "funding": -3,
+        "safety_risk": 4
+      }
+    },
+    {
+      "id": "outsource",
+      "style": "fast",
+      "effects": {
+        "research_progress": 13,
+        "funding": -4
+      }
+    },
+    {
+      "id": "solid",
+      "style": "steady",
+      "effects": {
+        "research_progress": 9,
+        "funding": -1,
+        "data": 3,
+        "year": 1
+      }
+    },
+    {
+      "id": "mechanism",
+      "style": "steady",
+      "effects": {
+        "research_progress": 9,
+        "funding": -2,
+        "efficacy": 3
+      }
+    },
+    {
+      "id": "lean",
+      "style": "cheap",
+      "effects": {
+        "research_progress": 8,
+        "safety_risk": 2
+      }
+    },
+    {
+      "id": "academic",
+      "style": "cheap",
+      "effects": {
+        "research_progress": 9,
+        "funding": -1,
+        "data": 1,
+        "year": 1
+      }
+    },
+    {
+      "id": "safety_study",
+      "style": "steady",
+      "effects": {
+        "research_progress": 7,
+        "funding": -2,
+        "safety_risk": -5
+      }
+    }
+  ],
+  "card_choices": 3
+}

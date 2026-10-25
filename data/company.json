@@ -1,0 +1,15 @@
+{
+  "level_thresholds": [50, 120, 220, 350, 500],
+  "base_utilization": 0.4,
+  "utilization_per_level": 0.12,
+  "company_data_cap": 40,
+  "transfer_rate": 1.0,
+  "tiers": [
+    { "id": "low", "max": 20, "multiplier": 0.5, "deviation": 30 },
+    { "id": "mid", "max": 60, "multiplier": 1.0, "deviation": 15 },
+    { "id": "high", "max": 999999, "multiplier": 1.75, "deviation": 5 }
+  ],
+  "data_ratio": { "terminated": 0.6, "failed": 0.3, "approved": 0.6 },
+  "funding_carry_ratio": 0.3,
+  "funding_carry_cap": 10
+}

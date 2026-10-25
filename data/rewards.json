@@ -1,0 +1,19 @@
+{
+  "card_rarities": {
+    "common": { "name_key": "card.rarity.common" },
+    "rare": { "name_key": "card.rarity.rare" },
+    "epic": { "name_key": "card.rarity.epic" }
+  },
+  "abilities": [
+    { "id": "data_flywheel", "rarity": "rare", "weight": 30, "trigger": "type_played", "type": "experiment", "count": 3, "effects": [{ "op": "data", "value": 2 }] },
+    { "id": "ai_platform", "rarity": "rare", "weight": 30, "passive": { "ai_deviation": -10 } },
+    { "id": "lab_automation", "rarity": "rare", "weight": 30, "trigger": "turn_start", "effects": [{ "op": "block", "value": 3 }] },
+    { "id": "clinical_network", "rarity": "common", "weight": 40, "trigger": "battle_start", "effects": [{ "op": "draw", "value": 2 }] },
+    { "id": "kol_board", "rarity": "common", "weight": 40, "passive": { "type_bonus": { "type": "molecular", "op": "damage", "amount": 2 } } },
+    { "id": "safety_board", "rarity": "common", "weight": 40, "passive": { "type_bonus": { "type": "experiment", "op": "block", "amount": 2 } } },
+    { "id": "cro_partner", "rarity": "common", "weight": 40, "passive": { "type_bonus": { "type": "clinical", "op": "status", "amount": 2 } } },
+    { "id": "gmp_line", "rarity": "rare", "weight": 30, "trigger": "battle_start", "effects": [{ "op": "status", "to": "self", "id": "strength", "value": 1 }] },
+    { "id": "ethics_board", "rarity": "common", "weight": 35, "passive": { "victory_heal": 4 } },
+    { "id": "platform_team", "rarity": "epic", "weight": 20, "requires_process": 2, "trigger": "battle_start", "effects": [{ "op": "energy", "value": 1 }] }
+  ]
+}

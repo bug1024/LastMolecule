@@ -1,0 +1,39 @@
+{
+  "project_name_key": "project.name",
+  "start_year": 1,
+  "initial_funding_billion": 40,
+  "yearly_cost_billion": 2,
+  "initial_progress": 0,
+  "initial_efficacy": 25,
+  "initial_safety_risk": 20,
+  "final_review": {
+    "efficacy_min": 60,
+    "safety_risk_below": 70,
+    "extra_study": {
+      "funding": -3,
+      "year": 1,
+      "efficacy": 5
+    }
+  },
+  "partner": {
+    "invest_base": 5,
+    "buy_cost": 3,
+    "remove_cost": 2
+  },
+  "stages": [
+    "候选化合物发现",
+    "临床前研究",
+    "一期临床试验",
+    "二期临床试验",
+    "三期临床试验",
+    "获批上市"
+  ],
+  "months_per_year": 12,
+  "rest_heal": 25,
+  "strength_per_efficacy": 20,
+  "strength_efficacy_base": 20,
+  "fast_track": {
+    "accept_progress": 0,
+    "decline_progress": 5
+  }
+}

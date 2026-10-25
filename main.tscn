@@ -1,0 +1,440 @@
+[gd_scene load_steps=20 format=3 uid="uid://dopp4rbwk6m4p"]
+
+[ext_resource type="Script" path="res://scripts/game.gd" id="1_gm"]
+[ext_resource type="Script" path="res://scripts/rd_ui.gd" id="2_ui"]
+[ext_resource type="PackedScene" path="res://card_popup.tscn" id="3_popup"]
+[ext_resource type="PackedScene" path="res://event_popup.tscn" id="4_event"]
+[ext_resource type="Script" path="res://scripts/ui/battle/battle_view.gd" id="5_battle"]
+[ext_resource type="PackedScene" path="res://map_screen.tscn" id="6_map"]
+[ext_resource type="PackedScene" path="res://reward_popup.tscn" id="7_rew"]
+[ext_resource type="Script" path="res://scripts/ui/molecule_background.gd" id="8_bg"]
+[ext_resource type="Script" path="res://scripts/ui/pipeline_view.gd" id="9_pipe"]
+[ext_resource type="Script" path="res://scripts/ui/molecule_art.gd" id="10_art"]
+[ext_resource type="Texture2D" path="res://assets/icons/logo.svg" id="11_logo"]
+[ext_resource type="Texture2D" path="res://assets/icons/stat_funding.svg" id="12_fund"]
+[ext_resource type="Texture2D" path="res://assets/icons/stat_year.svg" id="13_year"]
+[ext_resource type="Texture2D" path="res://assets/icons/stat_efficacy.svg" id="14_eff"]
+[ext_resource type="Texture2D" path="res://assets/icons/stat_safety.svg" id="15_safe"]
+[ext_resource type="Texture2D" path="res://assets/icons/stat_progress.svg" id="16_prog"]
+[ext_resource type="Texture2D" path="res://assets/icons/ui_help.svg" id="17_help"]
+[ext_resource type="Texture2D" path="res://assets/icons/ui_pause.svg" id="18_pause"]
+[ext_resource type="Texture2D" path="res://assets/icons/ui_deck.svg" id="19_deck"]
+
+[node name="Main" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("2_ui")
+
+[node name="GameLogic" type="Node" parent="."]
+script = ExtResource("1_gm")
+
+[node name="Background" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("8_bg")
+
+[node name="Layout" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 16
+
+[node name="VBox" type="VBoxContainer" parent="Layout"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="TopBar" type="HBoxContainer" parent="Layout/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Logo" type="TextureRect" parent="Layout/VBox/TopBar"]
+custom_minimum_size = Vector2(46, 46)
+layout_mode = 2
+texture = ExtResource("11_logo")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Names" type="VBoxContainer" parent="Layout/VBox/TopBar"]
+layout_mode = 2
+theme_override_constants/separation = 0
+alignment = 1
+
+[node name="TitleLabel" type="Label" parent="Layout/VBox/TopBar/Names"]
+layout_mode = 2
+theme_type_variation = &"HeaderLabel"
+theme_override_font_sizes/font_size = 22
+text = "ui.title"
+
+[node name="ProjectLabel" type="Label" parent="Layout/VBox/TopBar/Names"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.58, 0.64, 0.72, 1)
+theme_override_font_sizes/font_size = 14
+text = "project.name"
+
+[node name="Spacer" type="Control" parent="Layout/VBox/TopBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="CompanyLabel" type="Label" parent="Layout/VBox/TopBar"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.45, 0.75, 1, 1)
+theme_override_font_sizes/font_size = 14
+
+[node name="HelpButton" type="Button" parent="Layout/VBox/TopBar"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 42)
+layout_mode = 2
+text = "title.help"
+icon = ExtResource("17_help")
+
+[node name="MenuButton" type="Button" parent="Layout/VBox/TopBar"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 42)
+layout_mode = 2
+text = "pause.menu"
+icon = ExtResource("18_pause")
+
+[node name="PipelinePanel" type="PanelContainer" parent="Layout/VBox"]
+layout_mode = 2
+
+[node name="Pipeline" type="Control" parent="Layout/VBox/PipelinePanel"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 70)
+layout_mode = 2
+script = ExtResource("9_pipe")
+
+[node name="Body" type="HBoxContainer" parent="Layout/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 12
+
+[node name="LeftPanel" type="PanelContainer" parent="Layout/VBox/Body"]
+custom_minimum_size = Vector2(300, 0)
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="Layout/VBox/Body/LeftPanel"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Header" type="Label" parent="Layout/VBox/Body/LeftPanel/VBox"]
+layout_mode = 2
+theme_type_variation = &"HeaderLabel"
+theme_override_colors/font_color = Color(0.31, 0.78, 0.56, 1)
+theme_override_font_sizes/font_size = 17
+text = "ui.hub_metrics"
+
+[node name="FundingRow" type="HBoxContainer" parent="Layout/VBox/Body/LeftPanel/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Icon" type="TextureRect" parent="Layout/VBox/Body/LeftPanel/VBox/FundingRow"]
+self_modulate = Color(0.95, 0.8, 0.4, 1)
+custom_minimum_size = Vector2(30, 30)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("12_fund")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Col" type="VBoxContainer" parent="Layout/VBox/Body/LeftPanel/VBox/FundingRow"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Key" type="Label" parent="Layout/VBox/Body/LeftPanel/VBox/FundingRow/Col"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.58, 0.64, 0.72, 1)
+theme_override_font_sizes/font_size = 13
+text = "ui.funding_key"
+
+[node name="FundingLabel" type="Label" parent="Layout/VBox/Body/LeftPanel/VBox/FundingRow/Col"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.8, 0.4, 1)
+theme_override_font_sizes/font_size = 18
+text = "ui.sample_funding"
+
+[node name="YearRow" type="HBoxContainer" parent="Layout/VBox/Body/LeftPanel/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Icon" type="TextureRect" parent="Layout/VBox/Body/LeftPanel/VBox/YearRow"]
+self_modulate = Color(0.8, 0.84, 0.9, 1)
+custom_minimum_size = Vector2(30, 30)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("13_year")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Col" type="VBoxContainer" parent="Layout/VBox/Body/LeftPanel/VBox/YearRow"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Key" type="Label" parent="Layout/VBox/Body/LeftPanel/VBox/YearRow/Col"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.58, 0.64, 0.72, 1)
+theme_override_font_sizes/font_size = 13
+text = "ui.year_key"
+
+[node name="YearLabel" type="Label" parent="Layout/VBox/Body/LeftPanel/VBox/YearRow/Col"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "ui.sample_year"
+
+[node name="EfficacyRow" type="HBoxContainer" parent="Layout/VBox/Body/LeftPanel/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Icon" type="TextureRect" parent="Layout/VBox/Body/LeftPanel/VBox/EfficacyRow"]
+self_modulate = Color(0.35, 0.85, 0.6, 1)
+custom_minimum_size = Vector2(30, 30)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("14_eff")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Col" type="VBoxContainer" parent="Layout/VBox/Body/LeftPanel/VBox/EfficacyRow"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Key" type="Label" parent="Layout/VBox/Body/LeftPanel/VBox/EfficacyRow/Col"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.58, 0.64, 0.72, 1)
+theme_override_font_sizes/font_size = 13
+text = "ui.success_key"
+
+[node name="SuccessLabel" type="Label" parent="Layout/VBox/Body/LeftPanel/VBox/EfficacyRow/Col"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.35, 0.85, 0.6, 1)
+theme_override_font_sizes/font_size = 18
+text = "ui.sample_success"
+
+[node name="SafetyRow" type="HBoxContainer" parent="Layout/VBox/Body/LeftPanel/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Icon" type="TextureRect" parent="Layout/VBox/Body/LeftPanel/VBox/SafetyRow"]
+self_modulate = Color(0.95, 0.55, 0.45, 1)
+custom_minimum_size = Vector2(30, 30)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("15_safe")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Col" type="VBoxContainer" parent="Layout/VBox/Body/LeftPanel/VBox/SafetyRow"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Key" type="Label" parent="Layout/VBox/Body/LeftPanel/VBox/SafetyRow/Col"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.58, 0.64, 0.72, 1)
+theme_override_font_sizes/font_size = 13
+text = "ui.safety_key"
+
+[node name="SafetyLabel" type="Label" parent="Layout/VBox/Body/LeftPanel/VBox/SafetyRow/Col"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.55, 0.45, 1)
+theme_override_font_sizes/font_size = 18
+text = "ui.sample_safety"
+
+[node name="ProgressRow" type="HBoxContainer" parent="Layout/VBox/Body/LeftPanel/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Icon" type="TextureRect" parent="Layout/VBox/Body/LeftPanel/VBox/ProgressRow"]
+self_modulate = Color(0.45, 0.85, 0.95, 1)
+custom_minimum_size = Vector2(30, 30)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("16_prog")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Col" type="VBoxContainer" parent="Layout/VBox/Body/LeftPanel/VBox/ProgressRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="Key" type="Label" parent="Layout/VBox/Body/LeftPanel/VBox/ProgressRow/Col"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.58, 0.64, 0.72, 1)
+theme_override_font_sizes/font_size = 13
+text = "ui.progress_key"
+
+[node name="ProgressBar" type="ProgressBar" parent="Layout/VBox/Body/LeftPanel/VBox/ProgressRow/Col"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+show_percentage = true
+
+[node name="CenterPanel" type="PanelContainer" parent="Layout/VBox/Body"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="VBox" type="VBoxContainer" parent="Layout/VBox/Body/CenterPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="StageLabel" type="Label" parent="Layout/VBox/Body/CenterPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"HeaderLabel"
+theme_override_colors/font_color = Color(0.55, 0.9, 1, 1)
+theme_override_font_sizes/font_size = 26
+text = "stage.候选化合物发现"
+horizontal_alignment = 1
+
+[node name="MoleculeArt" type="Control" parent="Layout/VBox/Body/CenterPanel/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 150)
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+script = ExtResource("10_art")
+
+[node name="EventLabel" type="Label" parent="Layout/VBox/Body/CenterPanel/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 64)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.8, 0.84, 0.9, 1)
+theme_override_font_sizes/font_size = 15
+text = "ui.event_default"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3
+
+[node name="Buttons" type="HBoxContainer" parent="Layout/VBox/Body/CenterPanel/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+alignment = 1
+
+[node name="AdvanceButton" type="Button" parent="Layout/VBox/Body/CenterPanel/VBox/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(260, 54)
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "ui.enter_map"
+
+[node name="ChallengeButton" type="Button" parent="Layout/VBox/Body/CenterPanel/VBox/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(160, 54)
+layout_mode = 2
+theme_override_font_sizes/font_size = 17
+text = "ui.view_deck"
+icon = ExtResource("19_deck")
+
+[node name="RightPanel" type="PanelContainer" parent="Layout/VBox/Body"]
+custom_minimum_size = Vector2(330, 0)
+layout_mode = 2
+
+[node name="Scroll" type="ScrollContainer" parent="Layout/VBox/Body/RightPanel"]
+layout_mode = 2
+horizontal_scroll_mode = 0
+
+[node name="VBox" type="VBoxContainer" parent="Layout/VBox/Body/RightPanel/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="AIHeader" type="Label" parent="Layout/VBox/Body/RightPanel/Scroll/VBox"]
+layout_mode = 2
+theme_type_variation = &"HeaderLabel"
+theme_override_colors/font_color = Color(0.45, 0.75, 1, 1)
+theme_override_font_sizes/font_size = 17
+text = "ui.hub_ai"
+
+[node name="ChallengeLabel" type="Label" parent="Layout/VBox/Body/RightPanel/Scroll/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(290, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.72, 0.8, 0.9, 1)
+theme_override_font_sizes/font_size = 14
+autowrap_mode = 3
+
+[node name="Sep1" type="HSeparator" parent="Layout/VBox/Body/RightPanel/Scroll/VBox"]
+layout_mode = 2
+
+[node name="AbilitiesHeader" type="Label" parent="Layout/VBox/Body/RightPanel/Scroll/VBox"]
+layout_mode = 2
+theme_type_variation = &"HeaderLabel"
+theme_override_colors/font_color = Color(0.78, 0.55, 0.95, 1)
+theme_override_font_sizes/font_size = 17
+text = "ui.hub_abilities"
+
+[node name="AbilitiesLabel" type="Label" parent="Layout/VBox/Body/RightPanel/Scroll/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(290, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.82, 0.72, 0.95, 1)
+theme_override_font_sizes/font_size = 14
+text = "ui.owned_abilities_none"
+autowrap_mode = 3
+
+[node name="Sep2" type="HSeparator" parent="Layout/VBox/Body/RightPanel/Scroll/VBox"]
+layout_mode = 2
+
+[node name="CompetitionHeader" type="Label" parent="Layout/VBox/Body/RightPanel/Scroll/VBox"]
+layout_mode = 2
+theme_type_variation = &"HeaderLabel"
+theme_override_colors/font_color = Color(0.95, 0.8, 0.4, 1)
+theme_override_font_sizes/font_size = 17
+text = "ui.competition_title"
+
+[node name="CompetitionLabel" type="RichTextLabel" parent="Layout/VBox/Body/RightPanel/Scroll/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(290, 0)
+layout_mode = 2
+theme_override_font_sizes/normal_font_size = 14
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+
+[node name="MapScreen" parent="." instance=ExtResource("6_map")]
+
+[node name="BattleView" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("5_battle")
+
+[node name="CardPopup" parent="." instance=ExtResource("3_popup")]
+
+[node name="EventPopup" parent="." instance=ExtResource("4_event")]
+
+[node name="RewardPopup" parent="." instance=ExtResource("7_rew")]
+
+[node name="FloatLayer" type="Control" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
