@@ -10,6 +10,8 @@ extends RefCounted
 ##   poison     持续损伤：回合开始受到层数伤害（无视防护），然后 -1
 ##   metallicize 代谢稳定：回合结束获得层数防护
 ##   thorns     反噬：被攻击时攻击者受到层数伤害
+##   retain_block 稳定平台：自己回合开始时护盾不清零
+##   data_boost   数据增幅：每次获得数据额外多得层数
 ##   ritual     疾病进展：回合结束获得层数效力
 ##   auto_block 标准作业：回合开始获得层数防护
 ##   pipeline   临床网络：回合开始多抽层数张牌

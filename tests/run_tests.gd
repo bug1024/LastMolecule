@@ -54,6 +54,7 @@ func _run() -> void:
 	_test_program_decisions()
 	_test_evidence_and_campaign()
 	_test_campaign_end_to_end()
+	_test_build_cards()
 	_test_upgrade_preview()
 	_test_run_save()
 	_test_card_roles()
@@ -66,6 +67,13 @@ func _run() -> void:
 	await _test_title_screen()
 	print("%d checks, %d failures" % [_checks, _failures.size()])
 	quit(0 if _failures.is_empty() else 1)
+
+
+func _arg_str(prefix: String) -> String:
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with(prefix):
+			return arg.trim_prefix(prefix)
+	return ""
 
 
 func _arg_int(prefix: String) -> int:
@@ -524,6 +532,60 @@ func _test_campaign_end_to_end() -> void:
 	Company.default_save_path = ""
 
 
+## v0.4 构筑卡：防守反击 / 护盾翻倍 / 护盾保留 / 数据驱动伤害 / 数据增幅；阶段卡池；牌组套路判断
+func _test_build_cards() -> void:
+	var m := _manager(["poor_solubility"], ["exp_assay", "exp_assay", "exp_assay", "exp_assay", "exp_assay"])
+	var e: Enemy = m.enemies[0]
+	e.max_hp = 999
+	e.hp = 999
+	m.energy = 9
+	m.player.block = 10
+	m.hand.append(_card("exp_counter"))
+	m.play_card(m.hand.back(), 0)
+	_expect(e.hp == 999 - 14, "Counter-Evidence deals damage equal to Block +4")
+	m.hand.append(_card("exp_replicate"))
+	m.play_card(m.hand.back(), -1)
+	_expect(m.player.block == 20, "Replication doubles Block")
+	m.hand.append(_card("exp_stable_platform"))
+	m.play_card(m.hand.back(), -1)
+	m.end_turn()
+	_expect(m.player.block > 0, "Stable Platform keeps Block into the next turn")
+	m.free()
+	var a := _manager(["poor_solubility"], ["exp_hts", "exp_hts", "exp_hts", "exp_hts", "exp_hts"])
+	a.enemies[0].max_hp = 999
+	a.enemies[0].hp = 999
+	a.energy = 9
+	a.hand.append(_card("ai_mlops"))
+	a.play_card(a.hand.back(), -1)
+	a.play_card(a.hand[0], -1)
+	_expect(a.data_gained == 3, "MLOps adds +1 data whenever data is gained")
+	var lead := _card("ai_lead_opt")
+	lead.effects[0]["value"] = 4
+	a.hand.append(lead)
+	var hp_before: int = a.enemies[0].hp
+	a.play_card(lead, 0)
+	_expect(a.last_deviation or hp_before - a.enemies[0].hp >= 3 + 3 / 2, "AI Lead Optimization adds damage per data gained this battle")
+	a.free()
+	_expect(ResearchCard.deck_build([_card("mol_analog"), _card("mol_broad"), _card("mol_sar"), _card("exp_assay")]) == "molecular",
+		"Deck build: mostly molecular cards reads as Molecular Rush")
+	_expect(ResearchCard.deck_build([_card("clin_dosing"), _card("clin_combo"), _card("ai_stratify"), _card("clin_endpoint"), _card("mol_broad")]) == "poison",
+		"Deck build: four Poison/detonate cards read as Toxicity Control")
+	_expect(ResearchCard.deck_build([_card("mol_hit"), _card("exp_assay")]) == "thin", "Deck build: starter cards are ignored")
+	# 阶段卡池：二期临床阶段抽到的临床策略卡明显多于发现阶段
+	var g := _new_game(21)
+	var counts := {}
+	for stage in ["候选化合物发现", "二期临床试验"]:
+		g.state.stage = stage
+		var n := 0
+		for i in 200:
+			for card in g._sample_cards(3):
+				if card.type == "clinical":
+					n += 1
+		counts[stage] = n
+	_expect(int(counts["二期临床试验"]) > int(counts["候选化合物发现"]) * 1.5, "Phase II rewards lean toward Clinical cards")
+	g.free()
+
+
 ## 战斗手牌尺寸（0.9 倍）下，所有卡、中英文，牌面文字都不小于 12px，名称不超出名称条
 func _test_card_face_readable() -> void:
 	var small: Array[String] = []
@@ -797,10 +859,17 @@ func _simulate(runs: int) -> void:
 			type_arg = arg.trim_prefix("--type=")
 	Bot.respect_rules = _arg_int("--naive=") == 0
 	Bot.decision_index = _arg_int("--decision=")
-	print("project type: %s, respect rules: %s, decision: %d" % [type_arg if not type_arg.is_empty() else "standard", Bot.respect_rules, Bot.decision_index])
+	Bot.build = _arg_str("--build=")
+	var company_data := _arg_int("--company-data=")
+	var by_build := {}     # 牌组主导套路 → [获批, 局数]
+	var by_card := {}      # 卡 id → [获批, 出现局数]（只统计非起始卡）
+	var starters: Array = JsonData.load_dict("res://data/cards.json").get("starter_cards", [])
+	print("project type: %s, respect rules: %s, decision: %d, build: %s, company data: %d" % [type_arg if not type_arg.is_empty() else "standard",
+		Bot.respect_rules, Bot.decision_index, Bot.build if not Bot.build.is_empty() else "any", company_data])
 	for s in runs:
 		RunSave.new_project_type = type_arg
 		var game := _new_game(10000 + s)
+		game.company.data = company_data   # 模拟公司已积累的数据（决定流程等级、AI 起点与可解锁的卡）
 		var result: Dictionary = Bot.play(game, 600)
 		outcomes[result.outcome] = int(outcomes.get(result.outcome, 0)) + 1
 		var key := "%s/%s" % [result.outcome, result.reason]
@@ -815,6 +884,17 @@ func _simulate(runs: int) -> void:
 		var bonus := int(game.run_flags.get("final_safety_bonus", 0))
 		if result.outcome == "approved" and bonus > 0 and game.state.safety_risk >= game.get_final_safety_limit() - bonus:
 			saved_by_bonus += 1
+		var won := 1 if result.outcome == "approved" else 0
+		var dominant := _deck_build(game, starters)
+		var bb: Array = by_build.get(dominant, [0, 0])
+		by_build[dominant] = [bb[0] + won, bb[1] + 1]
+		var seen := {}
+		for card_id in game.deck:
+			if starters.has(card_id) or seen.has(card_id):
+				continue
+			seen[card_id] = true
+			var bc: Array = by_card.get(card_id, [0, 0])
+			by_card[card_id] = [bc[0] + won, bc[1] + 1]
 		var end_key := "%s eff=%d" % [game.state.stage, game.state.efficacy / 10 * 10]
 		ends[end_key] = int(ends.get(end_key, 0)) + 1
 		game.free()
@@ -832,6 +912,19 @@ func _simulate(runs: int) -> void:
 	keys.sort()
 	for k in keys:
 		print("  end ", k, ": ", ends[k])
+	print("-- approval by dominant deck build (non-starter cards) --")
+	for b in by_build:
+		print("  build %-11s %3d / %3d  (%d%%)" % [b, by_build[b][0], by_build[b][1], roundi(100.0 * by_build[b][0] / by_build[b][1])])
+	var rated: Array = by_card.keys().filter(func(id: String) -> bool: return int(by_card[id][1]) >= maxi(10, runs / 10))
+	rated.sort_custom(func(a: String, b: String) -> bool: return float(by_card[a][0]) / by_card[a][1] > float(by_card[b][0]) / by_card[b][1])
+	print("-- approval when the card is in the final deck (>= %d runs) --" % maxi(10, runs / 10))
+	for id in rated:
+		print("  card %-16s %3d%%  (%d runs)" % [id, roundi(100.0 * by_card[id][0] / by_card[id][1]), by_card[id][1]])
+
+
+## 本局牌组的主导套路（同 ResearchCard.deck_build）
+func _deck_build(game: Node, _starters: Array) -> String:
+	return ResearchCard.deck_build(game.build_deck())
 
 
 # ---------- 界面 ----------

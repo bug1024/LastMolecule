@@ -8,6 +8,14 @@
     "status": "card.type.status"
   },
   "rarity_weights": { "common": 10, "rare": 5, "epic": 2 },
+  "_stage_type_bias": "奖励卡池按阶段偏向不同类型（权重倍数）：发现多分子设计与 AI，临床前多实验验证，一期多实验与流程，二期多临床策略与 AI，三期多流程与临床。没列出的类型为 1。",
+  "stage_type_bias": {
+    "候选化合物发现": { "molecular": 2.0, "ai": 1.5 },
+    "临床前研究": { "experiment": 2.0, "molecular": 1.3 },
+    "一期临床试验": { "experiment": 1.5, "process": 1.5, "clinical": 1.3 },
+    "二期临床试验": { "clinical": 2.0, "ai": 1.5 },
+    "三期临床试验": { "process": 2.0, "clinical": 1.5 }
+  },
   "starter_cards": [
     "mol_hit", "mol_hit", "mol_hit", "mol_hit",
     "exp_assay", "exp_assay", "exp_assay", "exp_assay",
@@ -21,7 +29,7 @@
     { "id": "mol_analog", "type": "molecular", "kind": "attack", "rarity": "common", "cost": 1, "target": "enemy",
       "effects": [{ "op": "damage", "value": 4, "times": 2 }] },
     { "id": "mol_scaffold", "type": "molecular", "kind": "attack", "rarity": "common", "cost": 1, "target": "enemy",
-      "effects": [{ "op": "damage", "value": 13 }, { "op": "self_damage", "value": 3 }] },
+      "effects": [{ "op": "damage", "value": 13 }, { "op": "self_damage", "value": 4 }] },
     { "id": "mol_selectivity", "type": "molecular", "kind": "attack", "rarity": "common", "cost": 1, "target": "enemy",
       "effects": [{ "op": "damage", "value": 6 }, { "op": "status", "to": "target", "id": "weak", "value": 2 }] },
     { "id": "mol_broad", "type": "molecular", "kind": "attack", "rarity": "common", "cost": 1, "target": "all",
@@ -29,9 +37,9 @@
     { "id": "mol_prodrug", "type": "molecular", "kind": "attack", "rarity": "rare", "cost": 1, "target": "enemy",
       "effects": [{ "op": "damage", "value": 8 }, { "op": "block", "value": 6 }] },
     { "id": "mol_multivalent", "type": "molecular", "kind": "attack", "rarity": "rare", "cost": 2, "target": "enemy",
-      "effects": [{ "op": "damage", "value": 6, "times": 3 }] },
+      "effects": [{ "op": "damage", "value": 5, "times": 3 }] },
     { "id": "mol_sar", "type": "molecular", "kind": "power", "rarity": "rare", "cost": 1, "target": "self",
-      "effects": [{ "op": "status", "to": "self", "id": "strength", "value": 2 }] },
+      "effects": [{ "op": "status", "to": "self", "id": "strength", "value": 1 }] },
     { "id": "mol_covalent", "type": "molecular", "kind": "attack", "rarity": "epic", "cost": 3, "target": "enemy",
       "effects": [{ "op": "damage", "value": 30 }, { "op": "status", "to": "target", "id": "vulnerable", "value": 2 }] },
 
@@ -49,6 +57,14 @@
       "effects": [{ "op": "block", "value": 15 }, { "op": "data", "value": 2 }] },
     { "id": "exp_biomarker", "type": "experiment", "kind": "skill", "rarity": "rare", "cost": 1, "target": "enemy",
       "effects": [{ "op": "status", "to": "target", "id": "vulnerable", "value": 2 }, { "op": "data", "value": 2 }, { "op": "draw", "value": 1 }] },
+    { "id": "exp_counter", "type": "experiment", "kind": "attack", "rarity": "common", "cost": 1, "target": "enemy",
+      "effects": [{ "op": "block_damage", "value": 4 }], "upgrade": { "cost": 0 } },
+    { "id": "exp_stable_platform", "type": "experiment", "kind": "power", "rarity": "epic", "cost": 2, "target": "self",
+      "effects": [{ "op": "status", "to": "self", "id": "retain_block", "value": 1 }], "upgrade": { "cost": 1 } },
+    { "id": "exp_safety_net", "type": "experiment", "kind": "power", "rarity": "rare", "cost": 1, "target": "self",
+      "effects": [{ "op": "status", "to": "self", "id": "thorns", "value": 3 }] },
+    { "id": "exp_replicate", "type": "experiment", "kind": "skill", "rarity": "rare", "cost": 2, "target": "self",
+      "effects": [{ "op": "double_block" }], "upgrade": { "cost": 1 } },
 
     { "id": "clin_dosing", "type": "clinical", "kind": "skill", "rarity": "common", "cost": 1, "target": "enemy",
       "effects": [{ "op": "status", "to": "target", "id": "poison", "value": 6 }] },
@@ -62,7 +78,7 @@
       "effects": [{ "op": "status", "to": "all", "id": "poison", "value": 5 }, { "op": "status", "to": "all", "id": "weak", "value": 1 }] },
     { "id": "clin_endpoint", "type": "clinical", "kind": "attack", "rarity": "rare", "cost": 1, "target": "enemy",
       "effects": [{ "op": "detonate", "value": 2 }] },
-    { "id": "clin_network", "type": "clinical", "kind": "power", "rarity": "epic", "cost": 2, "target": "self",
+    { "id": "clin_network", "type": "clinical", "kind": "power", "rarity": "epic", "cost": 1, "target": "self",
       "effects": [{ "op": "status", "to": "self", "id": "pipeline", "value": 1 }] },
 
     { "id": "ai_screen", "type": "ai", "kind": "attack", "rarity": "common", "cost": 1, "target": "enemy", "starter_only": true,
@@ -90,6 +106,11 @@
     { "id": "ai_agent", "type": "ai", "kind": "attack", "rarity": "epic", "cost": 2, "target": "all", "requires_process": 3,
       "effects": [{ "op": "damage", "value": 12 }, { "op": "block", "value": 10 }],
       "deviation": [{ "op": "add_card", "id": "noise", "value": 2 }, { "op": "self_damage", "value": 4 }] },
+    { "id": "ai_lead_opt", "type": "ai", "kind": "attack", "rarity": "rare", "cost": 1, "target": "enemy",
+      "effects": [{ "op": "data_damage", "value": 4, "per": 1 }],
+      "deviation": [{ "op": "add_card", "id": "noise", "value": 1 }] },
+    { "id": "ai_mlops", "type": "ai", "kind": "power", "rarity": "rare", "cost": 1, "target": "self", "reliable": true,
+      "effects": [{ "op": "status", "to": "self", "id": "data_boost", "value": 1 }], "upgrade": { "cost": 0 } },
 
     { "id": "proc_sop", "type": "process", "kind": "power", "rarity": "common", "cost": 1, "target": "self",
       "effects": [{ "op": "status", "to": "self", "id": "auto_block", "value": 3 }] },

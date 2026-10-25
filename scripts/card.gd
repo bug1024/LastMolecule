@@ -15,7 +15,7 @@ extends RefCounted
 ## deviation：AI 卡模型偏差时代替 effects 结算的效果
 ## 升级：data.upgrade 可指定 {cost, effects}；未指定时数值效果自动提升约三分之一
 
-const MAGNITUDE_OPS := ["damage", "block", "status", "self_damage", "detonate"]
+const MAGNITUDE_OPS := ["damage", "block", "status", "self_damage", "detonate", "block_damage", "data_damage"]
 
 var id: String = ""
 var name: String = ""        # 名称 i18n key
@@ -33,6 +33,7 @@ var unplayable := false
 var ethereal := false
 var reliable := false         # AI 卡：不会偏差
 var end_turn_damage := 0      # 状态牌：回合结束仍在手中时受到的伤害
+var starter := false           # 起始专属卡（判断牌组套路时不计）
 var upgraded := false          # 每张卡只有两级：普通 → 升级（+），升级即满级
 var copies := 1                # 牌库里同名卡的张数（升级界面显示「×4 张一起升级」）
 var upgrade_preview: ResearchCard = null   # 升级界面用：这张卡升级后的样子
@@ -55,6 +56,7 @@ static func from_dict(data: Dictionary, upgrade := false) -> ResearchCard:
 	card.ethereal = bool(data.get("ethereal", false))
 	card.reliable = bool(data.get("reliable", false))
 	card.end_turn_damage = int(data.get("end_turn_damage", 0))
+	card.starter = bool(data.get("starter_only", false))
 	if upgrade and not card.unplayable:
 		card.upgraded = true
 		var spec: Dictionary = data.get("upgrade", {})
@@ -67,6 +69,31 @@ static func from_dict(data: Dictionary, upgrade := false) -> ResearchCard:
 					var value := int(effect.value)
 					effect["value"] = value + maxi(1, int(ceil(value / 3.0)))
 	return card
+
+
+## 牌组的主要套路（查看牌库与模拟统计共用）：只看非起始卡；
+## 中毒 / 引爆卡超过 3 张为 poison，某一类型过半为该类型，非起始卡不足 3 张为 thin，其余 mixed
+static func deck_build(cards: Array) -> String:
+	var counts := {}
+	var extra := 0
+	var poison := 0
+	for card in cards:
+		if card.starter or card.type == "status":
+			continue
+		extra += 1
+		counts[card.type] = int(counts.get(card.type, 0)) + 1
+		if card.effects.any(func(e: Dictionary) -> bool:
+				return e.get("op", "") == "detonate" or (e.get("op", "") == "status" and e.get("id", "") == "poison")):
+			poison += 1
+	if extra < 3:
+		return "thin"
+	if poison > 3:
+		return "poison"
+	var best := ""
+	for t in counts:
+		if best.is_empty() or int(counts[t]) > int(counts[best]):
+			best = t
+	return best if int(counts[best]) * 2 > extra else "mixed"
 
 
 func is_ai() -> bool:
@@ -137,6 +164,14 @@ func effect_rows(mods := {}) -> Array:
 				rows.append({"icon": "ui_plus", "color": Color(0.5, 1.0, 0.75), "number": "", "text": t.translate("row.cleanse"), "change": 0})
 			"detonate":
 				rows.append({"icon": "status_poison", "color": Color(1.0, 0.45, 0.35), "number": "×%d" % value, "text": t.translate("row.detonate"), "change": 0})
+			"block_damage":
+				rows.append({"icon": "intent_attack", "color": Color(0.45, 0.72, 1.0), "number": "+%d" % value if value > 0 else "",
+					"text": t.translate("row.block_damage"), "change": signi(value - base)})
+			"double_block":
+				rows.append({"icon": "intent_defend", "color": Color(0.45, 0.72, 1.0), "number": "×2", "text": t.translate("row.double_block"), "change": 0})
+			"data_damage":
+				rows.append({"icon": "intent_attack", "color": Color(1.0, 0.45, 0.35), "number": str(value),
+					"text": t.translate("row.data_damage"), "change": signi(value - base)})
 			"add_card":
 				rows.append({"icon": "intent_debuff", "color": Color(0.7, 0.7, 0.75), "number": "+%d" % value,
 					"text": t.translate("row.add_card") % t.translate("card." + String(effect.get("id", ""))), "change": 0})
@@ -254,6 +289,12 @@ static func describe_effect(effect: Dictionary, mods: Dictionary, ai_scaled: boo
 			return t.translate("cardtext.cleanse")
 		"detonate":
 			return t.translate("cardtext.detonate") % value
+		"block_damage":
+			return t.translate("cardtext.block_damage") % value
+		"double_block":
+			return t.translate("cardtext.double_block")
+		"data_damage":
+			return t.translate("cardtext.data_damage") % [value, maxi(1, int(effect.get("per", 1)))]
 		"add_card":
 			return t.translate("cardtext.add_card") % [value, t.translate("card." + String(effect.get("id", "")))]
 	return ""

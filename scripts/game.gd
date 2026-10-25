@@ -49,6 +49,7 @@ var _random_events: Array = []
 var _cards_data: Array = []
 var _card_types: Dictionary = {}
 var _rarity_weights: Dictionary = {}
+var _stage_type_bias: Dictionary = {}   # 阶段 → {卡牌类型: 权重倍数}，见 cards.json stage_type_bias
 var _abilities_data: Array = []
 var _card_rarities: Dictionary = {}
 var _battle_reward: Dictionary = {}
@@ -1019,7 +1020,9 @@ func _sample_cards(count: int, rare_boost := false) -> Array:
 		if (bool(data.get("starter_only", false)) and bonus <= 0) or bool(data.get("token", false)) or int(data.get("requires_process", 0)) > level:
 			continue
 		var rarity := String(data.get("rarity", "common"))
-		var weight := int(_rarity_weights.get(rarity, 5)) * (2 if rare_boost and rarity != "common" else 1) * maxi(1, bonus)
+		var stage_bias := float(_stage_type_bias.get(state.stage, {}).get(String(data.get("type", "")), 1.0))
+		var weight := int(_rarity_weights.get(rarity, 5)) * (2 if rare_boost and rarity != "common" else 1) * maxi(1, bonus) \
+			* maxi(1, roundi(stage_bias * 10))   # 阶段偏向（×10 取整，保持整数权重）
 		pool.append({"data": data, "weight": weight})
 	var picked: Array = []
 	while picked.size() < count and not pool.is_empty():
@@ -1092,6 +1095,7 @@ func _load_data() -> void:
 	_cards_data = cards.get("cards", [])
 	_card_types = cards.get("card_types", {})
 	_rarity_weights = cards.get("rarity_weights", {})
+	_stage_type_bias = cards.get("stage_type_bias", {})
 	deck = cards.get("starter_cards", []).duplicate()
 	var rewards := JsonData.load_dict(REWARDS_DATA_PATH)
 	_abilities_data = rewards.get("abilities", [])

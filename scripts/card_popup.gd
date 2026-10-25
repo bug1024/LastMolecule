@@ -29,7 +29,7 @@ func show_cards(cards: Array, purpose: String, cost: int, funding: int, ai_info:
 	_funding = funding
 	_title_label.text = tr(title_key if not title_key.is_empty() else "ui.pick.%s.title" % purpose)
 	if purpose == "view":
-		_hint_label.text = tr("ui.pick.view.hint") % cards.size()
+		_hint_label.text = tr("ui.pick.view.hint") % cards.size() + "  ·  " + _composition(cards)
 	else:
 		_hint_label.text = tr("ui.pick.%s.hint" % purpose) + (tr("ui.pick.cost") % cost if cost > 0 else "")
 	_hint_label.text += "  ·  " + tr("ui.card_detail.tip")
@@ -51,6 +51,20 @@ func show_cards(cards: Array, purpose: String, cost: int, funding: int, ai_info:
 			face.set_state(false, false, true)
 		_card_row.add_child(face)
 	visible = true
+
+
+## 牌组构成：各类型张数 + 主要套路，例如「分子设计 5 · 实验验证 4 · 套路：分子快攻」
+func _composition(cards: Array) -> String:
+	var counts := {}
+	for card in cards:
+		if card.type != "status":
+			counts[card.type] = int(counts.get(card.type, 0)) + 1
+	var parts: Array[String] = []
+	for t in ["molecular", "experiment", "clinical", "ai", "process"]:
+		if counts.has(t):
+			parts.append("%s %d" % [tr("card.type." + t), counts[t]])
+	parts.append(tr("build.label") % tr("build." + ResearchCard.deck_build(cards)))
+	return " · ".join(parts)
 
 
 ## 升级候选：直接展示「升级后」的牌面（变大的数字是绿色），下面列出前后对比和会一起升级的张数

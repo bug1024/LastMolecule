@@ -16,7 +16,12 @@
   "last_layer": "platform",
   "elite_from_layer": 2,
   "weights": { "fight": 5, "elite": 2, "research": 3, "event": 3, "partner": 2, "platform": 1, "fast_track": 1 },
+  "_stage_weights": "各阶段地图节点的风格：发现是探索（多研究、事件），临床前是排雷（多战斗、精英），一期是生存与剂量（多平台休整），二期是疗效验证（多研究、精英），三期是多中心管理（多事件、合作）。",
   "stage_weights": {
-    "候选化合物发现": { "fast_track": 0 }
+    "候选化合物发现": { "fast_track": 0, "research": 5, "event": 4, "fight": 4 },
+    "临床前研究": { "fight": 6, "elite": 3, "event": 2 },
+    "一期临床试验": { "platform": 3, "partner": 1, "elite": 2 },
+    "二期临床试验": { "research": 4, "elite": 3, "fight": 4 },
+    "三期临床试验": { "event": 4, "partner": 3, "fight": 5 }
   }
 }

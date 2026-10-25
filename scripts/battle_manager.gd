@@ -226,6 +226,8 @@ func get_ai_tier() -> Dictionary:
 ## 获得数据 / 流程；AI 档位因此变化时额外发出 ai_tier 事件（升档提示）
 func _gain_ai(data: int, process: int) -> void:
 	var before := get_ai_tier()
+	if data > 0 and player != null:
+		data += player.get_status("data_boost")   # AI 训练平台：每次获得数据额外多得
 	data_gained += data
 	process_gained += process
 	if data != 0:
@@ -321,7 +323,8 @@ func _begin_turn() -> void:
 	attacks_this_turn = 0
 	rule_attacks = 0
 	_dosed_this_turn = false
-	player.block = 0
+	if player.get_status("retain_block") <= 0:   # 稳定平台：护盾不再每回合清零
+		player.block = 0
 	_emit({"t": "turn", "turn": turn})
 	_ramp_enemies()
 	_tick_poison(player, "player", 0)
@@ -434,6 +437,17 @@ func _apply_card_effect(effect: Dictionary, card: ResearchCard, target: int, mul
 					_attack(player, "player", 0, enemies[i], "enemy", i, value, true)
 		"block":
 			_gain_block(player, "player", 0, value + player.get_status("dexterity"))
+		"block_damage":
+			# 防守反击：造成等于当前护盾（再加 value）的伤害
+			for i in _targets(card, target):
+				_attack(player, "player", 0, enemies[i], "enemy", i, player.block + value, true)
+		"double_block":
+			_gain_block(player, "player", 0, player.block)
+		"data_damage":
+			# 数据驱动：基础伤害 + 本场每获得 per 点数据 +1
+			var bonus := data_gained / maxi(1, int(effect.get("per", 1)))
+			for i in _targets(card, target):
+				_attack(player, "player", 0, enemies[i], "enemy", i, value + bonus, true)
 		"status":
 			var to := String(effect.get("to", "target"))
 			if to == "self":
