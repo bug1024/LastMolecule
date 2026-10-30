@@ -10,6 +10,8 @@ extends Control
 
 var stage_label: Label
 var molecule_art: MoleculeArt
+var mol_view: MoleculeView        # 设计了分子的项目：显示玩家自己的分子结构（代替装饰分子）
+var _mol_line: Label
 var avatar: PlayerAvatar
 var hp_label: Label
 var hp_bar: ProgressBar
@@ -67,6 +69,14 @@ func _build() -> void:
 
 	molecule_art = MoleculeArt.new()
 	add_child(molecule_art)
+	mol_view = MoleculeView.new()
+	mol_view.visible = false
+	add_child(mol_view)
+	_mol_line = UIKit.label("", Color(0.82, 0.75, 1.0), 14)
+	_mol_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_mol_line.add_theme_constant_override("outline_size", 5)
+	_mol_line.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+	add_child(_mol_line)
 	avatar = PlayerAvatar.new()
 	add_child(avatar)
 	avatar.custom_minimum_size = Vector2(170, 204)
@@ -167,6 +177,10 @@ func _layout() -> void:
 	var mol := Vector2(minf(300, w * 0.26), minf(240, bench_y - 70))
 	molecule_art.size = mol
 	molecule_art.position = Vector2(w * 0.56 - mol.x * 0.5, bench_y - 58 - mol.y)
+	mol_view.size = Vector2(minf(440, w * 0.38), minf(220, bench_y - 110))
+	mol_view.position = Vector2(w * 0.56 - mol_view.size.x * 0.5, bench_y - 60 - mol_view.size.y)
+	_mol_line.position = Vector2(STATUS_W + 20, 50)
+	_mol_line.size = Vector2(w - STATUS_W - CARDS_W - 40, 22)
 	_bench_panel.position = Vector2(0, bench_y + 14)
 	_bench_panel.size = Vector2(w, h - bench_y - 14)
 	var plate: Control = _bench_panel.get_node("Plate")
@@ -206,6 +220,18 @@ func refresh(game, competition_summary: String, competition_text: String) -> voi
 	_tint = BattleView.STAGE_TINT.get(state.stage, Color(0.2, 0.5, 0.5))
 	var stages: Array = game.get_stages()
 	molecule_art.stage_index = maxi(stages.find(state.stage), 0)
+	var mol: Molecule = game.molecule
+	molecule_art.visible = mol == null
+	mol_view.visible = mol != null
+	_mol_line.visible = mol != null
+	if mol != null:
+		mol_view.set_molecule(mol)
+		var props := mol.properties()
+		var parts: Array[String] = []
+		for p in Molecule.PROPS:
+			parts.append("%s %d" % [tr("prop." + p), int(props[p])])
+		parts.append("%s %d" % [tr("prop.alerts"), mol.open_alerts()])
+		_mol_line.text = " · ".join(parts)
 	molecule_art.health = clampf(0.5 + (state.efficacy - state.safety_risk) / 120.0, 0.0, 1.0)
 	var hp := maxi(0, 100 - state.safety_risk)
 	hp_bar.value = hp

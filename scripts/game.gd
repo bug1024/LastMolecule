@@ -27,6 +27,8 @@ signal map_updated()
 signal news_posted(items: Array)
 signal run_ended(outcome: String, reason_key: String, summary: Dictionary)
 signal player_leveled(level: int)
+signal molecule_design_requested(mode: String)   # initial：开局设计分子；modify：里程碑修饰分子
+signal fragment_gained(fragment_id: String)
 
 const PROJECT_DATA_PATH := "res://data/project.json"
 const EVENTS_DATA_PATH := "res://data/events.json"
@@ -37,7 +39,7 @@ const MAPS_DATA_PATH := "res://data/maps.json"
 const ENCOUNTERS_DATA_PATH := "res://data/encounters.json"
 const PLAYER_DATA_PATH := "res://data/player.json"
 
-enum RoundPhase { IDLE, WAITING_EVENT, WAITING_CARD, BATTLE, REWARD, FINISHED }
+enum RoundPhase { IDLE, WAITING_EVENT, WAITING_CARD, BATTLE, REWARD, DESIGN, FINISHED }
 
 var state: ProjectState = null
 var company: Company = null
@@ -85,6 +87,8 @@ var run_stats := {"attacks": 0, "precise": 0, "backfires": 0}   # 本局累计�
 var run_flags := {}                  # 项目专属决策带来的持续效果（见 projects.json milestones）
 var decisions: Array = []            # 本局做过的项目专属决策 id（写入公司历史，结局因果链用）
 var route := ""                      # 最终项目 LM-001 选择的研究路线 id
+var molecule: Molecule = null        # 玩家设计的分子（项目类型 molecule: true 时启用）
+var _design_mode := ""               # 分子设计阶段：initial / modify
 var _event_is_gate := false
 
 
@@ -119,7 +123,10 @@ func _ready() -> void:
 			state.funding += bonus
 			company.save()
 		_map.generate(state.stage, rng)
-		if not (_type_cfg.get("routes", []) as Array).is_empty():
+		if bool(_type_cfg.get("molecule", false)):
+			molecule = Molecule.create()
+			_queue_design("initial")
+		elif not (_type_cfg.get("routes", []) as Array).is_empty():
 			_queue_route_choice()
 	_battle_manager = BattleManager.new()
 	_battle_manager.rng = rng
@@ -158,6 +165,8 @@ func replay_pending() -> void:
 			reward_offered.emit(_pending_reward)
 		RoundPhase.BATTLE:
 			_start_battle(_battle_kind)
+		RoundPhase.DESIGN:
+			molecule_design_requested.emit(_design_mode)
 
 
 # ---------- 存档 ----------
@@ -183,6 +192,7 @@ func to_save() -> Dictionary:
 		"player_xp": player_xp, "battles_fought": battles_fought,
 		"project_type": project_type, "project_code": project_code,
 		"run_stats": run_stats.duplicate(), "run_flags": run_flags.duplicate(true), "decisions": decisions.duplicate(), "route": route,
+		"molecule": molecule.to_dict() if molecule != null else {}, "design_mode": _design_mode,
 	}
 
 
@@ -213,11 +223,14 @@ func _load_run(d: Dictionary) -> bool:
 	run_flags = d.get("run_flags", {})
 	decisions = d.get("decisions", []).duplicate()
 	route = String(d.get("route", ""))
+	var mol: Dictionary = d.get("molecule", {})
+	molecule = Molecule.from_dict(mol) if not mol.is_empty() else null
+	_design_mode = String(d.get("design_mode", ""))
 	_current_event = d.get("event", {})
 	_event_is_gate = bool(d.get("event_is_gate", false))
 	_pick_purpose = String(d.get("pick_purpose", ""))
 	_pending_reward = d.get("reward", {})
-	_phase = clampi(int(d.get("phase", RoundPhase.IDLE)), RoundPhase.IDLE, RoundPhase.REWARD)
+	_phase = clampi(int(d.get("phase", RoundPhase.IDLE)), RoundPhase.IDLE, RoundPhase.DESIGN)
 	_offered_cards.clear()
 	if _phase == RoundPhase.WAITING_CARD:
 		if _pick_purpose == "upgrade" or _pick_purpose == "remove":
@@ -434,7 +447,8 @@ func get_final_efficacy_bar() -> int:
 
 
 func get_final_safety_limit() -> int:
-	return int(_project.get("final_review", {}).get("safety_risk_below", 70)) + int(run_flags.get("final_safety_bonus", 0))
+	var alerts := molecule.open_alerts() if molecule != null else 0   # 未排除的毒性警示：每项安全线 −5
+	return int(_project.get("final_review", {}).get("safety_risk_below", 70)) + int(run_flags.get("final_safety_bonus", 0)) - 5 * alerts
 
 
 ## 终审目标清单（总览与地图常驻显示，和终审弹窗的提交条件一致）：
@@ -605,7 +619,18 @@ func _offer_platform() -> void:
 		{"label_key": "platform.rest", "label_args": [heal], "effects": {"safety_risk": -heal}, "action": ""},
 		{"label_key": "platform.upgrade", "effects": {}, "action": "upgrade"},
 		{"label_key": "platform.process", "effects": {}, "action": "process"},
-	]})
+	] + _tox_choice()})
+
+
+## 有未验证的毒性警示时，平台建设多一个「毒理验证」：花钱花时间，按概率排除或确认一项警示
+func _tox_choice() -> Array:
+	if molecule == null or molecule.unknown_alerts().is_empty():
+		return []
+	var cfg: Dictionary = Molecule.config().get("tox_study", {})
+	var cost := -int(cfg.get("funding", -2))
+	return [{"label_key": "tox.study", "label_args": ["alert." + String(molecule.unknown_alerts()[0])], "desc_key": "tox.study.desc",
+		"requires": {"funding_min": cost + 1},
+		"effects": {"funding": -cost}, "action": "tox_study"}]
 
 
 func _offer_fast_track() -> void:
@@ -638,7 +663,17 @@ func _start_battle(kind: String) -> void:
 	var strength := get_efficacy_strength() + int(bonus.get("strength", 0)) + int(run_flags.get("strength", 0))
 	if kind == "boss" and state.stage == "二期临床试验":
 		strength += rp2d
-	_battle_manager.start_battle(encounter, build_deck(), abilities, {
+	var mol := molecule.effects(state.stage) if molecule != null else {}
+	strength += int(mol.get("strength", 0))
+	var deck_cards := build_deck()
+	if int(mol.get("clinical_cost", 0)) > 0:   # 溶解度差：临床策略卡（给药）更贵
+		for card in deck_cards:
+			if card.type == "clinical":
+				card.cost += int(mol.clinical_cost)
+	var rules := get_battle_rules()
+	if bool(mol.get("offtarget", false)) and not rules.has("offtarget_limit"):
+		rules.merge({"offtarget_limit": 2, "offtarget_damage": 3, "precise_free": true})
+	_battle_manager.start_battle(encounter, deck_cards, abilities, {
 		"hp": 100 - state.safety_risk,
 		"max_hp": 100,
 		"strength": strength,
@@ -646,9 +681,14 @@ func _start_battle(kind: String) -> void:
 		"boss_strength": competition.boss_strength_bonus,
 		"dose_max": int(_encounters.get("dose_max", 4)),
 		"start_block": int(bonus.get("start_block", 0)),
-		"first_draw": int(bonus.get("first_draw", 0)),
-		"dexterity": int(bonus.get("dexterity", 0)),
-		"rules": get_battle_rules(),
+		"first_draw": int(bonus.get("first_draw", 0)) + int(mol.get("first_draw", 0)),
+		"dexterity": int(bonus.get("dexterity", 0)) + int(mol.get("dexterity", 0)),
+		"rules": rules,
+		"weak": int(mol.get("weak", 0)),
+		"vulnerable_bonus": int(mol.get("vulnerable_bonus", 0)),
+		"poison_bonus": int(mol.get("poison_bonus", 0)),
+		"enemy_strength": int(mol.get("enemy_strength", 0)),
+		"extra_lines": mol.get("lines", []),
 	})
 
 
@@ -698,6 +738,11 @@ func _on_battle_ended(victory: bool, outcome: Dictionary) -> void:
 	player_xp += int(_player_cfg.get("xp_per_battle", {}).get(_battle_kind, 1))
 	if get_player_level() > before:
 		player_leveled.emit(get_player_level())
+	if molecule != null and _battle_kind != "verify" and state.stage in ["候选化合物发现", "临床前研究"]:
+		_grant_fragment()
+	if _battle_kind == "verify":
+		_offer_milestone()   # 修饰后的验证试验通过：回到里程碑继续决策
+		return
 	_offer_reward()
 
 
@@ -762,9 +807,106 @@ func _offer_milestone() -> void:
 				requires["funding_min"] = cost + 1
 			choices.append({"label_key": key, "desc_key": key + ".desc", "tag_key": "milestone.opt_tag",
 				"requires": requires, "effects": effects, "action": "decide", "option": String(option.id)})
+	if molecule != null and state.stage == "临床前研究" and state.stage_battle_won and not bool(run_flags.get("modified", false)):
+		choices.append({"label_key": "mol.modify", "desc_key": "mol.modify.desc", "tag_key": "mol.tag", "effects": {}, "action": "modify_molecule"})
 	choices.append({"label_key": "milestone.terminate", "effects": {}, "action": "terminate"})
 	_offer_event({"id": "milestone", "title_key": "node.milestone", "desc_key": desc_key,
 		"desc_args": [_tr_stage(state.stage), get_final_efficacy_bar(), state.efficacy], "choices": choices}, true)
+
+
+# ---------- 分子设计 ----------
+
+func _queue_design(mode: String) -> void:
+	_design_mode = mode
+	_current_event = {}
+	_phase = RoundPhase.DESIGN
+	_autosave()
+	molecule_design_requested.emit(mode)
+
+
+func is_designing() -> bool:
+	return _phase == RoundPhase.DESIGN
+
+
+func get_design_mode() -> String:
+	return _design_mode
+
+
+## 提交分子结构（位点 → 片段）。开局设计直接生效；里程碑修饰按规模付代价并打一场验证试验：
+##   局部修饰（只换取代基）：额外耗时，打一场验证试验后回到里程碑；
+##   更换核心结构（连接位）：前期疗效数据作废（疗效 −8），同样需要验证试验。
+## 返回 "" 表示成功，否则为错误键
+func submit_molecule(placement: Dictionary) -> String:
+	if _phase != RoundPhase.DESIGN or molecule == null:
+		return "mol.err.phase"
+	var kind := molecule.change_kind(placement) if _design_mode == "modify" else "initial"
+	if not molecule.apply_layout(placement):
+		return "mol.err.layout"
+	if _design_mode == "initial":
+		_design_mode = ""
+		state_synced.emit(state)
+		_finish_node()
+		return ""
+	_design_mode = ""
+	if kind == "none":
+		_offer_milestone()
+		return ""
+	run_flags["modified"] = true
+	decisions.append("mol_" + kind)
+	var cfg: Dictionary = Molecule.config().get("modify", {})
+	_pass_time(int(cfg.get("months", 2)))
+	if kind == "core":
+		_apply_effects({"efficacy": int(cfg.get("core_efficacy", -8))})
+	state_synced.emit(state)
+	if _check_end_conditions():
+		return ""
+	_start_battle("verify")
+	return ""
+
+
+## 修饰时改主意：不改了，回到里程碑
+func cancel_design() -> void:
+	if _phase == RoundPhase.DESIGN and _design_mode == "modify":
+		_design_mode = ""
+		_offer_milestone()
+
+
+## 修饰预估：{kind: none/local/core, efficacy}（界面在确认前展示代价）
+func preview_modify(placement: Dictionary) -> Dictionary:
+	if molecule == null:
+		return {"kind": "none"}
+	var kind := molecule.change_kind(placement)
+	return {"kind": kind, "efficacy": int(Molecule.config().get("modify", {}).get("core_efficacy", -8)) if kind == "core" else 0}
+
+
+func _run_tox_study() -> void:
+	var cfg: Dictionary = Molecule.config().get("tox_study", {})
+	_pass_time(int(cfg.get("months", 4)))
+	var unknown := molecule.unknown_alerts()
+	if unknown.is_empty() or _check_end_conditions():
+		_finish_node()
+		return
+	var alert := String(unknown[0])
+	var cleared := rng.randi_range(1, 100) <= int(cfg.get("clear_chance", 55))
+	molecule.alerts[alert] = "cleared" if cleared else "confirmed"
+	if not cleared:
+		_apply_effects({"safety_risk": int(cfg.get("confirm_risk", 8))})
+		if _check_end_conditions():
+			return
+	state_synced.emit(state)
+	_offer_event({"id": "tox_result", "tag_key": "ui.decision_tag", "title_key": "tox.result_title",
+		"desc_key": "tox.cleared" if cleared else "tox.confirmed", "desc_args": ["alert." + alert, int(cfg.get("confirm_risk", 8))],
+		"choices": [{"label_key": "tox.ok", "effects": {}, "action": ""}]})
+
+
+## 打赢发现 / 临床前的战斗：随机获得一个分子片段（进库存，里程碑修饰时可用）
+func _grant_fragment() -> void:
+	var pool: Array = Molecule.config().get("fragments", [])
+	if pool.is_empty():
+		return
+	var id := String(pool[rng.randi_range(0, pool.size() - 1)].id)
+	molecule.inventory.append(id)
+	fragment_gained.emit(id)
 
 
 ## 最终项目开场：按公司已有的研究证据选择研究路线
@@ -818,6 +960,10 @@ func _run_action(action: String, choice: Dictionary) -> void:
 				_offer_final_review()
 			else:
 				_advance_stage(_next_stage())
+		"tox_study":
+			_run_tox_study()
+		"modify_molecule":
+			_queue_design("modify")
 		"route":
 			route = String(choice.get("route", ""))
 			decisions.append("route:" + route)

@@ -22,10 +22,15 @@ func _expect(condition: bool, message: String) -> void:
 		push_error(message)
 
 
-func _new_game(seed_value := 1024) -> Node:
+## with_molecule 为 false 时跳过标准项目开局的分子设计（旧测试按没有分子的规则写）
+func _new_game(seed_value := 1024, with_molecule := false) -> Node:
 	var game := Game.new()
 	root.add_child(game)
 	game.reseed(seed_value)
+	if game.is_designing() and not with_molecule:
+		game.molecule = null
+		game._design_mode = ""
+		game._phase = Game.RoundPhase.IDLE
 	return game
 
 
@@ -63,6 +68,8 @@ func _run() -> void:
 	_test_card_roles()
 	_test_competition()
 	_test_milestone_terminate()
+	_test_molecule()
+	_test_molecule_in_run()
 	_test_bot_runs()
 	await _test_ui_smoke()
 	await _test_restart()
@@ -764,7 +771,8 @@ func _test_run_save() -> void:
 	_expect(c._battle_manager.is_battle_active(), "Quitting mid-battle restarts that battle on continue")
 	var d := Game.new()
 	root.add_child(d)
-	_expect(not d.resumed and not RunSave.exists(), "Starting a new project discards the old save")
+	_expect(not d.resumed and (not RunSave.exists() or int(RunSave.read().get("phase", -1)) == d.RoundPhase.DESIGN),
+		"Starting a new project discards the old save")
 	for g in [a, b, c, d]:
 		g.free()
 	RunSave.save_path = ""
@@ -909,6 +917,112 @@ func _test_milestone_terminate() -> void:
 	game.free()
 
 
+# ---------- 分子设计 ----------
+
+func _test_molecule() -> void:
+	var m := Molecule.create()
+	_expect(m.sites.is_empty() and m.inventory.size() == 12, "A new molecule starts empty with the 12-fragment starter kit")
+	_expect(not Molecule.can_place("amide", "R1") and Molecule.can_place("amide", "L1"), "Fragments only fit their site types")
+	_expect(not m.apply_layout({"R1": "amide"}) and m.sites.is_empty(), "An illegal layout is rejected without changing the molecule")
+	_expect(not m.apply_layout({"R1": "nitro", "R2": "nitro"}), "A fragment can't be placed twice from a single copy")
+	m.apply_preset("potent")
+	var p := m.properties()
+	_expect(int(p.potency) >= 4 and m.alerts.get("genotox", "") == "unknown" and m.open_alerts() >= 1,
+		"The potent preset is strong but carries an unverified alert")
+	var fx := m.effects("临床前研究")
+	_expect(int(fx.strength) > 0 and int(fx.clinical_cost) == 1 and int(fx.enemy_strength) == m.open_alerts(),
+		"Potency gives strength, poor solubility taxes clinical cards, open alerts strengthen preclinical enemies")
+	_expect(int(m.effects("候选化合物发现").enemy_strength) == 0, "Alerts only strengthen enemies in preclinical")
+	var copy := Molecule.from_dict(m.to_dict())
+	_expect(copy.sites == m.sites and copy.inventory == m.inventory and copy.alerts == m.alerts, "A molecule survives save/load")
+	var local: Dictionary = m.sites.duplicate()
+	local["R3"] = "hydroxyl"
+	var core: Dictionary = m.sites.duplicate()
+	core["L1"] = "pyridine"
+	_expect(m.change_kind(m.sites.duplicate()) == "none" and m.change_kind(local) == "local" and m.change_kind(core) == "core",
+		"Swapping a substituent is local, swapping a linker is a core change")
+	m.apply_preset("balanced")
+	_expect(m.alerts.is_empty() and m.inventory.size() == 5, "Re-laying out drops stale alerts and returns fragments to inventory")
+	m.apply_preset("selective")
+	fx = m.effects("候选化合物发现")
+	_expect(int(fx.weak) == 1 and int(fx.vulnerable_bonus) == 1 and int(fx.first_draw) == 1 and int(fx.strength) == 0,
+		"The selective preset trades potency (weak) for vulnerable bonus and an extra first draw")
+
+
+func _test_molecule_in_run() -> void:
+	var game := _new_game(77, true)
+	_expect(game.is_designing() and game.get_design_mode() == "initial", "A standard project opens with molecule design")
+	_expect(game.submit_molecule({"R1": "amide"}) == "mol.err.layout" and game.is_designing(), "An illegal design is refused")
+	game.molecule.apply_preset("potent")
+	_expect(game.submit_molecule(game.molecule.sites.duplicate()) == "" and not game.is_designing(), "Submitting the design starts the run")
+	_expect(game.get_final_safety_limit() < _final_limit_without_molecule(game), "Open alerts lower the final safety limit")
+	# 溶解度差：战斗里临床卡更贵；制剂优化能抵消
+	game.deck.append("clin_dosing")
+	var base_cost := int(game.get_card_by_id("clin_dosing").cost)
+	game._start_battle("fight")
+	var bm = game._battle_manager
+	var clinical: Array = []
+	for pile in [bm.hand, bm.draw_pile, bm.discard_pile]:
+		for c in pile:
+			if c.type == "clinical":
+				clinical.append(c)
+	_expect(not clinical.is_empty() and clinical.all(func(c) -> bool: return c.cost == base_cost + 1),
+		"Poor solubility raises clinical card costs in battle")
+	_expect(bm.player.get_status("strength") > 0, "Potency shows up as starting strength")
+	bm._apply_card_effect({"op": "formulate", "value": 1}, clinical[0], -1, 1.0)
+	_expect(clinical.all(func(c) -> bool: return c.cost == base_cost), "Formulation removes the solubility tax")
+	var frags: int = game.molecule.inventory.size()
+	game._on_battle_ended(true, bm.get_outcome())
+	_expect(game.molecule.inventory.size() == frags + 1, "Winning a discovery battle grants a fragment")
+	# 毒理验证：排除或确认一项警示
+	game._phase = Game.RoundPhase.IDLE
+	var months: int = game.months
+	var risk: int = game.state.safety_risk
+	game._run_tox_study()
+	var st := String(game.molecule.alerts.get("genotox", ""))
+	_expect(game.months == months + 4 and (st == "cleared" or (st == "confirmed" and game.state.safety_risk == risk + 8)),
+		"A tox study takes time and clears or confirms the alert")
+	_expect(String(game._current_event.get("id", "")) == "tox_result", "The tox result is shown as an event")
+	# 临床前里程碑：修饰分子 → 验证试验 → 回到里程碑
+	game._phase = Game.RoundPhase.IDLE
+	game.state.stage = "临床前研究"
+	game.state.stage_battle_won = true
+	game._offer_milestone()
+	var idx := -1
+	var choices: Array = game._current_event.get("choices", [])
+	for i in choices.size():
+		if String(choices[i].get("action", "")) == "modify_molecule":
+			idx = i
+	_expect(idx >= 0, "The preclinical milestone offers a molecule modification")
+	game.resolve_event_choice("milestone", idx)
+	_expect(game.is_designing() and game.get_design_mode() == "modify", "Choosing to modify opens the editor in modify mode")
+	game.cancel_design()
+	_expect(String(game._current_event.get("id", "")) == "milestone", "Cancelling a modification returns to the milestone")
+	game.resolve_event_choice("milestone", idx)
+	var core: Dictionary = game.molecule.sites.duplicate()
+	core["L1"] = "pyridine"
+	var eff: int = game.state.efficacy
+	_expect(game.preview_modify(core).kind == "core", "The editor previews a core change")
+	game.submit_molecule(core)
+	_expect(game.state.efficacy == eff - 8 and game._battle_kind == "verify" and bm.is_battle_active(),
+		"A core change costs efficacy and requires a verification trial")
+	game._on_battle_ended(true, bm.get_outcome())
+	choices = game._current_event.get("choices", [])
+	_expect(String(game._current_event.get("id", "")) == "milestone"
+		and not choices.any(func(c: Dictionary) -> bool: return String(c.get("action", "")) == "modify_molecule"),
+		"Passing verification returns to the milestone without a second modification")
+	_expect(game.to_save().molecule.sites == game.molecule.sites, "The run save includes the molecule")
+	game.free()
+
+
+func _final_limit_without_molecule(game: Node) -> int:
+	var m: Molecule = game.molecule
+	game.molecule = null
+	var limit: int = game.get_final_safety_limit()
+	game.molecule = m
+	return limit
+
+
 # ---------- 整局 ----------
 
 func _test_bot_runs() -> void:
@@ -938,15 +1052,17 @@ func _simulate(runs: int) -> void:
 	Bot.respect_rules = _arg_int("--naive=") == 0
 	Bot.decision_index = _arg_int("--decision=")
 	Bot.build = _arg_str("--build=")
+	Bot.mol_preset = _arg_str("--mol=") if not _arg_str("--mol=").is_empty() else "balanced"
+	Bot.mol_aware = _arg_int("--mol-aware=") == 1
 	var company_data := _arg_int("--company-data=")
 	var by_build := {}     # 牌组主导套路 → [获批, 局数]
 	var by_card := {}      # 卡 id → [获批, 出现局数]（只统计非起始卡）
 	var starters: Array = JsonData.load_dict("res://data/cards.json").get("starter_cards", [])
-	print("project type: %s, respect rules: %s, decision: %d, build: %s, company data: %d" % [type_arg if not type_arg.is_empty() else "standard",
-		Bot.respect_rules, Bot.decision_index, Bot.build if not Bot.build.is_empty() else "any", company_data])
+	print("project type: %s, respect rules: %s, decision: %d, build: %s, company data: %d, molecule: %s%s" % [type_arg if not type_arg.is_empty() else "standard",
+		Bot.respect_rules, Bot.decision_index, Bot.build if not Bot.build.is_empty() else "any", company_data, Bot.mol_preset, " (aware)" if Bot.mol_aware else ""])
 	for s in runs:
 		RunSave.new_project_type = type_arg
-		var game := _new_game(10000 + s)
+		var game := _new_game(10000 + s, Bot.mol_preset != "none")
 		game.company.data = company_data   # 模拟公司已积累的数据（决定流程等级、AI 起点与可解锁的卡）
 		var result: Dictionary = Bot.play(game, 600)
 		outcomes[result.outcome] = int(outcomes.get(result.outcome, 0)) + 1
@@ -1071,7 +1187,7 @@ func _test_restart() -> void:
 	scene._advance_button.pressed.emit()
 	await scene_changed
 	var restarted: Node = current_scene.get_node("GameLogic")
-	_expect(restarted.is_idle() and restarted.state.funding == 40 and restarted.state.year == 1,
+	_expect((restarted.is_idle() or restarted.is_designing()) and restarted.state.funding == 40 and restarted.state.year == 1,
 		"Restart button must reload a clean project with initial resources")
 	_expect(restarted.state.abilities.is_empty() and restarted.get_map().get_layer_index() == -1,
 		"Restart must reset abilities and map progress")

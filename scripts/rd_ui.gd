@@ -45,6 +45,7 @@ var _pause_menu: PauseMenu
 var _settings: SettingsPanel
 var _help: HelpPanel
 var _ending: EndingPanel
+var _mol_editor: MoleculeEditor
 
 const OVERLAY_Z := 200
 
@@ -65,6 +66,9 @@ func _ready() -> void:
 	_game_logic.reward_claimed.connect(_on_reward_claimed)
 	_game_logic.news_posted.connect(_on_news_posted)
 	_game_logic.run_ended.connect(_on_run_ended)
+	_game_logic.molecule_design_requested.connect(_on_molecule_design)
+	_game_logic.fragment_gained.connect(func(id: String) -> void:
+		_spawn_float(tr("mol.fragment_gained") % tr("frag." + id), Color(0.75, 0.6, 1.0)))
 	_build_hub()
 	_advance_button.pressed.connect(_on_advance_pressed)
 	_challenge_button.pressed.connect(_on_view_deck_pressed)
@@ -86,7 +90,7 @@ func _ready() -> void:
 
 	_build_overlays()
 	# 战斗手牌用了 z_index（悬停的卡最高 50），弹窗与菜单必须整体压在它们之上
-	for overlay in [_card_popup, _event_popup, _reward_popup, _ending, _pause_menu, _help, _settings]:
+	for overlay in [_card_popup, _event_popup, _reward_popup, _mol_editor, _ending, _pause_menu, _help, _settings]:
 		overlay.z_index = OVERLAY_Z
 	_style_buttons()
 	_event_label.text = _company_intro()
@@ -125,11 +129,16 @@ func _build_overlays() -> void:
 	_pause_menu = PauseMenu.new()
 	_pause_menu.help_requested.connect(func() -> void: _help.open())
 	_pause_menu.settings_requested.connect(func() -> void: _settings.open())
+	_mol_editor = MoleculeEditor.new()
+	_mol_editor.submitted.connect(func(placement: Dictionary) -> void:
+		_game_logic.submit_molecule(placement)
+		_on_state_synced(_game_logic.get_state()))
+	_mol_editor.cancelled.connect(_game_logic.cancel_design)
 	_ending = EndingPanel.new()
 	_ending.restart_requested.connect(func() -> void:
 		RunSave.new_project_type = _game_logic.project_type   # 「再来一局」沿用同类项目，换类型回标题选
 		SceneRouter.restart_scene())
-	for overlay in [_ending, _pause_menu, _help, _settings]:
+	for overlay in [_mol_editor, _ending, _pause_menu, _help, _settings]:
 		add_child(overlay)
 	_help_button.pressed.connect(func() -> void: _help.open())
 	_menu_button.pressed.connect(func() -> void: _pause_menu.open())
@@ -315,6 +324,13 @@ func _on_event_offered(event: Dictionary, is_gate: bool) -> void:
 	_show_or_queue(func() -> void:
 		GameAudio.sfx("open")
 		_event_popup.show_event(event, is_gate, _game_logic.get_state()))
+
+
+## 分子设计（开局）/ 修饰（临床前里程碑）：战斗结果展示中则排队到「继续」之后
+func _on_molecule_design(mode: String) -> void:
+	_show_or_queue(func() -> void:
+		GameAudio.sfx("open")
+		_mol_editor.edit(_game_logic.molecule, mode, _game_logic.preview_modify))
 
 
 func _on_card_pick_offered(cards: Array, purpose: String) -> void:

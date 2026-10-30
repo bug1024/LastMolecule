@@ -167,6 +167,8 @@ func effect_rows(mods := {}) -> Array:
 			"block_damage":
 				rows.append({"icon": "intent_attack", "color": Color(0.45, 0.72, 1.0), "number": "+%d" % value if value > 0 else "",
 					"text": t.translate("row.block_damage"), "change": signi(value - base)})
+			"formulate":
+				rows.append({"icon": "type_clinical", "color": Color(0.95, 0.55, 0.55), "number": "-%d" % value, "text": t.translate("row.formulate"), "change": 0})
 			"double_block":
 				rows.append({"icon": "intent_defend", "color": Color(0.45, 0.72, 1.0), "number": "×2", "text": t.translate("row.double_block"), "change": 0})
 			"data_damage":
@@ -293,6 +295,8 @@ static func describe_effect(effect: Dictionary, mods: Dictionary, ai_scaled: boo
 			return t.translate("cardtext.block_damage") % value
 		"double_block":
 			return t.translate("cardtext.double_block")
+		"formulate":
+			return t.translate("cardtext.formulate") % value
 		"data_damage":
 			return t.translate("cardtext.data_damage") % [value, maxi(1, int(effect.get("per", 1)))]
 		"add_card":

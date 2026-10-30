@@ -120,6 +120,8 @@
       "effects": [{ "op": "status", "to": "self", "id": "lims", "value": 1 }] },
     { "id": "proc_platform", "type": "process", "kind": "power", "rarity": "epic", "cost": 1, "target": "self",
       "effects": [{ "op": "process", "value": 1 }, { "op": "calibrate", "value": 10 }, { "op": "data", "value": 3 }] },
+    { "id": "proc_formulation", "type": "process", "kind": "skill", "rarity": "common", "cost": 1, "target": "self",
+      "effects": [{ "op": "formulate", "value": 1 }, { "op": "draw", "value": 1 }], "upgrade": { "cost": 0 } },
     { "id": "proc_review", "type": "process", "kind": "skill", "rarity": "common", "cost": 1, "target": "self", "exhaust": true,
       "effects": [{ "op": "cleanse" }, { "op": "block", "value": 4 }, { "op": "process", "value": 1 }] },
 

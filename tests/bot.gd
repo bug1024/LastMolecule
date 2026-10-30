@@ -16,6 +16,8 @@ static func play(game: Node, max_steps: int) -> Dictionary:
 	while not game.is_finished() and steps < max_steps:
 		steps += 1
 		match game._phase:
+			Game.RoundPhase.DESIGN:
+				_design(game)
 			Game.RoundPhase.IDLE:
 				_choose_node(game)
 			Game.RoundPhase.WAITING_EVENT:
@@ -40,14 +42,52 @@ static func play(game: Node, max_steps: int) -> Dictionary:
 				battles[key] = entry
 			Game.RoundPhase.REWARD:
 				var reward: Dictionary = game._pending_reward
-				game.claim_reward(_pick_reward_card(reward.cards), reward.abilities[0].id if not reward.abilities.is_empty() else "")
+				game.claim_reward(_pick_reward_card(reward.cards, game), reward.abilities[0].id if not reward.abilities.is_empty() else "")
 	return {"finished": game.is_finished(), "outcome": outcome.outcome, "reason": outcome.reason,
 		"battles": battles, "steps": steps}
 
 
-static func _pick_reward_card(cards: Array) -> String:
+## 分子设计：开局按预设方案摆放；里程碑修饰时不改（直接确认）
+static func _design(game: Node) -> void:
+	if game.get_design_mode() == "initial":
+		game.molecule.apply_preset(mol_preset)
+	game.submit_molecule(game.molecule.sites.duplicate())
+
+
+## 看懂分子的玩家：溶解度差就要制剂卡、少拿临床卡；选择性好就要破绽卡；稳定性好就要中毒卡
+static func _mol_score(game: Node, card: Dictionary) -> int:
+	if not mol_aware or game.molecule == null:
+		return 0
+	var p: Dictionary = game.molecule.properties()
+	var effects: Array = card.get("effects", [])
+	var score := 0
+	if int(p.solubility) <= 1:
+		if effects.any(func(e: Dictionary) -> bool: return e.op == "formulate"):
+			score += 3
+		elif String(card.get("type", "")) == "clinical":
+			score -= 2
+	if int(p.selectivity) >= 4 and effects.any(func(e: Dictionary) -> bool: return e.op == "status" and e.get("id", "") == "vulnerable"):
+		score += 2
+	if int(p.stability) >= 4 and effects.any(func(e: Dictionary) -> bool: return e.op == "status" and e.get("id", "") == "poison"):
+		score += 2
+	if int(p.potency) >= 4 and String(card.get("kind", "")) == "attack":
+		score += 1
+	return score
+
+
+static func _pick_reward_card(cards: Array, game: Node = null) -> String:
 	if cards.is_empty():
 		return ""
+	if mol_aware and game != null:
+		var best: Dictionary = {}
+		var best_score := 0
+		for c in cards:
+			var sc := _mol_score(game, c)
+			if sc > best_score:
+				best_score = sc
+				best = c
+		if not best.is_empty():
+			return String(best.id)
 	if not build.is_empty():
 		# 偏向构筑：有本套路的牌就拿（稀有优先），没有就按普通方式挑一张
 		var fits := cards.filter(func(c: Dictionary) -> bool: return _fits_build(c))
@@ -147,6 +187,8 @@ const RARITY_ORDER := ["common", "rare", "epic"]
 ## 偏向构筑（模拟用，有本套路的牌就优先拿和优先打）："" 为不挑牌；类型名（molecular / experiment / clinical / ai / process）按卡牌类型挑；
 ## "poison" 按效果挑（中毒 / 引爆）
 static var build := ""
+static var mol_preset := "balanced"   # 分子方案：potent / balanced / selective（开局设计用）
+static var mol_aware := false         # 选卡时是否顺着分子的长短处挑（模拟「看懂分子的玩家」）
 static var decision_index := 0     # 项目专属里程碑决策选第几个（模拟不同决策）
 static var respect_rules := true   # false 时无视项目规则一味猛攻（模拟「攻击最高的牌全拿」）
 

@@ -7,6 +7,7 @@
   "types": [
     {
       "id": "standard",
+      "molecule": true,
       "difficulty": 1,
       "icon": "type_molecular",
       "evidence": "foundation"

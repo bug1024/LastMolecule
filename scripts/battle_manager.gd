@@ -56,7 +56,11 @@ var dose_max := 4
 var attacks_this_turn := 0
 var rules: Dictionary = {}           # 项目规则，见文件头
 var rule_attacks := 0                # 本回合计入项目规则的攻击牌数
-var stats := {"attacks": 0, "precise": 0, "backfires": 0}   # 本场统计：攻击牌数 / 打破绽目标的攻击 / 反噬次数
+var stats := {"attacks": 0, "precise": 0, "backfires": 0}
+## 分子属性带来的修正（见 Molecule.effects）：施加破绽 / 中毒的额外层数、额外的战斗说明
+var vulnerable_bonus := 0
+var poison_bonus := 0
+var extra_lines: Array = []   # 本场统计：攻击牌数 / 打破绽目标的攻击 / 反噬次数
 var last_deviation := false
 
 var _enemy_defs := {}
@@ -92,11 +96,16 @@ func start_battle(enc: Dictionary, deck: Array, abilities: Array, ctx: Dictionar
 	player.hp = clampi(int(ctx.get("hp", player.max_hp)), 1, player.max_hp)
 	_start_hp = player.hp
 	rules = ctx.get("rules", {})
+	vulnerable_bonus = int(ctx.get("vulnerable_bonus", 0))
+	poison_bonus = int(ctx.get("poison_bonus", 0))
+	extra_lines = ctx.get("extra_lines", [])
 	stats = {"attacks": 0, "precise": 0, "backfires": 0}
 	if int(ctx.get("strength", 0)) > 0:
 		player.add_status("strength", int(ctx.strength))
 	if int(ctx.get("dexterity", 0)) > 0:
 		player.add_status("dexterity", int(ctx.dexterity))
+	if int(ctx.get("weak", 0)) > 0:   # 分子活性太低：开局虚弱
+		player.add_status("weak", int(ctx.weak))
 	_start_block = int(ctx.get("start_block", 0))
 	_first_draw = int(ctx.get("first_draw", 0))
 	enemies.clear()
@@ -108,6 +117,8 @@ func start_battle(enc: Dictionary, deck: Array, abilities: Array, ctx: Dictionar
 		var e := Enemy.from_dict(def, rng, float(ctx.get("hp_scale", 1.0)) if is_boss else 1.0)
 		if is_boss and int(ctx.get("boss_strength", 0)) > 0:
 			e.add_status("strength", int(ctx.boss_strength))
+		if int(ctx.get("enemy_strength", 0)) > 0:   # 分子的毒性警示：临床前的敌人更强
+			e.add_status("strength", int(ctx.enemy_strength))
 		e.roll_intent(rng)
 		enemies.append(e)
 	turn = 0
@@ -265,6 +276,7 @@ func get_mechanic_lines() -> Array:
 		lines.append({"key": "mechanic.selective", "args": [int(rules.offtarget_limit), int(rules.get("offtarget_damage", 3))]})
 	if int(rules.get("enemy_ramp_every", 0)) > 0:
 		lines.append({"key": "mechanic.chronic", "args": [int(rules.enemy_ramp_every)]})
+	lines.append_array(extra_lines)
 	var seen := {}
 	for e in enemies:
 		if e.mechanic.is_empty() or seen.has(e.mechanic):
@@ -441,6 +453,13 @@ func _apply_card_effect(effect: Dictionary, card: ResearchCard, target: int, mul
 			# 防守反击：造成等于当前护盾（再加 value）的伤害
 			for i in _targets(card, target):
 				_attack(player, "player", 0, enemies[i], "enemy", i, player.block + value, true)
+		"formulate":
+			# 制剂优化：本场所有临床策略卡费用 −value（不低于 0）
+			for pile in [hand, draw_pile, discard_pile]:
+				for c in pile:
+					if c.type == "clinical":
+						c.cost = maxi(0, c.cost - value)
+			_emit({"t": "mechanic", "key": "mechanic.formulate", "args": [value]})
 		"double_block":
 			_gain_block(player, "player", 0, player.block)
 		"data_damage":
@@ -453,8 +472,13 @@ func _apply_card_effect(effect: Dictionary, card: ResearchCard, target: int, mul
 			if to == "self":
 				_add_status(player, "player", 0, String(effect.id), value)
 			else:
+				var amount := value
+				if String(effect.id) == "vulnerable":
+					amount += vulnerable_bonus
+				elif String(effect.id) == "poison":
+					amount = maxi(1, amount + poison_bonus)
 				for i in (_alive_indices() if to == "all" else ([target] if target >= 0 else [])):
-					_add_status(enemies[i], "enemy", i, String(effect.id), value)
+					_add_status(enemies[i], "enemy", i, String(effect.id), amount)
 		"self_damage":
 			_hurt(player, "player", 0, value, true)
 		"draw":

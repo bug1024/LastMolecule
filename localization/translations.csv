@@ -371,7 +371,7 @@ help.tab.battles,阶段试验,Stage Trials
 help.tab.cards,卡牌与 AI,Cards & AI
 help.tab.decisions,立项决策,Go / No-Go
 help.tab.glossary,术语,Glossary
-help.goal,[b][color=#4fc896]目标：让候选药物获批上市[/color][/b]\n候选药物要依次走过 [b]发现 → 临床前 → 一期 → 二期 → 三期[/b]，最后通过上市审评。\n\n[b]项目类型[/b]：立项时选择项目类型。不同类型的起始牌组、终审要求和战斗规则不同，需要不同打法（例如[color=#ffcf73]高选择性项目[/color]猛攻会脱靶）。每个项目有自己的编号。\n\n[b]主线：最后的分子[/b]：LM-001 是公司搁置多年的那个分子。项目获批（或在一期之后的里程碑主动终止）会得到该类项目的[color=#73c0ff]研究证据[/color]；集齐 2 项就能重启 LM-001，证据决定它能走哪条研究路线。\n\n[b]四项核心指标[/b]\n· [color=#f2cc66]资金[/color]：每走一个地图节点花 1 亿、过 1 年。资金耗尽 = 失败。\n· [color=#5ad99a]疗效[/color]：整局累积。终审要求疗效 ≥ 门槛（起始 60，竞品获批后会提高）。\n· [color=#f28c73]安全风险[/color]：越低越好。终审要求 < 70；涨到 100 会被监管叫停。\n· [color=#73c0ff]数据[/color]：决定 AI 卡有多强，结束时一部分沉淀为公司数据。\n\n[b]三种结局[/b]\n· [color=#5ad99a]获批上市[/color]：成功！沉淀 60% 数据。\n· [color=#f2cc66]主动终止[/color]：在里程碑判断不值得继续而止损，沉淀 60% 数据，并把部分剩余资金带到下个项目。\n· [color=#ed6b6b]研发失败[/color]：资金耗尽或安全风险爆表，只沉淀 30% 数据。\n\n现实中的药物研发就是在[b]更快推进[/b]和[b]尽量少出现疾病进展（PD）与不良反应（AE）[/b]之间找平衡。,"[b][color=#4fc896]Goal: get your candidate approved[/color][/b]\nThe candidate must pass [b]Discovery → Preclinical → Phase I → Phase II → Phase III[/b], then the marketing review.\n\n[b]Program types[/b]: pick a type when you launch. Each type changes the starting deck, final review bar and battle rules, so each needs a different plan (e.g. a [color=#ffcf73]High-Selectivity[/color] program punishes attack spam). Every program gets its own code.\n\n[b]Campaign: The Last Molecule[/b]: LM-001 is the molecule the company shelved long ago. Approving a program (or terminating it at a milestone from Phase I on) earns that type's [color=#73c0ff]research evidence[/color]; with 2 you can restart LM-001, and your evidence decides its research routes.\n\n[b]Four core metrics[/b]\n· [color=#f2cc66]Funding[/color]: every map node costs 1 and takes a year. Run out and you fail.\n· [color=#5ad99a]Efficacy[/color]: accumulates all run. The final review needs efficacy ≥ the bar (60 at first; rises when a competitor is approved).\n· [color=#f28c73]Safety risk[/color]: lower is better. The final review needs < 70; at 100 regulators halt the program.\n· [color=#73c0ff]Data[/color]: powers AI cards; part of it is banked as company data at the end.\n\n[b]Three endings[/b]\n· [color=#5ad99a]Approved[/color]: success! Banks 60% of the data.\n· [color=#f2cc66]Terminated[/color]: you cut losses at a milestone. Banks 60% of the data and carries some funding forward.\n· [color=#ed6b6b]Failed[/color]: funding ran out or safety hit the ceiling. Banks only 30%.\n\nReal drug R&D is a balance between [b]moving fast[/b] and [b]avoiding disease progression (PD) and adverse events (AE)[/b]."
+help.goal,[b][color=#4fc896]目标：让候选药物获批上市[/color][/b]\n候选药物要依次走过 [b]发现 → 临床前 → 一期 → 二期 → 三期[/b]，最后通过上市审评。\n\n[b]项目类型[/b]：立项时选择项目类型。不同类型的起始牌组、终审要求和战斗规则不同，需要不同打法（例如[color=#ffcf73]高选择性项目[/color]猛攻会脱靶）。每个项目有自己的编号。\n\n[b]主线：最后的分子[/b]：LM-001 是公司搁置多年的那个分子。项目获批（或在一期之后的里程碑主动终止）会得到该类项目的[color=#73c0ff]研究证据[/color]；集齐 2 项就能重启 LM-001，证据决定它能走哪条研究路线。\n\n[b]设计候选分子[/b]：标准新药项目开局要亲手拼一颗分子——在骨架的位点上放片段，每个片段有收益也有代价，相邻的片段还会组合出效果。分子的活性、选择性、稳定性、溶解度会改变你的卡牌怎么用；毒性警示是待验证的风险，可以在平台建设做毒理验证。临床前里程碑可以修饰一次分子。\n\n[b]四项核心指标[/b]\n· [color=#f2cc66]资金[/color]：每走一个地图节点花 1 亿、过 1 年。资金耗尽 = 失败。\n· [color=#5ad99a]疗效[/color]：整局累积。终审要求疗效 ≥ 门槛（起始 60，竞品获批后会提高）。\n· [color=#f28c73]安全风险[/color]：越低越好。终审要求 < 70；涨到 100 会被监管叫停。\n· [color=#73c0ff]数据[/color]：决定 AI 卡有多强，结束时一部分沉淀为公司数据。\n\n[b]三种结局[/b]\n· [color=#5ad99a]获批上市[/color]：成功！沉淀 60% 数据。\n· [color=#f2cc66]主动终止[/color]：在里程碑判断不值得继续而止损，沉淀 60% 数据，并把部分剩余资金带到下个项目。\n· [color=#ed6b6b]研发失败[/color]：资金耗尽或安全风险爆表，只沉淀 30% 数据。\n\n现实中的药物研发就是在[b]更快推进[/b]和[b]尽量少出现疾病进展（PD）与不良反应（AE）[/b]之间找平衡。,"[b][color=#4fc896]Goal: get your candidate approved[/color][/b]\nThe candidate must pass [b]Discovery → Preclinical → Phase I → Phase II → Phase III[/b], then the marketing review.\n\n[b]Program types[/b]: pick a type when you launch. Each type changes the starting deck, final review bar and battle rules, so each needs a different plan (e.g. a [color=#ffcf73]High-Selectivity[/color] program punishes attack spam). Every program gets its own code.\n\n[b]Campaign: The Last Molecule[/b]: LM-001 is the molecule the company shelved long ago. Approving a program (or terminating it at a milestone from Phase I on) earns that type's [color=#73c0ff]research evidence[/color]; with 2 you can restart LM-001, and your evidence decides its research routes.\n\n[b]Design the candidate[/b]: a Standard program starts with you assembling a molecule — place fragments on the scaffold's sites; each has a gain and a cost, and neighbors combine. Potency, selectivity, stability and solubility change how your cards work; tox alerts are risks to test at a Platform. You may modify the molecule once at the Preclinical milestone.\n\n[b]Four core metrics[/b]\n· [color=#f2cc66]Funding[/color]: every map node costs 1 and takes a year. Run out and you fail.\n· [color=#5ad99a]Efficacy[/color]: accumulates all run. The final review needs efficacy ≥ the bar (60 at first; rises when a competitor is approved).\n· [color=#f28c73]Safety risk[/color]: lower is better. The final review needs < 70; at 100 regulators halt the program.\n· [color=#73c0ff]Data[/color]: powers AI cards; part of it is banked as company data at the end.\n\n[b]Three endings[/b]\n· [color=#5ad99a]Approved[/color]: success! Banks 60% of the data.\n· [color=#f2cc66]Terminated[/color]: you cut losses at a milestone. Banks 60% of the data and carries some funding forward.\n· [color=#ed6b6b]Failed[/color]: funding ran out or safety hit the ceiling. Banks only 30%.\n\nReal drug R&D is a balance between [b]moving fast[/b] and [b]avoiding disease progression (PD) and adverse events (AE)[/b]."
 help.map,[b]每个阶段是一张分支地图[/b]\n从上往下走：第一层是实验难题，中间随机，最后一层是平台建设（休整），然后挑战本阶段 [color=#ed6b6b]BOSS[/color]，最后到达里程碑。\n\n[b]节点类型[/b]\n· [color=#d98c73]实验难题[/color]：普通战斗，赢了选卡。\n· [color=#f9b840]关键难关[/color]：精英战斗，更难，但能拿研发能力。\n· [color=#5aadf2]研究[/color]：三选一研究方案并拿一张卡；[b]前期研究会削弱本阶段 Boss 的生命（最多 30%）[/b]。\n· [color=#f2b84c]事件[/color]：随机事件。\n· [color=#66d18c]合作融资[/color]：拿投资、买卡或删卡。\n· [color=#73ccbf]平台建设[/color]：安全评估（安全风险 -25）、升级卡或梳理流程。\n· [color=#f280cc]加速通道[/color]：后续节点不耗时，但 Boss 更强。\n\n[b]时间与资金[/b]\n每个节点花几个月，满一年扣 2 亿年度成本，竞品也会推进。资金耗尽 = 失败。,"[b]Each stage is a branching map[/b]\nWalk down: the first row is challenges, the middle is random, the last row is rest (Platform), then the stage [color=#ed6b6b]BOSS[/color], then the milestone.\n\n[b]Node types[/b]\n· [color=#d98c73]Challenge[/color]: normal fight, pick a card.\n· [color=#f9b840]Critical Hurdle[/color]: elite fight, harder, grants an ability.\n· [color=#5aadf2]Research[/color]: pick a plan and a card; [b]research weakens this stage's boss HP (up to 30%)[/b].\n· [color=#f2b84c]Event[/color]: random event.\n· [color=#66d18c]Partner[/color]: funding, buy or remove cards.\n· [color=#73ccbf]Platform[/color]: Safety Review (risk -25), upgrade a card, or build process.\n· [color=#f280cc]Fast track[/color]: later nodes cost no time, but the boss is stronger.\n\n[b]Time and money[/b]\nNodes take months; each full year costs 2 funding and moves competitors. Run out of funding and you fail."
 help.battles,[b]战斗规则（类似杀戮尖塔）[/b]\n· 每回合 3 点[color=#f2cc66]能量[/color]、抽 5 张牌，打出卡牌消耗能量，最后点「结束回合」（快捷键 E）。\n· 敌人头顶的[b]意图[/b]告诉你它下回合要干什么：红色数字是伤害，盾牌是护盾，箭头是增益，水滴是给你上负面状态。\n· [color=#7fb3ff]护盾[/color]能挡伤害，但到你下回合开始就清零。挡不住的伤害会直接变成[color=#f28c73]安全风险[/color]——它就是你的血量，涨到 100 项目就被叫停。\n· 开局[color=#5ad99a]力量[/color]来自项目疗效：疗效越高，每次伤害越高。\n\n[b]五个阶段 Boss，各有绝招[/b]\n[color=#9b6cf2]发现 · 活性悬崖[/color]：一回合打出超过 3 张攻击牌会反噬。\n[color=#8ed14a]临床前 · 毒性风暴[/color]：给你叠中毒，每 3 回合一记器官毒性重击。\n[color=#ee4a4a]一期 · 剂量限制性毒性[/color]：可以加剂量，你和它一起变强；锁定的剂量带进二期。\n[color=#4a8df0]二期 · 疾病进展[/color]：每回合越来越强，还往你牌堆塞不良反应。\n[color=#58c9b9]三期 · 多中心试验[/color]：三个中心一起上，没被攻击到的中心会加护盾。\n\n地图右侧随时可以看到本阶段 Boss 的预告。,"[b]Combat (Slay the Spire style)[/b]\n· Each turn: 3 [color=#f2cc66]energy[/color], draw 5. Cards cost energy; press End Turn (E) when done.\n· Enemy [b]intents[/b] show next turn's plan: red numbers are damage, shields are Block, arrows are buffs, drops are debuffs on you.\n· [color=#7fb3ff]Block[/color] absorbs damage but resets on your next turn. Unblocked damage becomes [color=#f28c73]safety risk[/color] — your HP. At 100 the program is halted.\n· Starting [color=#5ad99a]Strength[/color] comes from project efficacy: higher efficacy, harder hits.\n\n[b]Five stage bosses, each with a twist[/b]\n[color=#9b6cf2]Discovery · Activity Cliff[/color]: more than 3 attacks in a turn backfires.\n[color=#8ed14a]Preclinical · Toxicity Storm[/color]: stacks Poison, Organ Toxicity every 3 turns.\n[color=#ee4a4a]Phase I · Dose-Limiting Toxicity[/color]: raise the dose to buff both sides; the locked dose carries into Phase II.\n[color=#4a8df0]Phase II · Disease Progression[/color]: grows every turn and seeds Adverse Events into your deck.\n[color=#58c9b9]Phase III · Multicenter Trial[/color]: three sites at once; any site you don't hit gains Block.\n\nThe map always previews the current stage boss."
 help.cards,[b]五类卡牌，各有定位[/b]\n· [color=#8c6bf2]分子设计[/color]：主力输出——伤害、破绽（易伤）、力量成长。\n· [color=#f2b84c]实验验证[/color]：护盾与数据，还能抑制对手药效。\n· [color=#f07070]临床策略[/color]：中毒（中毒）、抽牌、能量，终点评估可以引爆中毒。\n· [color=#4aa0ff]AI 技术[/color]：数值最高，但吃数据、可能偏差。\n· [color=#73ccbf]流程建设[/color]：能力牌，整场持续生效。\n\n[b]AI 卡有多强，取决于数据[/b]\n有效数据 =（本局数据 + 继承的公司数据）× 数据利用率。\n· 低档（< 20）：效果 ×0.5，偏差 30%\n· 中档（< 60）：效果 ×1，偏差 15%\n· 高档（≥ 60）：效果 ×1.75，偏差 5%\n[color=#ed6b6b]偏差[/color]：卡牌效果作废，还会往牌堆塞「噪声数据」或让你受伤。\n\n先用实验卡攒数据、用流程卡提升利用率，AI 才会真正发力——战斗里打出的数据卡会让同一场的 AI 卡立刻变强。\n\n[b]看不清？[/b]右键（或长按）任意一张卡，会打开大图和完整说明。\n\n[b]常见套路[/b]：分子快攻（力量＋多段攻击）、毒性控制（中毒＋引爆）、稳健防守（叠护盾＋反证实验、稳定平台）、数据驱动（多拿数据，AI 先导优化越打越疼；需要公司数据积累）、流程体系。查看牌库时会显示你的牌组偏向哪个套路。每个阶段奖励里常见的卡也不一样。,"[b]Five card types, five roles[/b]\n· [color=#8c6bf2]Molecular[/color]: main damage — hits, Weak Spot, Strength growth.\n· [color=#f2b84c]Experiment[/color]: Block and data, plus Weak.\n· [color=#f07070]Clinical[/color]: Poison (poison), draw, energy; Endpoint Readout detonates it.\n· [color=#4aa0ff]AI[/color]: biggest numbers, but needs data and may deviate.\n· [color=#73ccbf]Process[/color]: powers that last all battle.\n\n[b]AI strength depends on data[/b]\nEffective data = (run data + inherited company data) × utilization.\n· Low (< 20): ×0.5, 30% deviation\n· Mid (< 60): ×1, 15% deviation\n· High (≥ 60): ×1.75, 5% deviation\n[color=#ed6b6b]Deviation[/color]: the effect is void and Noisy Data or self-damage follows.\n\nBuild data with experiments and utilization with process first — data gained mid-battle powers up AI cards right away.\n\n[b]Can't read it?[/b] Right-click (or hold) any card for a big view and full text.\n\n[b]Common builds[/b]: Molecular Rush (Strength + multi-hit), Toxicity Control (Poison + detonate), Steady Defense (stack Block + Counter-Evidence, Stable Platform), Data-Driven (gather data so AI Lead Optimization hits harder; needs company data), Process Engine. The deck view shows which build you lean toward. Each stage favors different reward cards."
@@ -879,3 +879,86 @@ credits.name.music,tools/gen_audio.py 程序合成，无外部素材\nLM-001 主
 credits.dedication,谨以此献给每一位做新药的人。,Dedicated to everyone who makes new medicines.
 battle.turn_word,回合,Turn
 battle.ai_miss,失误 %d%%,Miss %d%%
+frag.fluoro,氟原子,Fluorine
+frag.methyl,甲基,Methyl
+frag.hydroxyl,羟基,Hydroxyl
+frag.phenyl,苯环,Phenyl
+frag.morpholine,吗啉,Morpholine
+frag.nitro,硝基,Nitro
+frag.amide,酰胺,Amide
+frag.sulfonamide,磺酰胺,Sulfonamide
+frag.tbutyl,叔丁基,tert-Butyl
+frag.pyridine,吡啶,Pyridine
+frag.cyclopropyl,环丙基,Cyclopropyl
+frag.acid,羧酸,Carboxylic Acid
+site.linker,连接位 · 核心结构,Linker · core
+site.ring,环上取代位,Ring position
+site.terminal,末端位,Terminal
+prop.potency,活性,Potency
+prop.selectivity,选择性,Selectivity
+prop.stability,稳定性,Stability
+prop.solubility,溶解度,Solubility
+prop.alerts,毒性警示,Tox alerts
+prop.potency.tip,≥4：开局力量 +1（活性 6 时 +2）　≤1：开局虚弱,≥4: +1 Strength (+2 at 6)　≤1: start Weak
+prop.selectivity.tip,≥4：开局坚固 +1，打出的破绽 +1　≤1：发现 / 临床前战斗会脱靶,"≥4: +1 Sturdy, Weak Spot +1　≤1: off-target rule early"
+prop.stability.tip,≥4：中毒 +1　≤1：中毒 −1，且活性力量减半,"≥4: Poison +1　≤1: Poison −1, potency Strength halved"
+prop.solubility.tip,≥4：第一回合多抽 1 张　≤1：临床策略卡费用 +1,≥4: draw +1 on turn 1　≤1: Clinical cards cost +1
+prop.alerts.tip,每项未排除的警示：临床前敌人力量 +1，终审安全线 −5。可在平台建设做毒理验证。,"Each open alert: preclinical enemies +1 Strength, final safety limit −5. Test it at a Platform."
+combo.balance,亲脂—极性平衡：溶解度 +1,Lipophilic–polar balance: Solubility +1
+combo.stacking,芳香堆叠：活性 +2、溶解度 −1,"Aromatic stacking: Potency +2, Solubility −1"
+combo.shield,氟原子挡住代谢软点：稳定性 +1,Fluorine shields a soft spot: Stability +1
+combo.greasy,过度亲脂（≥3 个亲脂片段）：心脏毒性警示,Too greasy (3+ lipophilic): cardiac alert
+alert.genotox,遗传毒性警示（硝基）,Genotoxicity alert (nitro)
+alert.herg,心脏毒性警示（hERG）,Cardiac alert (hERG)
+alert.state.unknown,待验证,untested
+alert.state.cleared,已排除,cleared
+alert.state.confirmed,已确认,confirmed
+mol.fx.strength,分子活性高：开局力量 +%d,High potency: +%d Strength
+mol.fx.unstable_strength,代谢太快：活性带来的力量减半为 %d,Metabolized fast: potency Strength halved to %d
+mol.fx.weak,分子活性太低：开局虚弱,Low potency: start Weak
+mol.fx.offtarget,选择性差：一回合第 3 张攻击牌起脱靶，每张掉 3 血（破绽目标除外）,"Poor selectivity: from the 3rd attack each turn, 3 HP backfire (Weak Spot targets exempt)"
+mol.fx.vulnerable,选择性好，副作用少：开局坚固 +1，打出的破绽 +1 层,"High selectivity, fewer side effects: +1 Sturdy, Weak Spot +1"
+mol.fx.poison_up,代谢稳定：施加的中毒 +1 层,Stable: Poison +1
+mol.fx.poison_down,代谢不稳定：施加的中毒 −1 层,Unstable: Poison −1
+mol.fx.clinical_cost,溶解度差，给药困难：临床策略卡费用 +1（制剂优化卡可抵消）,Poor solubility: Clinical cards cost +1 (Formulation offsets it)
+mol.fx.draw,溶解度好：第一回合多抽 1 张,Good solubility: draw +1 on turn 1
+mol.fx.alerts,毒性警示 %d 项：临床前敌人力量 +%d,%d tox alerts: preclinical enemies +%d Strength
+mol.title,设计候选分子,Design the Candidate
+mol.subtitle,卡组是你的研发能力，分子才是你的角色,Your deck is your capability; the molecule is your character
+mol.modify_title,修饰分子,Modify the Molecule
+mol.modify,修饰分子,Modify the molecule
+mol.modify.desc,换取代基需要一场验证试验；更换核心结构（连接位）还会让前期疗效数据作废（疗效 −8）。每个项目只能修饰一次。,Swapping substituents needs a verification trial; changing the core (linkers) also voids early efficacy data (−8). Once per program.
+mol.tag,分子,Molecule
+mol.preset.potent,高活性方案,Potent
+mol.preset.balanced,均衡方案,Balanced
+mol.preset.selective,高选择性方案,Selective
+mol.presets,快速方案,Quick schemes
+mol.confirm,确认分子，开始研发,Confirm and Start
+mol.confirm_modify,确认修饰,Confirm Modification
+mol.cancel,不改了,Never Mind
+mol.inventory,片段库（点击放进选中的位点）,Fragments (click to place in the selected site)
+mol.hint,点骨架上的位点选中它，再点下面的片段放进去；点已放的位点上的片段可以取下。,"Click a site, then a fragment to place it; click a placed fragment to remove it."
+mol.cost.none,还没有改动。,No changes yet.
+mol.cost.local,局部修饰：需要打一场验证试验，额外耗时 2 个月。,"Local change: one verification trial, +2 months."
+mol.cost.core,更换核心结构：疗效 %d（前期数据作废），需要打一场验证试验。,"Core change: efficacy %d (early data voided), plus a verification trial."
+mol.properties,分子属性,Properties
+mol.combos,触发的组合,Active combos
+mol.combos_none,无,None
+mol.alerts_none,无毒性警示,No tox alerts
+mol.err.layout,这个片段放不进这个位点。,That fragment can't go in that site.
+mol.err.phase,现在不能修改分子。,You can't change the molecule now.
+mol.empty_site,空,empty
+mol.hub,我的分子,My Molecule
+mol.fragment_gained,获得分子片段：%s（临床前里程碑修饰分子时可用）,Fragment gained: %s (usable when modifying at the Preclinical milestone)
+tox.study,毒理验证：%s,Toxicology study: %s
+tox.study.desc,做专项毒理实验：大约一半的机会排除这项警示；否则警示被确认，安全风险上升。,A focused tox study: about half the time the alert is cleared; otherwise it is confirmed and safety risk rises.
+tox.result_title,毒理验证结果,Toxicology Result
+tox.cleared,好消息：%s 已排除，不再影响项目。,Good news: %s is cleared and no longer affects the program.
+tox.confirmed,%s 被确认了：安全风险 +%d。它会一直影响项目，除非在里程碑把对应结构修饰掉。,%s is confirmed: safety risk +%d. It stays until you modify that structure away at a milestone.
+tox.ok,知道了,Got it
+mechanic.formulate,制剂优化：临床策略卡费用 −%d,Formulation: Clinical cards cost −%d
+row.formulate,临床卡费用,Clinical cost
+cardtext.formulate,本场临床策略卡费用 −%d,Clinical cards cost −%d this battle
+card.proc_formulation,制剂优化,Formulation
+encounter.kind.verify,验证试验,Verification Trial
+mol.core,核心,Core

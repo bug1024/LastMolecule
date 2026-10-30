@@ -107,6 +107,7 @@ func _construct() -> void:
 		names.add_child(UIKit.label(tr(subtitle_key), Color(accent.lightened(0.2), 0.8), 14))
 	bar.add_child(names)
 	var back := UIKit.close_button(accent)
+	back.set_meta("close", true)
 	back.pressed.connect(close)
 	bar.add_child(back)
 	outer.add_child(bar)
