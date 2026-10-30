@@ -53,6 +53,8 @@ var _kind_tag: Label
 var _turn_badge: BattleHud.TurnBadge
 var _ai_chip: BattleHud.AiChip
 var _mechanic: RichTextLabel
+var _mol: MoleculeView          # 设计了分子的项目：玩家的分子小图，属性效果生效时对应片段闪一下
+var _mol_tag: Label
 var _fx: Control
 var _arrow: Control
 var _banner: Control
@@ -132,6 +134,17 @@ func _build() -> void:
 	_mechanic.position = Vector2(24, 50)
 	_mechanic.size = Vector2(560, 60)
 	add_child(_mechanic)
+	_mol = MoleculeView.new()
+	_mol.compact = true
+	_mol.tooltip_text = " "
+	_mol.mouse_filter = Control.MOUSE_FILTER_PASS
+	_mol.size = Vector2(190, 104)
+	_shake_root.add_child(_mol)
+	_mol_tag = UIKit.label("", Color(0.78, 0.68, 1.0), 13, true)
+	_mol_tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_mol_tag.add_theme_constant_override("outline_size", 5)
+	_mol_tag.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	_shake_root.add_child(_mol_tag)
 
 	_energy_orb = Control.new()
 	_energy_orb.size = Vector2(90, 90)
@@ -235,6 +248,10 @@ func _layout() -> void:
 	_player_bar.size = Vector2(190, 26)
 	_player_status.position = Vector2(w * 0.1 + 14, 418)
 	_dose_button.position = Vector2(w * 0.1 - 6, 102)
+	_mol.position = Vector2(w * 0.1 + 196, 214)
+	_mol_tag.position = Vector2(_mol.position.x, _mol.position.y + _mol.size.y)
+	_mol_tag.size = Vector2(_mol.size.x + 40, 70)
+	_mol_tag.position.x -= 20
 	_kind_tag.position = Vector2(24 + _title.get_combined_minimum_size().x + 14, 20)
 	_turn_badge.position = Vector2(w * 0.5 - 75, 8)
 	_turn_badge.size = _turn_badge.custom_minimum_size
@@ -325,11 +342,23 @@ func _on_battle_started(encounter: Dictionary) -> void:
 	_bg.glow_color = STAGE_TINT.get(_game.state.stage, Color(0.2, 0.5, 0.5))
 	var mech_lines: Array[String] = []
 	for line in _manager.get_mechanic_lines():
+		if String(line.get("key", "")).begins_with("mol.fx."):
+			continue   # 分子效果放在分子小图的提示里，这里只留阶段考验等机制
 		mech_lines.append(_fmt(line))
 	if kind == "boss" and _game.rp2d > 0 and _game.state.stage == "二期临床试验":
 		mech_lines.append(tr("mechanic.rp2d") % _game.rp2d)
 	_mechanic.text = "\n".join(mech_lines.map(func(l: String) -> String: return "[color=#ffcf73]◆[/color] " + l))
 	_mechanic.visible = not mech_lines.is_empty()
+	var molecule: Molecule = _game.molecule
+	_mol.visible = molecule != null
+	_mol_tag.visible = molecule != null
+	if molecule != null:
+		_mol.set_molecule(molecule)
+		var props := molecule.properties()
+		_mol_tag.text = " ".join(Molecule.PROPS.map(func(p: String) -> String: return "%s%d" % [tr("prop." + p).left(1), int(props[p])])) \
+			+ "\n" + _mol_summary(molecule.effects(_game.state.stage))
+		var tips: Array = molecule.effects(_game.state.stage).lines.map(func(l: Dictionary) -> String: return _fmt(l))
+		_mol.tooltip_text = tr("mol.battle_tip") + ("\n" + "\n".join(tips) if not tips.is_empty() else "")
 	visible = true
 	modulate.a = 0.0
 	create_tween().tween_property(self, "modulate:a", 1.0, 0.3)
@@ -347,6 +376,25 @@ func _on_battle_started(encounter: Dictionary) -> void:
 
 
 ## 每局第一场战斗：图示说明卡牌颜色与敌人意图
+## 分子效果的一行速览：「力量+1 · 破绽+1 · 首回合抽牌+1」
+func _mol_summary(fx: Dictionary) -> String:
+	var parts: Array[String] = []
+	for key in ["strength", "dexterity", "vulnerable_bonus", "poison_bonus", "enemy_poison", "first_draw", "first_energy", "clinical_cost"]:
+		var v := int(fx.get(key, 0))
+		if v != 0:
+			parts.append(tr("mol.short." + key) % v)
+	if int(fx.get("weak", 0)) > 0:
+		parts.append(tr("mol.short.weak"))
+	if bool(fx.get("offtarget", false)):
+		parts.append(tr("mol.short.offtarget"))
+	if parts.is_empty():
+		return tr("mol.short.none")
+	var rows: Array[String] = []
+	for i in range(0, parts.size(), 2):
+		rows.append(" · ".join(parts.slice(i, i + 2)))
+	return "\n".join(rows)
+
+
 func _show_tip() -> void:
 	if _tip != null:
 		_tip.queue_free()
@@ -471,6 +519,11 @@ func _play(ev: Dictionary) -> void:
 		"mechanic":
 			_float_text(_fmt(ev), Vector2(size.x * 0.5, 150), Color(1.0, 0.82, 0.45), 20)
 			await _wait(0.55)
+		"mol":
+			_mol.flash(String(ev.prop))
+			if not bool(ev.get("start", false)):   # 开场时所有生效的片段一起亮，不逐个飘字
+				_float_text(tr("prop." + String(ev.prop)), _mol.position + Vector2(_mol.size.x * 0.5, 10), Color(0.8, 0.7, 1.0), 16)
+				await _wait(0.15)
 		"ai_tier":
 			var tier: Dictionary = ev.tier
 			var up := bool(ev.up)

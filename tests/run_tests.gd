@@ -927,12 +927,23 @@ func _test_molecule() -> void:
 	_expect(not m.apply_layout({"R1": "nitro", "R2": "nitro"}), "A fragment can't be placed twice from a single copy")
 	m.apply_preset("potent")
 	var p := m.properties()
-	_expect(int(p.potency) >= 4 and m.alerts.get("genotox", "") == "unknown" and m.open_alerts() >= 1,
+	_expect(int(p.potency) == 6 and m.alerts.get("genotox", "") == "unknown" and m.open_alerts() >= 1,
 		"The potent preset is strong but carries an unverified alert")
 	var fx := m.effects("临床前研究")
-	_expect(int(fx.strength) > 0 and int(fx.clinical_cost) == 1 and int(fx.enemy_strength) == m.open_alerts(),
-		"Potency gives strength, poor solubility taxes clinical cards, open alerts strengthen preclinical enemies")
-	_expect(int(m.effects("候选化合物发现").enemy_strength) == 0, "Alerts only strengthen enemies in preclinical")
+	_expect(int(fx.strength) == 2 and int(fx.poison_bonus) == 1 and int(fx.enemy_poison) == 2 and int(fx.clinical_cost) == 1
+		and int(fx.vulnerable_bonus) == 0, "Potent: +2 Strength, very stable poison, clinical tax, neutral selectivity")
+	_expect(not bool(m.exam_result("临床前研究").passed) and bool(m.exam_result("二期临床试验").passed)
+		and not bool(m.exam_result("一期临床试验").passed) and not bool(m.exam_result("候选化合物发现").has),
+		"Stage exams check alerts in preclinical, selectivity in phase I, potency in phase II")
+	var want_cards := {}
+	for c in m.active_combos():
+		if not String(c.get("card", "")).is_empty():
+			want_cards[String(c.card)] = true
+	_expect(m.signature_cards().size() == want_cards.size(), "Each active combo adds its trait card once")
+	_expect(Molecule.card_affinity({"kind": "attack", "effects": [{"op": "damage", "value": 6}]}) == ["potency"]
+		and m.pool_weight({"kind": "attack", "effects": [{"op": "damage", "value": 6}]}) == 30
+		and m.pool_weight({"kind": "skill", "effects": [{"op": "block", "value": 5}]}) == 10,
+		"Cards that fit a strong property show up more often in rewards")
 	var copy := Molecule.from_dict(m.to_dict())
 	_expect(copy.sites == m.sites and copy.inventory == m.inventory and copy.alerts == m.alerts, "A molecule survives save/load")
 	var local: Dictionary = m.sites.duplicate()
@@ -943,10 +954,13 @@ func _test_molecule() -> void:
 		"Swapping a substituent is local, swapping a linker is a core change")
 	m.apply_preset("balanced")
 	_expect(m.alerts.is_empty() and m.inventory.size() == 5, "Re-laying out drops stale alerts and returns fragments to inventory")
+	fx = m.effects("候选化合物发现")
+	_expect(int(fx.strength) == 1 and int(fx.vulnerable_bonus) == 1 and int(fx.poison_bonus) == 1 and int(fx.first_draw) == 1,
+		"A balanced molecule gets a small bonus from every property (no dead middle)")
 	m.apply_preset("selective")
 	fx = m.effects("候选化合物发现")
-	_expect(int(fx.weak) == 1 and int(fx.vulnerable_bonus) == 1 and int(fx.first_draw) == 1 and int(fx.strength) == 0,
-		"The selective preset trades potency (weak) for vulnerable bonus and an extra first draw")
+	_expect(int(fx.weak) == 1 and int(fx.vulnerable_bonus) == 1 and int(fx.first_draw) == 1 and int(fx.first_energy) == 1 and int(fx.strength) == 0,
+		"The selective preset trades potency (weak) for weak spots and a strong first turn")
 
 
 func _test_molecule_in_run() -> void:
@@ -956,49 +970,76 @@ func _test_molecule_in_run() -> void:
 	game.molecule.apply_preset("potent")
 	_expect(game.submit_molecule(game.molecule.sites.duplicate()) == "" and not game.is_designing(), "Submitting the design starts the run")
 	_expect(game.get_final_safety_limit() < _final_limit_without_molecule(game), "Open alerts lower the final safety limit")
-	# 溶解度差：战斗里临床卡更贵；制剂优化能抵消
+	# 战斗：溶解度差让临床卡更贵（制剂优化能抵消）；分子特性卡在牌组里；敌人开局中毒
 	game.deck.append("clin_dosing")
 	var base_cost := int(game.get_card_by_id("clin_dosing").cost)
 	game._start_battle("fight")
 	var bm = game._battle_manager
-	var clinical: Array = []
-	for pile in [bm.hand, bm.draw_pile, bm.discard_pile]:
-		for c in pile:
-			if c.type == "clinical":
-				clinical.append(c)
+	var all_cards: Array = bm.hand + bm.draw_pile + bm.discard_pile
+	var clinical: Array = all_cards.filter(func(c) -> bool: return c.type == "clinical")
 	_expect(not clinical.is_empty() and clinical.all(func(c) -> bool: return c.cost == base_cost + 1),
 		"Poor solubility raises clinical card costs in battle")
-	_expect(bm.player.get_status("strength") > 0, "Potency shows up as starting strength")
+	var sig: Array = game.molecule.signature_cards()
+	_expect(sig.all(func(id) -> bool: return all_cards.any(func(c) -> bool: return c.id == id)) and game.deck.all(func(id) -> bool: return not sig.has(id)),
+		"Trait cards join every battle without entering the permanent deck")
+	_expect(bm.player.get_status("strength") > 0 and bm.enemies[0].get_status("poison") >= 1, "Potency gives strength, stability poisons enemies")
 	bm._apply_card_effect({"op": "formulate", "value": 1}, clinical[0], -1, 1.0)
 	_expect(clinical.all(func(c) -> bool: return c.cost == base_cost), "Formulation removes the solubility tax")
 	var frags: int = game.molecule.inventory.size()
 	game._on_battle_ended(true, bm.get_outcome())
-	_expect(game.molecule.inventory.size() == frags + 1, "Winning a discovery battle grants a fragment")
+	_expect(game._pending_reward.get("fragments", []).is_empty(), "Normal fights don't offer fragments")
+	game.claim_reward("", "")
+	# Boss 胜利：奖励之后三选一片段，然后进入里程碑
+	game._phase = Game.RoundPhase.IDLE
+	game._start_battle("boss")
+	game._on_battle_ended(true, bm.get_outcome())
+	var reward: Dictionary = game._pending_reward
+	_expect((reward.get("fragments", []) as Array).size() == 3, "Beating a boss offers three fragments")
+	game.claim_reward("", reward.abilities[0].id if not reward.abilities.is_empty() else "")
+	_expect(String(game._current_event.get("id", "")) == "fragment", "The fragment pick follows the boss reward")
+	var picked := String(game._current_event.choices[0].fragment)
+	game.resolve_event_choice("fragment", 0)
+	_expect(game.molecule.inventory.size() == frags + 1 and game.molecule.inventory.has(picked)
+		and String(game._current_event.get("id", "")) == "milestone", "Picking a fragment adds it and continues to the milestone")
+	# 每个里程碑都能换取代基（1 个月，不打验证）；同一里程碑只能一次
+	var idx := _choice_index(game, "modify_molecule")
+	_expect(idx >= 0, "Every milestone offers a molecule modification")
+	game.resolve_event_choice("milestone", idx)
+	var local: Dictionary = game.molecule.sites.duplicate()
+	local["R3"] = "hydroxyl"
+	var months: int = game.months
+	_expect(game.submit_molecule(local) == "" and game.months == months + 1 and String(game._current_event.get("id", "")) == "milestone"
+		and _choice_index(game, "modify_molecule") < 0, "A substituent swap costs a month and returns to the milestone")
+	# 阶段考验：一期考选择性（2，未通过）→ Boss 更强；二期考活性（6，通过）→ Boss 开局带破绽
+	game._phase = Game.RoundPhase.IDLE
+	game.state.stage = "一期临床试验"
+	game._start_battle("boss")
+	_expect(bm.extra_lines.any(func(l: Dictionary) -> bool: return l.key == "mol.exam.battle_fail"), "A failed exam strengthens the boss")
+	bm._active = false
+	game._phase = Game.RoundPhase.IDLE
+	game.state.stage = "二期临床试验"
+	game._start_battle("boss")
+	_expect(bm.enemies[0].get_status("vulnerable") >= int(Molecule.config().exam_pass_vulnerable), "A passed exam opens the boss with weak spots")
+	bm._active = false
 	# 毒理验证：排除或确认一项警示
 	game._phase = Game.RoundPhase.IDLE
-	var months: int = game.months
+	game.state.stage = "临床前研究"
+	months = game.months
 	var risk: int = game.state.safety_risk
 	game._run_tox_study()
 	var st := String(game.molecule.alerts.get("genotox", ""))
 	_expect(game.months == months + 4 and (st == "cleared" or (st == "confirmed" and game.state.safety_risk == risk + 8)),
 		"A tox study takes time and clears or confirms the alert")
 	_expect(String(game._current_event.get("id", "")) == "tox_result", "The tox result is shown as an event")
-	# 临床前里程碑：修饰分子 → 验证试验 → 回到里程碑
+	# 临床前里程碑：换核心结构 → 验证试验 → 回到里程碑；之后的里程碑不能再换核心
 	game._phase = Game.RoundPhase.IDLE
-	game.state.stage = "临床前研究"
 	game.state.stage_battle_won = true
 	game._offer_milestone()
-	var idx := -1
-	var choices: Array = game._current_event.get("choices", [])
-	for i in choices.size():
-		if String(choices[i].get("action", "")) == "modify_molecule":
-			idx = i
-	_expect(idx >= 0, "The preclinical milestone offers a molecule modification")
-	game.resolve_event_choice("milestone", idx)
+	game.resolve_event_choice("milestone", _choice_index(game, "modify_molecule"))
 	_expect(game.is_designing() and game.get_design_mode() == "modify", "Choosing to modify opens the editor in modify mode")
 	game.cancel_design()
 	_expect(String(game._current_event.get("id", "")) == "milestone", "Cancelling a modification returns to the milestone")
-	game.resolve_event_choice("milestone", idx)
+	game.resolve_event_choice("milestone", _choice_index(game, "modify_molecule"))
 	var core: Dictionary = game.molecule.sites.duplicate()
 	core["L1"] = "pyridine"
 	var eff: int = game.state.efficacy
@@ -1007,12 +1048,26 @@ func _test_molecule_in_run() -> void:
 	_expect(game.state.efficacy == eff - 8 and game._battle_kind == "verify" and bm.is_battle_active(),
 		"A core change costs efficacy and requires a verification trial")
 	game._on_battle_ended(true, bm.get_outcome())
-	choices = game._current_event.get("choices", [])
-	_expect(String(game._current_event.get("id", "")) == "milestone"
-		and not choices.any(func(c: Dictionary) -> bool: return String(c.get("action", "")) == "modify_molecule"),
+	_expect(String(game._current_event.get("id", "")) == "milestone" and _choice_index(game, "modify_molecule") < 0,
 		"Passing verification returns to the milestone without a second modification")
+	game.state.stage = "一期临床试验"
+	game._offer_milestone()
+	game.resolve_event_choice("milestone", _choice_index(game, "modify_molecule"))
+	core = game.molecule.sites.duplicate()
+	core["L2"] = "sulfonamide"
+	_expect(bool(game.preview_modify(core).core_used) and game.submit_molecule(core) == "mol.err.core_used" and game.is_designing(),
+		"The core can only be changed once per program")
+	game.cancel_design()
 	_expect(game.to_save().molecule.sites == game.molecule.sites, "The run save includes the molecule")
 	game.free()
+
+
+func _choice_index(game: Node, action: String) -> int:
+	var choices: Array = game._current_event.get("choices", [])
+	for i in choices.size():
+		if String(choices[i].get("action", "")) == action:
+			return i
+	return -1
 
 
 func _final_limit_without_molecule(game: Node) -> int:
@@ -1169,8 +1224,11 @@ func _test_ui_smoke() -> void:
 		"Reward confirmation must fit inside the default 1280x720 viewport")
 	var reward: Dictionary = game._pending_reward
 	game.claim_reward(reward.cards[0].id, reward.abilities[0].id)
-	_expect(not popup.visible and scene.get_node("EventPopup").visible, "Claiming a boss reward shows the milestone decision")
-	game.resolve_event_choice("milestone", 1)
+	_expect(not popup.visible and scene.get_node("EventPopup").visible, "Claiming a boss reward shows the fragment pick")
+	game.resolve_event_choice("fragment", 0)
+	_expect(scene.get_node("EventPopup").visible and String(game._current_event.get("id", "")) == "milestone",
+		"After the fragment pick comes the milestone decision")
+	game.resolve_event_choice("milestone", _choice_index(game, "terminate"))
 	_expect(scene._advance_button.text == scene.tr("ui.restart") and not scene._advance_button.disabled,
 		"Terminal UI must offer an enabled restart button")
 	scene.free()

@@ -57,7 +57,20 @@ func _build_cards(cards: Array) -> void:
 		_card_row.add_child(_make_empty_label(tr("ui.reward_no_cards")))
 		return
 	for card in cards:
-		_card_row.add_child(_build_card_panel(card))
+		var fits: Array = card.get("mol_fit", [])
+		if fits.is_empty():
+			_card_row.add_child(_build_card_panel(card))
+			continue
+		# 契合分子强项的卡：卡下方标注，让「这张卡和我的分子合不合」一眼可见
+		var col := VBoxContainer.new()
+		col.add_theme_constant_override("separation", 4)
+		col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		col.add_child(_build_card_panel(card))
+		var names: Array = fits.map(func(p: String) -> String: return tr("prop." + p))
+		var tag := _make_label("⬡ " + tr("mol.fit") % "、".join(names), Color(0.75, 0.6, 1.0), 13)
+		tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		col.add_child(tag)
+		_card_row.add_child(col)
 
 
 func _build_abilities(abilities: Array) -> void:
@@ -158,7 +171,7 @@ func _on_ability_input(event: InputEvent, ability: Dictionary) -> void:
 func _select_card(card_id: String) -> void:
 	_selected_card_id = "" if card_id == _selected_card_id else card_id
 	GameAudio.sfx("card_draw" if not _selected_card_id.is_empty() else "click")
-	for child in _card_row.get_children():
+	for child in _card_row.find_children("*", "CardFace", true, false):
 		if child is CardFace:
 			var picked := String(child.get_meta("card_id")) == _selected_card_id
 			child.set_state(picked, picked, not picked and not _selected_card_id.is_empty())
@@ -236,7 +249,7 @@ func _update_confirm() -> void:
 
 
 func _picked_name(row: Container, meta_key: String, id: String) -> String:
-	for child in row.get_children():
+	for child in row.get_children() + row.find_children("*", "CardFace", true, false):
 		if child.has_meta(meta_key) and String(child.get_meta(meta_key)) == id:
 			return String(child.get_meta("name", id))
 	return id

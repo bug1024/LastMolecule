@@ -12,6 +12,7 @@ var stage_label: Label
 var molecule_art: MoleculeArt
 var mol_view: MoleculeView        # 设计了分子的项目：显示玩家自己的分子结构（代替装饰分子）
 var _mol_line: Label
+var _exam_line: Label   # 本阶段 Boss 的分子考验：通过 / 未通过
 var avatar: PlayerAvatar
 var hp_label: Label
 var hp_bar: ProgressBar
@@ -77,6 +78,11 @@ func _build() -> void:
 	_mol_line.add_theme_constant_override("outline_size", 5)
 	_mol_line.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
 	add_child(_mol_line)
+	_exam_line = UIKit.label("", UIKit.ACCENT, 14)
+	_exam_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_exam_line.add_theme_constant_override("outline_size", 5)
+	_exam_line.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+	add_child(_exam_line)
 	avatar = PlayerAvatar.new()
 	add_child(avatar)
 	avatar.custom_minimum_size = Vector2(170, 204)
@@ -177,10 +183,12 @@ func _layout() -> void:
 	var mol := Vector2(minf(300, w * 0.26), minf(240, bench_y - 70))
 	molecule_art.size = mol
 	molecule_art.position = Vector2(w * 0.56 - mol.x * 0.5, bench_y - 58 - mol.y)
-	mol_view.size = Vector2(minf(440, w * 0.38), minf(220, bench_y - 110))
-	mol_view.position = Vector2(w * 0.56 - mol_view.size.x * 0.5, bench_y - 60 - mol_view.size.y)
+	mol_view.size = Vector2(minf(440, w * 0.38), minf(196, bench_y - 134))
+	mol_view.position = Vector2(w * 0.56 - mol_view.size.x * 0.5, bench_y - 76 - mol_view.size.y)
 	_mol_line.position = Vector2(STATUS_W + 20, 50)
 	_mol_line.size = Vector2(w - STATUS_W - CARDS_W - 40, 22)
+	_exam_line.size = Vector2(460, 22)
+	_exam_line.position = Vector2(w * 0.56 - 230, bench_y - 62)   # 写在分子下方的投影台上
 	_bench_panel.position = Vector2(0, bench_y + 14)
 	_bench_panel.size = Vector2(w, h - bench_y - 14)
 	var plate: Control = _bench_panel.get_node("Plate")
@@ -232,6 +240,14 @@ func refresh(game, competition_summary: String, competition_text: String) -> voi
 			parts.append("%s %d" % [tr("prop." + p), int(props[p])])
 		parts.append("%s %d" % [tr("prop.alerts"), mol.open_alerts()])
 		_mol_line.text = " · ".join(parts)
+		var exam: Dictionary = game.get_exam(state.stage)
+		_exam_line.visible = bool(exam.get("has", false))
+		if _exam_line.visible:
+			var ok := bool(exam.passed)
+			_exam_line.text = tr("mol.exam.hub_pass" if ok else "mol.exam.hub_fail") % Molecule.exam_label(exam)
+			_exam_line.add_theme_color_override("font_color", UIKit.ACCENT if ok else UIKit.DANGER.lightened(0.25))
+	else:
+		_exam_line.visible = false
 	molecule_art.health = clampf(0.5 + (state.efficacy - state.safety_risk) / 120.0, 0.0, 1.0)
 	var hp := maxi(0, 100 - state.safety_risk)
 	hp_bar.value = hp

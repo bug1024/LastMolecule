@@ -899,35 +899,34 @@ prop.selectivity,选择性,Selectivity
 prop.stability,稳定性,Stability
 prop.solubility,溶解度,Solubility
 prop.alerts,毒性警示,Tox alerts
-prop.potency.tip,≥4：开局力量 +1（活性 6 时 +2）　≤1：开局虚弱,≥4: +1 Strength (+2 at 6)　≤1: start Weak
-prop.selectivity.tip,≥4：开局坚固 +1，打出的破绽 +1　≤1：发现 / 临床前战斗会脱靶,"≥4: +1 Sturdy, Weak Spot +1　≤1: off-target rule early"
-prop.stability.tip,≥4：中毒 +1　≤1：中毒 −1，且活性力量减半,"≥4: Poison +1　≤1: Poison −1, potency Strength halved"
-prop.solubility.tip,≥4：第一回合多抽 1 张　≤1：临床策略卡费用 +1,≥4: draw +1 on turn 1　≤1: Clinical cards cost +1
-prop.alerts.tip,每项未排除的警示：临床前敌人力量 +1，终审安全线 −5。可在平台建设做毒理验证。,"Each open alert: preclinical enemies +1 Strength, final safety limit −5. Test it at a Platform."
-combo.balance,亲脂—极性平衡：溶解度 +1,Lipophilic–polar balance: Solubility +1
-combo.stacking,芳香堆叠：活性 +2、溶解度 −1,"Aromatic stacking: Potency +2, Solubility −1"
-combo.shield,氟原子挡住代谢软点：稳定性 +1,Fluorine shields a soft spot: Stability +1
+prop.potency.tip,≤1：开局虚弱　≥3：开局力量 +1　≥5：+2,≤1: start Weak　≥3: +1 Strength　≥5: +2
+prop.selectivity.tip,≤1：早期战斗脱靶　≥3：破绽 +1　≥5：再加开局坚固 +1,≤1: off-target early　≥3: Weak Spot +1　≥5: also +1 Sturdy
+prop.stability.tip,≤1：中毒 −1、力量减半　≥3：中毒 +1　≥5：再加敌人开局中毒 2,"≤1: Poison −1, Strength halved　≥3: Poison +1　≥5: enemies also start with 2 Poison"
+prop.solubility.tip,≤1：临床卡费用 +1　≥3：首回合多抽 1 张　≥5：再加能量 +1,≤1: Clinical +1 cost　≥3: turn-1 draw +1　≥5: also +1 energy
+prop.alerts.tip,每项未排除的警示：终审安全线 −5，临床前 Boss 考验不通过。可在平台建设做毒理验证。,Each open alert: final safety limit −5 and fails the preclinical boss exam. Test it at a Platform.
+combo.balance,亲脂—极性平衡：溶解度 +1，特性卡「极性平衡」,"Lipophilic–polar balance: Solubility +1, trait card Polarity Balance"
+combo.stacking,芳香堆叠：活性 +2、溶解度 −1，特性卡「π-π 堆积」,"Aromatic stacking: Potency +2, Solubility −1, trait card π-π Stacking"
+combo.shield,氟原子挡住代谢软点：稳定性 +1，特性卡「代谢屏蔽」,"Fluorine shields a soft spot: Stability +1, trait card Metabolic Shield"
 combo.greasy,过度亲脂（≥3 个亲脂片段）：心脏毒性警示,Too greasy (3+ lipophilic): cardiac alert
 alert.genotox,遗传毒性警示（硝基）,Genotoxicity alert (nitro)
 alert.herg,心脏毒性警示（hERG）,Cardiac alert (hERG)
 alert.state.unknown,待验证,untested
 alert.state.cleared,已排除,cleared
 alert.state.confirmed,已确认,confirmed
-mol.fx.strength,分子活性高：开局力量 +%d,High potency: +%d Strength
+mol.fx.strength,分子活性：开局力量 +%d,Potency: +%d Strength
 mol.fx.unstable_strength,代谢太快：活性带来的力量减半为 %d,Metabolized fast: potency Strength halved to %d
 mol.fx.weak,分子活性太低：开局虚弱,Low potency: start Weak
 mol.fx.offtarget,选择性差：一回合第 3 张攻击牌起脱靶，每张掉 3 血（破绽目标除外）,"Poor selectivity: from the 3rd attack each turn, 3 HP backfire (Weak Spot targets exempt)"
-mol.fx.vulnerable,选择性好，副作用少：开局坚固 +1，打出的破绽 +1 层,"High selectivity, fewer side effects: +1 Sturdy, Weak Spot +1"
+mol.fx.vulnerable,选择性好：打出的破绽 +1 层,Good selectivity: Weak Spot +1
 mol.fx.poison_up,代谢稳定：施加的中毒 +1 层,Stable: Poison +1
 mol.fx.poison_down,代谢不稳定：施加的中毒 −1 层,Unstable: Poison −1
 mol.fx.clinical_cost,溶解度差，给药困难：临床策略卡费用 +1（制剂优化卡可抵消）,Poor solubility: Clinical cards cost +1 (Formulation offsets it)
 mol.fx.draw,溶解度好：第一回合多抽 1 张,Good solubility: draw +1 on turn 1
-mol.fx.alerts,毒性警示 %d 项：临床前敌人力量 +%d,%d tox alerts: preclinical enemies +%d Strength
 mol.title,设计候选分子,Design the Candidate
 mol.subtitle,卡组是你的研发能力，分子才是你的角色,Your deck is your capability; the molecule is your character
 mol.modify_title,修饰分子,Modify the Molecule
 mol.modify,修饰分子,Modify the molecule
-mol.modify.desc,换取代基需要一场验证试验；更换核心结构（连接位）还会让前期疗效数据作废（疗效 −8）。每个项目只能修饰一次。,Swapping substituents needs a verification trial; changing the core (linkers) also voids early efficacy data (−8). Once per program.
+mol.modify.desc,换取代基（环上 / 末端位）：耗时 1 个月，每个里程碑一次。更换核心结构（连接位）：疗效 −8、耗时 2 个月并要打一场验证试验，每个项目只能一次。,"Swap substituents (ring / terminal): 1 month, once per milestone. Change the core (linkers): efficacy −8, 2 months and a verification trial, once per program."
 mol.tag,分子,Molecule
 mol.preset.potent,高活性方案,Potent
 mol.preset.balanced,均衡方案,Balanced
@@ -939,8 +938,8 @@ mol.cancel,不改了,Never Mind
 mol.inventory,片段库（点击放进选中的位点）,Fragments (click to place in the selected site)
 mol.hint,点骨架上的位点选中它，再点下面的片段放进去；点已放的位点上的片段可以取下。,"Click a site, then a fragment to place it; click a placed fragment to remove it."
 mol.cost.none,还没有改动。,No changes yet.
-mol.cost.local,局部修饰：需要打一场验证试验，额外耗时 2 个月。,"Local change: one verification trial, +2 months."
-mol.cost.core,更换核心结构：疗效 %d（前期数据作废），需要打一场验证试验。,"Core change: efficacy %d (early data voided), plus a verification trial."
+mol.cost.local,局部修饰：耗时 1 个月。,Local change: 1 month.
+mol.cost.core,更换核心结构：疗效 %d（前期数据作废），耗时 2 个月，并要打一场验证试验。,"Core change: efficacy %d (early data voided), 2 months and a verification trial."
 mol.properties,分子属性,Properties
 mol.combos,触发的组合,Active combos
 mol.combos_none,无,None
@@ -949,7 +948,7 @@ mol.err.layout,这个片段放不进这个位点。,That fragment can't go in th
 mol.err.phase,现在不能修改分子。,You can't change the molecule now.
 mol.empty_site,空,empty
 mol.hub,我的分子,My Molecule
-mol.fragment_gained,获得分子片段：%s（临床前里程碑修饰分子时可用）,Fragment gained: %s (usable when modifying at the Preclinical milestone)
+mol.fragment_gained,获得分子片段：%s（里程碑修饰分子时可用）,Fragment gained: %s (usable when modifying at a milestone)
 tox.study,毒理验证：%s,Toxicology study: %s
 tox.study.desc,做专项毒理实验：大约一半的机会排除这项警示；否则警示被确认，安全风险上升。,A focused tox study: about half the time the alert is cleared; otherwise it is confirmed and safety risk rises.
 tox.result_title,毒理验证结果,Toxicology Result
@@ -962,3 +961,40 @@ cardtext.formulate,本场临床策略卡费用 −%d,Clinical cards cost −%d t
 card.proc_formulation,制剂优化,Formulation
 encounter.kind.verify,验证试验,Verification Trial
 mol.core,核心,Core
+card.sig_stacking,π-π 堆积,π-π Stacking
+card.sig_balance,极性平衡,Polarity Balance
+card.sig_shield,代谢屏蔽,Metabolic Shield
+mol.fx.vulnerable_plus,选择性极佳，副作用少：破绽 +1 层，开局坚固 +1,"Excellent selectivity, fewer side effects: Weak Spot +1, +1 Sturdy"
+mol.fx.poison_plus,代谢非常稳定：中毒 +1 层，敌人开局带 2 层中毒,"Very stable: Poison +1, enemies start with 2 Poison"
+mol.fx.draw_plus,溶解度极佳：第一回合多抽 1 张、能量 +1,Excellent solubility: turn 1 draw +1 and energy +1
+mol.exam.alerts_fmt,未排除的毒性警示 %d 项（需全部排除）,%d open tox alerts (need 0)
+mol.exam.props_fmt,%s %d / 需 ≥%d,%s %d / need ≥%d
+mol.exam.battle_pass,阶段考验通过（%s）：Boss 开局带 %d 层破绽,Stage exam passed (%s): boss starts with %d Weak Spot
+mol.exam.battle_fail,阶段考验未通过（%s）：Boss 力量 +%d,Stage exam failed (%s): boss +%d Strength
+mol.exam.title,阶段考验,Stage exam
+mol.exam.hub_pass,本阶段考验 ✓ %s,This stage's exam ✓ %s
+mol.exam.hub_fail,本阶段考验 ✗ %s,This stage's exam ✗ %s
+mol.exam.next_pass,下一阶段考验 ✓ %s,Next stage's exam ✓ %s
+mol.exam.next_fail,下一阶段考验 ✗ %s —— 可以趁现在修饰分子,Next stage's exam ✗ %s — modify the molecule now
+mol.exam.none,下一阶段没有分子考验,No molecule exam next stage
+mol.fit,契合分子：%s,Fits your molecule: %s
+mol.signature_tag,分子特性,Molecule trait
+mol.cost.core_used,这个项目已经换过一次核心结构了，这次只能换取代基。,The core was already changed once this program; only substituents can change now.
+mol.err.core_used,这个项目已经换过一次核心结构了。,The core was already changed once this program.
+frag.pick.title,选一个分子片段,Pick a Fragment
+frag.pick.desc,攻克难关后，化学组合成了新的片段。选一个放进片段库，下一个里程碑修饰分子时可以用。,Your chemists made new fragments. Pick one for your library; use it when modifying at the next milestone.
+frag.pick.skip,都不要,None of these
+frag.pick.tag,分子片段,Fragment
+frag.pick.sites,可放：%s,Fits: %s
+mol.battle_tip,你的分子正在起作用：,Your molecule at work:
+mol.short.strength,力量%+d,Str %+d
+mol.short.dexterity,坚固%+d,Sturdy %+d
+mol.short.vulnerable_bonus,破绽%+d,Weak Spot %+d
+mol.short.poison_bonus,中毒%+d,Poison %+d
+mol.short.enemy_poison,敌人开局中毒%d,Enemies start Poison %d
+mol.short.first_draw,首回合抽牌%+d,T1 draw %+d
+mol.short.first_energy,首回合能量%+d,T1 energy %+d
+mol.short.clinical_cost,临床卡费用%+d,Clinical cost %+d
+mol.short.weak,开局虚弱,Start Weak
+mol.short.offtarget,会脱靶,Off-target
+mol.short.none,分子效果：无,No molecule effects

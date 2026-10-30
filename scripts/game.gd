@@ -326,8 +326,12 @@ func claim_reward(card_id: String, ability_id: String) -> void:
 	if ability_id != "" and not state.abilities.has(ability_id):
 		state.abilities.append(ability_id)
 		state_synced.emit(state)
+	var fragments: Array = _pending_reward.get("fragments", [])
 	_pending_reward = {}
 	reward_claimed.emit()
+	if not fragments.is_empty():
+		_offer_fragment_pick(fragments, _battle_kind == "boss")
+		return
 	if _battle_kind == "boss":
 		_enter_milestone()
 	else:
@@ -666,6 +670,17 @@ func _start_battle(kind: String) -> void:
 	var mol := molecule.effects(state.stage) if molecule != null else {}
 	strength += int(mol.get("strength", 0))
 	var deck_cards := build_deck()
+	var lines: Array = (mol.get("lines", []) as Array).duplicate()
+	var exam_ctx := {}
+	if molecule != null:
+		for card_id in molecule.signature_cards():   # 分子特性卡：组合成立时每场战斗都在牌组里
+			var data := get_card_by_id(String(card_id))
+			if not data.is_empty():
+				var card := _make_card(data)
+				card.type_name = tr("mol.signature_tag")   # 卡面类型栏写「分子特性」
+				deck_cards.append(card)
+		if kind == "boss":
+			exam_ctx = _exam_battle_ctx(lines)
 	if int(mol.get("clinical_cost", 0)) > 0:   # 溶解度差：临床策略卡（给药）更贵
 		for card in deck_cards:
 			if card.type == "clinical":
@@ -687,9 +702,41 @@ func _start_battle(kind: String) -> void:
 		"weak": int(mol.get("weak", 0)),
 		"vulnerable_bonus": int(mol.get("vulnerable_bonus", 0)),
 		"poison_bonus": int(mol.get("poison_bonus", 0)),
-		"enemy_strength": int(mol.get("enemy_strength", 0)),
-		"extra_lines": mol.get("lines", []),
+		"enemy_poison": int(mol.get("enemy_poison", 0)),
+		"first_energy": int(mol.get("first_energy", 0)),
+		"boss_exam_strength": int(exam_ctx.get("strength", 0)),
+		"boss_exam_vulnerable": int(exam_ctx.get("vulnerable", 0)),
+		"extra_lines": lines,
 	})
+
+
+## Boss 战的阶段考验：通过则 Boss 开局带破绽，没通过则 Boss 更强；说明行追加到 lines
+func _exam_battle_ctx(lines: Array) -> Dictionary:
+	var exam := molecule.exam_result(state.stage)
+	if not bool(exam.get("has", false)):
+		return {}
+	var cfg := Molecule.config()
+	if bool(exam.passed):
+		var v := int(cfg.get("exam_pass_vulnerable", 2))
+		lines.append({"key": "mol.exam.battle_pass", "args": [exam_label(exam), v], "prop": _exam_prop(exam)})
+		return {"vulnerable": v}
+	var st := int(cfg.get("exam_fail_strength", 2))
+	lines.append({"key": "mol.exam.battle_fail", "args": [exam_label(exam), st], "prop": _exam_prop(exam)})
+	return {"strength": st}
+
+
+func exam_label(exam: Dictionary) -> String:
+	return Molecule.exam_label(exam)
+
+
+func _exam_prop(exam: Dictionary) -> String:
+	var props: Array = exam.get("props", [])
+	return String(props[0]) if not props.is_empty() else ""
+
+
+## 某阶段的考验结果（界面用；没有分子或该阶段没考验时 has = false）
+func get_exam(stage: String) -> Dictionary:
+	return molecule.exam_result(stage) if molecule != null else {"has": false}
 
 
 ## 疗效换算成战斗开局效力：每超过基准 20 点 +1
@@ -738,8 +785,6 @@ func _on_battle_ended(victory: bool, outcome: Dictionary) -> void:
 	player_xp += int(_player_cfg.get("xp_per_battle", {}).get(_battle_kind, 1))
 	if get_player_level() > before:
 		player_leveled.emit(get_player_level())
-	if molecule != null and _battle_kind != "verify" and state.stage in ["候选化合物发现", "临床前研究"]:
-		_grant_fragment()
 	if _battle_kind == "verify":
 		_offer_milestone()   # 修饰后的验证试验通过：回到里程碑继续决策
 		return
@@ -759,6 +804,8 @@ func _offer_reward() -> void:
 	for card in _sample_cards(int(reward.get("card_choices", 3)), _battle_kind != "fight"):
 		var data := get_card_by_id(card.id).duplicate()
 		data["type_name"] = card.type_name
+		if molecule != null:
+			data["mol_fit"] = molecule.strong_fits(data)
 		cards.append(data)
 	var level := company.process_level()
 	var pool := _abilities_data.filter(func(a: Dictionary) -> bool:
@@ -773,6 +820,8 @@ func _offer_reward() -> void:
 		if int(reward.get(key, 0)) != 0:
 			resources[key] = int(reward[key])
 	_pending_reward = {"kind": _battle_kind, "resources": resources, "cards": cards, "abilities": abilities}
+	if molecule != null and _battle_kind in ["elite", "boss"]:
+		_pending_reward["fragments"] = _roll_fragments()
 	_phase = RoundPhase.REWARD
 	_autosave()
 	reward_offered.emit(_pending_reward)
@@ -807,8 +856,9 @@ func _offer_milestone() -> void:
 				requires["funding_min"] = cost + 1
 			choices.append({"label_key": key, "desc_key": key + ".desc", "tag_key": "milestone.opt_tag",
 				"requires": requires, "effects": effects, "action": "decide", "option": String(option.id)})
-	if molecule != null and state.stage == "临床前研究" and state.stage_battle_won and not bool(run_flags.get("modified", false)):
-		choices.append({"label_key": "mol.modify", "desc_key": "mol.modify.desc", "tag_key": "mol.tag", "effects": {}, "action": "modify_molecule"})
+	if molecule != null and state.stage_battle_won and not is_last and String(run_flags.get("tweak_stage", "")) != state.stage:
+		choices.append({"label_key": "mol.modify", "desc_key": "mol.modify.desc", "desc_text": next_exam_text(),
+			"tag_key": "mol.tag", "effects": {}, "action": "modify_molecule"})
 	choices.append({"label_key": "milestone.terminate", "effects": {}, "action": "terminate"})
 	_offer_event({"id": "milestone", "title_key": "node.milestone", "desc_key": desc_key,
 		"desc_args": [_tr_stage(state.stage), get_final_efficacy_bar(), state.efficacy], "choices": choices}, true)
@@ -840,6 +890,8 @@ func submit_molecule(placement: Dictionary) -> String:
 	if _phase != RoundPhase.DESIGN or molecule == null:
 		return "mol.err.phase"
 	var kind := molecule.change_kind(placement) if _design_mode == "modify" else "initial"
+	if kind == "core" and bool(run_flags.get("core_modified", false)):
+		return "mol.err.core_used"
 	if not molecule.apply_layout(placement):
 		return "mol.err.layout"
 	if _design_mode == "initial":
@@ -851,12 +903,18 @@ func submit_molecule(placement: Dictionary) -> String:
 	if kind == "none":
 		_offer_milestone()
 		return ""
-	run_flags["modified"] = true
-	decisions.append("mol_" + kind)
 	var cfg: Dictionary = Molecule.config().get("modify", {})
+	run_flags["tweak_stage"] = state.stage
+	decisions.append("mol_" + kind)
+	if kind == "local":   # 换取代基：只花时间，回到里程碑继续决策
+		_pass_time(int(cfg.get("local_months", 1)))
+		state_synced.emit(state)
+		if not _check_end_conditions():
+			_offer_milestone()
+		return ""
+	run_flags["core_modified"] = true
 	_pass_time(int(cfg.get("months", 2)))
-	if kind == "core":
-		_apply_effects({"efficacy": int(cfg.get("core_efficacy", -8))})
+	_apply_effects({"efficacy": int(cfg.get("core_efficacy", -8))})
 	state_synced.emit(state)
 	if _check_end_conditions():
 		return ""
@@ -876,7 +934,8 @@ func preview_modify(placement: Dictionary) -> Dictionary:
 	if molecule == null:
 		return {"kind": "none"}
 	var kind := molecule.change_kind(placement)
-	return {"kind": kind, "efficacy": int(Molecule.config().get("modify", {}).get("core_efficacy", -8)) if kind == "core" else 0}
+	return {"kind": kind, "efficacy": int(Molecule.config().get("modify", {}).get("core_efficacy", -8)) if kind == "core" else 0,
+		"core_used": bool(run_flags.get("core_modified", false))}
 
 
 func _run_tox_study() -> void:
@@ -899,14 +958,37 @@ func _run_tox_study() -> void:
 		"choices": [{"label_key": "tox.ok", "effects": {}, "action": ""}]})
 
 
-## 打赢发现 / 临床前的战斗：随机获得一个分子片段（进库存，里程碑修饰时可用）
-func _grant_fragment() -> void:
-	var pool: Array = Molecule.config().get("fragments", [])
-	if pool.is_empty():
-		return
-	var id := String(pool[rng.randi_range(0, pool.size() - 1)].id)
-	molecule.inventory.append(id)
-	fragment_gained.emit(id)
+## 打赢精英 / Boss：随机给几个不同的片段让玩家挑一个
+func _roll_fragments() -> Array:
+	var pool: Array = (Molecule.config().get("fragments", []) as Array).map(func(f: Dictionary) -> String: return String(f.id))
+	var out: Array = []
+	while out.size() < int(Molecule.config().get("fragment_choices", 3)) and not pool.is_empty():
+		var idx := rng.randi_range(0, pool.size() - 1)
+		out.append(pool[idx])
+		pool.remove_at(idx)
+	return out
+
+
+func _offer_fragment_pick(fragments: Array, then_milestone: bool) -> void:
+	var choices: Array = []
+	for id in fragments:
+		var frag := Molecule.fragment(String(id))
+		var sites: Array = (frag.get("sites", []) as Array).map(func(t: String) -> String: return tr("site." + t).split(" ")[0])
+		var text := Molecule.fx_text(frag.get("fx", {})) + "　" + tr("frag.pick.sites") % " / ".join(sites)
+		if not String(frag.get("alert", "")).is_empty():
+			text += "　⚠ " + tr("alert." + String(frag.alert))
+		choices.append({"label_key": "frag." + String(id), "desc_text": text, "tag_key": "frag.pick.tag", "effects": {},
+			"action": "fragment", "fragment": String(id), "then_milestone": then_milestone})
+	choices.append({"label_key": "frag.pick.skip", "effects": {}, "action": "fragment", "fragment": "", "then_milestone": then_milestone})
+	_offer_event({"id": "fragment", "tag_key": "frag.pick.tag", "title_key": "frag.pick.title", "desc_key": "frag.pick.desc", "choices": choices})
+
+
+## 里程碑上「下一阶段考验」的提示（修饰选项下方显示）
+func next_exam_text() -> String:
+	var exam := get_exam(_next_stage())
+	if not bool(exam.get("has", false)):
+		return tr("mol.exam.none")
+	return tr("mol.exam.next_pass" if bool(exam.passed) else "mol.exam.next_fail") % exam_label(exam)
 
 
 ## 最终项目开场：按公司已有的研究证据选择研究路线
@@ -964,6 +1046,15 @@ func _run_action(action: String, choice: Dictionary) -> void:
 			_run_tox_study()
 		"modify_molecule":
 			_queue_design("modify")
+		"fragment":
+			var frag := String(choice.get("fragment", ""))
+			if not frag.is_empty():
+				molecule.inventory.append(frag)
+				fragment_gained.emit(frag)
+			if bool(choice.get("then_milestone", false)):
+				_enter_milestone()
+			else:
+				_finish_node()
 		"route":
 			route = String(choice.get("route", ""))
 			decisions.append("route:" + route)
@@ -1184,6 +1275,7 @@ func _sample_cards(count: int, rare_boost := false) -> Array:
 		var stage_bias := float(_stage_type_bias.get(state.stage, {}).get(String(data.get("type", "")), 1.0))
 		var weight := int(_rarity_weights.get(rarity, 5)) * (2 if rare_boost and rarity != "common" else 1) * maxi(1, bonus) \
 			* maxi(1, roundi(stage_bias * 10))   # 阶段偏向（×10 取整，保持整数权重）
+		weight *= molecule.pool_weight(data) if molecule != null else 10   # 分子偏向：契合强项的卡更常出现（同样 ×10）
 		pool.append({"data": data, "weight": weight})
 	var picked: Array = []
 	while picked.size() < count and not pool.is_empty():

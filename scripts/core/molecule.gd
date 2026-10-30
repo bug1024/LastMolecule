@@ -4,12 +4,14 @@ extends RefCounted
 ## 配置见 data/molecule.json：骨架 7 个带类型的位点（连接位 = 核心结构、环上取代位、末端位），片段有收益也有代价，
 ## 相邻片段按标签触发组合规则；部分片段或组合带「毒性警示」——待验证的风险，可以靠毒理验证排除或确认。
 ##
-## 属性（0–6）如何改变战斗（effects()）：
-##   活性      ≥4 开局力量 +1（6 时 +2）；≤1 开局虚弱
-##   选择性    ≤1 发现 / 临床前战斗有脱靶规则；≥4 开局坚固 +1、打出的破绽 +1（副作用少）
-##   稳定性    ≥4 施加的中毒 +1；≤1 中毒 −1，且活性带来的力量减半（作用难以维持）
-##   溶解度    ≤1 临床策略卡费用 +1（给药困难，制剂优化卡可抵消）；≥4 第一回合多抽 1 张
-##   毒性警示  未排除或已确认的每一项：临床前战斗敌人力量 +1，终审安全线 −5
+## 属性（0–6）如何改变战斗（effects()）。2 是中性值，≤1 有代价，≥3 有收益，≥5 收益更大：
+##   活性      ≤1 开局虚弱；≥3 开局力量 +1；≥5 +2
+##   选择性    ≤1 发现 / 临床前战斗有脱靶规则；≥3 打出的破绽 +1；≥5 另外开局坚固 +1（副作用少）
+##   稳定性    ≤1 中毒 −1，活性力量减半；≥3 施加的中毒 +1；≥5 另外敌人开局带 2 层中毒
+##   溶解度    ≤1 临床策略卡费用 +1（制剂优化卡可抵消）；≥3 第一回合多抽 1 张；≥5 另外第一回合能量 +1
+##   毒性警示  未排除或已确认的每一项：终审安全线 −5
+## 分子还决定：奖励卡池偏向（card_affinity）、分子特性卡（组合成立时加入战斗牌组）、
+## 各阶段 Boss 战的「阶段考验」（exam_result，见 molecule.json 的 exams）。
 
 const PATH := "res://data/molecule.json"
 const PROPS := ["potency", "selectivity", "stability", "solubility"]
@@ -104,7 +106,7 @@ func properties() -> Dictionary:
 	return props
 
 
-## 当前触发的组合规则（相邻标签组合 / 某标签数量达到阈值）
+## 当前触发的组合规则（相邻标签组合 / 某标签数量达到阈值），每个组合最多一次
 func active_combos() -> Array:
 	var out: Array = []
 	for combo in config().get("combos", []):
@@ -116,6 +118,7 @@ func active_combos() -> Array:
 					var b := fragment(String(sites.get(pair[1], ""))).get("tags", []) as Array
 					if (a.has(need[0]) and b.has(need[1])) or (a.has(need[1]) and b.has(need[0])):
 						out.append(combo)
+						break   # 同一组合在分子上出现几次都只算一次
 			"count":
 				var n := 0
 				for site_id in sites:
@@ -165,47 +168,128 @@ func unknown_alerts() -> Array:
 
 
 ## 属性带来的战斗效果（game 拼进战斗上下文；stage 决定哪些只在特定阶段生效）
-## {strength, dexterity, weak, offtarget (bool), vulnerable_bonus, poison_bonus, clinical_cost, first_draw, enemy_strength, lines: [{key,args}]}
+## {strength, dexterity, weak, offtarget (bool), vulnerable_bonus, poison_bonus, enemy_poison, clinical_cost,
+##  first_draw, first_energy, lines: [{key, args, prop}]}
 func effects(stage: String) -> Dictionary:
 	var p := properties()
 	var fx := {"strength": 0, "dexterity": 0, "weak": 0, "offtarget": false, "vulnerable_bonus": 0, "poison_bonus": 0,
-		"clinical_cost": 0, "first_draw": 0, "enemy_strength": 0, "lines": []}
+		"enemy_poison": 0, "clinical_cost": 0, "first_draw": 0, "first_energy": 0, "lines": []}
 	var lines: Array = []
-	var strength := (int(p.potency) - 2) / 2 if int(p.potency) >= 4 else 0
-	if int(p.stability) <= 1 and strength > 0:
+	var pot := int(p.potency)
+	var sel := int(p.selectivity)
+	var stab := int(p.stability)
+	var sol := int(p.solubility)
+	var strength := (2 if pot >= 5 else 1) if pot >= 3 else 0
+	if stab <= 1 and strength > 0:
 		strength = strength / 2
-		lines.append({"key": "mol.fx.unstable_strength", "args": [strength]})
+		lines.append({"key": "mol.fx.unstable_strength", "args": [strength], "prop": "stability"})
 	if strength > 0:
 		fx.strength = strength
-		lines.append({"key": "mol.fx.strength", "args": [strength]})
-	if int(p.potency) <= 1:
+		lines.append({"key": "mol.fx.strength", "args": [strength], "prop": "potency"})
+	if pot <= 1:
 		fx.weak = 1
-		lines.append({"key": "mol.fx.weak", "args": []})
-	var early := stage in ["候选化合物发现", "临床前研究"]
-	if int(p.selectivity) <= 1 and early:
+		lines.append({"key": "mol.fx.weak", "args": [], "prop": "potency"})
+	if sel <= 1 and stage in ["候选化合物发现", "临床前研究"]:
 		fx.offtarget = true
-		lines.append({"key": "mol.fx.offtarget", "args": []})
-	if int(p.selectivity) >= 4:
+		lines.append({"key": "mol.fx.offtarget", "args": [], "prop": "selectivity"})
+	if sel >= 3:
 		fx.vulnerable_bonus = 1
-		fx.dexterity = 1
-		lines.append({"key": "mol.fx.vulnerable", "args": []})
-	if int(p.stability) >= 4:
+		fx.dexterity = 1 if sel >= 5 else 0
+		lines.append({"key": "mol.fx.vulnerable_plus" if sel >= 5 else "mol.fx.vulnerable", "args": [], "prop": "selectivity"})
+	if stab >= 3:
 		fx.poison_bonus = 1
-		lines.append({"key": "mol.fx.poison_up", "args": []})
-	elif int(p.stability) <= 1:
+		fx.enemy_poison = 2 if stab >= 5 else 0
+		lines.append({"key": "mol.fx.poison_plus" if stab >= 5 else "mol.fx.poison_up", "args": [], "prop": "stability"})
+	elif stab <= 1:
 		fx.poison_bonus = -1
-		lines.append({"key": "mol.fx.poison_down", "args": []})
-	if int(p.solubility) <= 1:
+		lines.append({"key": "mol.fx.poison_down", "args": [], "prop": "stability"})
+	if sol <= 1:
 		fx.clinical_cost = 1
-		lines.append({"key": "mol.fx.clinical_cost", "args": []})
-	elif int(p.solubility) >= 4:
+		lines.append({"key": "mol.fx.clinical_cost", "args": [], "prop": "solubility"})
+	elif sol >= 3:
 		fx.first_draw = 1
-		lines.append({"key": "mol.fx.draw", "args": []})
-	if open_alerts() > 0 and stage == "临床前研究":
-		fx.enemy_strength = open_alerts()
-		lines.append({"key": "mol.fx.alerts", "args": [open_alerts(), open_alerts()]})
+		fx.first_energy = 1 if sol >= 5 else 0
+		lines.append({"key": "mol.fx.draw_plus" if sol >= 5 else "mol.fx.draw", "args": [], "prop": "solubility"})
 	fx.lines = lines
 	return fx
+
+
+## 阶段考验：{has, passed, props, min, value, alerts_max}；该阶段没有考验时 has = false
+func exam_result(stage: String) -> Dictionary:
+	var exam: Dictionary = config().get("exams", {}).get(stage, {})
+	if exam.is_empty():
+		return {"has": false}
+	if exam.has("alerts_max"):
+		var n := open_alerts()
+		return {"has": true, "passed": n <= int(exam.alerts_max), "alerts": true, "value": n, "min": int(exam.alerts_max)}
+	var p := properties()
+	var total := 0
+	for prop in exam.get("props", []):
+		total += int(p.get(prop, 0))
+	return {"has": true, "passed": total >= int(exam.get("min", 0)), "alerts": false, "props": exam.get("props", []),
+		"value": total, "min": int(exam.get("min", 0))}
+
+
+## 「选择性 3 / 需 ≥4」「未排除的毒性警示 1 项（需全部排除）」这样的考验说明
+static func exam_label(exam: Dictionary) -> String:
+	if bool(exam.get("alerts", false)):
+		return TranslationServer.translate("mol.exam.alerts_fmt") % int(exam.value)
+	var names: Array = (exam.get("props", []) as Array).map(func(p: String) -> String: return TranslationServer.translate("prop." + p))
+	return TranslationServer.translate("mol.exam.props_fmt") % ["+".join(names), int(exam.value), int(exam.min)]
+
+
+## 当前组合带来的分子特性卡 id（同一组合触发多次也只给一张）
+func signature_cards() -> Array:
+	var ids: Array = []
+	for combo in active_combos():
+		var id := String(combo.get("card", ""))
+		if not id.is_empty() and not ids.has(id):
+			ids.append(id)
+	return ids
+
+
+## 一张卡和哪些属性「契合」：攻击 / 力量 ↔ 活性，破绽 ↔ 选择性，中毒 / 引爆 ↔ 稳定性，抽牌 / 能量 / 临床卡 ↔ 溶解度
+static func card_affinity(card: Dictionary) -> Array:
+	var out: Array = []
+	var effects: Array = card.get("effects", [])
+	var has_status := func(id: String) -> bool:
+		return effects.any(func(e: Dictionary) -> bool: return String(e.get("op", "")) == "status" and String(e.get("id", "")) == id)
+	var has_op := func(op: String) -> bool:
+		return effects.any(func(e: Dictionary) -> bool: return String(e.get("op", "")) == op)
+	if String(card.get("kind", "")) == "attack" or has_status.call("strength"):
+		out.append("potency")
+	if has_status.call("vulnerable"):
+		out.append("selectivity")
+	if has_status.call("poison") or has_op.call("detonate"):
+		out.append("stability")
+	if String(card.get("type", "")) == "clinical" or has_op.call("draw") or has_op.call("energy") or has_op.call("formulate"):
+		out.append("solubility")
+	return out
+
+
+## 奖励卡池里这张卡的权重倍数（×10 的整数）：契合的属性越高越常出现；属性 ≤2 的契合不加成
+func pool_weight(card: Dictionary) -> int:
+	var p := properties()
+	var mult := 1.0
+	for prop in card_affinity(card):
+		mult = maxf(mult, 1.0 + maxi(0, int(p[prop]) - 2) * 0.5)
+	return roundi(mult * 10)
+
+
+## 这张卡契合的「强项」（属性 ≥3），奖励界面用来标注
+func strong_fits(card: Dictionary) -> Array:
+	var p := properties()
+	return card_affinity(card).filter(func(prop: String) -> bool: return int(p[prop]) >= 3)
+
+
+## 「活性+2 溶解度−1」这样的短文本
+static func fx_text(fx: Dictionary) -> String:
+	var parts: Array[String] = []
+	for p in PROPS:
+		var v := int(fx.get(p, 0))
+		if v != 0:
+			parts.append("%s%s%d" % [TranslationServer.translate("prop." + p), "+" if v > 0 else "", v])
+	return " ".join(parts)
 
 
 ## 修饰的规模：none（没变）/ local（只换了取代基）/ core（换了连接位 = 核心结构）

@@ -14,6 +14,7 @@ var _inventory: HFlowContainer
 var _props: VBoxContainer
 var _combos: Label
 var _alerts: VBoxContainer
+var _exams: VBoxContainer
 var _cost: Label
 var _confirm: Button
 var _cancel: Button
@@ -115,6 +116,9 @@ func _build(box: VBoxContainer) -> void:
 	right.add_child(_combos)
 	_alerts = VBoxContainer.new()
 	right.add_child(_alerts)
+	_exams = VBoxContainer.new()
+	_exams.add_theme_constant_override("separation", 0)
+	right.add_child(_exams)
 	_cost = UIKit.label("", UIKit.GOLD, 14, true)
 	right.add_child(_cost)
 	var spacer := Control.new()
@@ -216,23 +220,13 @@ func _fragment_chip(id: String, count: int) -> Control:
 	if not String(frag.get("alert", "")).is_empty():
 		name_row.add_child(UIKit.label(" ⚠", UIKit.GOLD, 13))
 	col_box.add_child(name_row)
-	col_box.add_child(UIKit.label(fx_text(frag.get("fx", {})), Color(0.8, 0.86, 0.92) if fits else Color(0.55, 0.6, 0.66), 12))
+	col_box.add_child(UIKit.label(Molecule.fx_text(frag.get("fx", {})), Color(0.8, 0.86, 0.92) if fits else Color(0.55, 0.6, 0.66), 12))
 	var site_names: Array = (frag.get("sites", []) as Array).map(func(t: String) -> String: return tr("site." + t).split(" ")[0])
 	col_box.add_child(UIKit.label(" / ".join(site_names), Color(0.55, 0.62, 0.7), 11))
 	for node in col_box.find_children("*", "Control", true, false):
 		(node as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
 	btn.disabled = not fits
 	return btn
-
-
-## 「活性+2 溶解度−1」这样的短文本
-static func fx_text(fx: Dictionary) -> String:
-	var parts: Array[String] = []
-	for p in Molecule.PROPS:
-		var v := int(fx.get(p, 0))
-		if v != 0:
-			parts.append("%s%s%d" % [TranslationServer.translate("prop." + p), "+" if v > 0 else "", v])
-	return " ".join(parts)
 
 
 func _fill_props() -> void:
@@ -279,9 +273,24 @@ func _fill_extras() -> void:
 		var state := String(_work.alerts[id])
 		var color: Color = {"cleared": UIKit.ACCENT, "confirmed": UIKit.DANGER}.get(state, UIKit.GOLD)
 		_alerts.add_child(UIKit.label("⚠ %s（%s）" % [tr("alert." + String(id)), tr("alert.state." + state)], color, 13, true))
+	# 各阶段 Boss 的分子考验：设计时就能看到这个分子会在哪一关吃亏
+	for child in _exams.get_children():
+		child.queue_free()
+	_exams.add_child(UIKit.label(tr("mol.exam.title"), accent.lightened(0.2), 13))
+	for stage in Molecule.config().get("exams", {}):
+		var exam := _work.exam_result(String(stage))
+		var ok := bool(exam.passed)
+		_exams.add_child(UIKit.label("%s %s　%s" % ["✓" if ok else "✗", tr("stage_short." + String(stage)), Molecule.exam_label(exam)],
+			UIKit.ACCENT if ok else UIKit.DANGER.lightened(0.25), 12))
+	_confirm.disabled = false
+	_cost.add_theme_color_override("font_color", UIKit.GOLD)
 	if mode == "modify" and _preview.is_valid():
 		var info: Dictionary = _preview.call(_work.sites)
 		match String(info.get("kind", "none")):
+			"core" when bool(info.get("core_used", false)):
+				_cost.text = tr("mol.cost.core_used")
+				_cost.add_theme_color_override("font_color", UIKit.DANGER.lightened(0.25))
+				_confirm.disabled = true
 			"core":
 				_cost.text = tr("mol.cost.core") % int(info.get("efficacy", -8))
 			"local":

@@ -11,7 +11,7 @@ extends Node
 ##   block {side, index, amount, block} / status {side, index, id, amount}
 ##   data {amount} / draw {count, hand（手牌快照）} / energy {energy} / add_card {id, count}
 ##   enemy_turn / enemy_move {index, move} / turn {turn} / death {side, index}
-##   mechanic {key, args} / end {victory}
+##   mechanic {key, args} / mol {prop, start}（分子某项属性的效果生效；start 为开场时的一次性提示）/ end {victory}
 ## AI 卡：威力取决于有效数据所在档位（倍率 + 偏差概率），偏差时改为结算卡牌的 deviation 效果。
 ## 项目规则 rules（由项目类型决定，见 data/projects.json battle_rules）：
 ##   offtarget_limit / offtarget_damage：一回合超过 limit 张攻击牌，每多 1 张掉 damage 血（选择性项目）；
@@ -60,6 +60,7 @@ var stats := {"attacks": 0, "precise": 0, "backfires": 0}
 ## 分子属性带来的修正（见 Molecule.effects）：施加破绽 / 中毒的额外层数、额外的战斗说明
 var vulnerable_bonus := 0
 var poison_bonus := 0
+var first_energy := 0
 var extra_lines: Array = []   # 本场统计：攻击牌数 / 打破绽目标的攻击 / 反噬次数
 var last_deviation := false
 
@@ -84,7 +85,9 @@ func _ready() -> void:
 ## encounter：{id, kind: fight/elite/boss, enemies: [enemy id]}
 ## deck：ResearchCard 列表；abilities：已持有能力定义
 ## ctx：{hp, max_hp, strength（来自疗效与团队等级）, hp_scale（Boss 血量倍率）, boss_strength（竞品加成）, dose_max,
-##       start_block / first_draw / dexterity（团队等级自带能力）}
+##       start_block / first_draw / dexterity（团队等级自带能力）,
+##       分子：weak / vulnerable_bonus / poison_bonus / enemy_poison / first_energy / extra_lines,
+##       阶段考验：boss_exam_strength / boss_exam_vulnerable}
 func start_battle(enc: Dictionary, deck: Array, abilities: Array, ctx: Dictionary) -> void:
 	encounter = enc
 	_abilities = abilities
@@ -108,6 +111,7 @@ func start_battle(enc: Dictionary, deck: Array, abilities: Array, ctx: Dictionar
 		player.add_status("weak", int(ctx.weak))
 	_start_block = int(ctx.get("start_block", 0))
 	_first_draw = int(ctx.get("first_draw", 0))
+	first_energy = int(ctx.get("first_energy", 0))
 	enemies.clear()
 	var is_boss := String(enc.get("kind", "fight")) == "boss"
 	for enemy_id in enc.get("enemies", []):
@@ -117,8 +121,12 @@ func start_battle(enc: Dictionary, deck: Array, abilities: Array, ctx: Dictionar
 		var e := Enemy.from_dict(def, rng, float(ctx.get("hp_scale", 1.0)) if is_boss else 1.0)
 		if is_boss and int(ctx.get("boss_strength", 0)) > 0:
 			e.add_status("strength", int(ctx.boss_strength))
-		if int(ctx.get("enemy_strength", 0)) > 0:   # 分子的毒性警示：临床前的敌人更强
-			e.add_status("strength", int(ctx.enemy_strength))
+		if is_boss and int(ctx.get("boss_exam_strength", 0)) > 0:   # 分子没通过阶段考验：Boss 更强
+			e.add_status("strength", int(ctx.boss_exam_strength))
+		if is_boss and int(ctx.get("boss_exam_vulnerable", 0)) > 0:   # 通过了阶段考验：Boss 开局带破绽
+			e.add_status("vulnerable", int(ctx.boss_exam_vulnerable))
+		if int(ctx.get("enemy_poison", 0)) > 0:   # 分子代谢很稳定：敌人开局带中毒
+			e.add_status("poison", int(ctx.enemy_poison))
 		e.roll_intent(rng)
 		enemies.append(e)
 	turn = 0
@@ -135,6 +143,12 @@ func start_battle(enc: Dictionary, deck: Array, abilities: Array, ctx: Dictionar
 	dose_max = int(ctx.get("dose_max", 4))
 	_active = true
 	battle_started.emit(encounter)
+	var flashed := {}
+	for line in extra_lines:   # 分子效果生效：界面上让对应的片段闪一下
+		var prop := String(line.get("prop", ""))
+		if not prop.is_empty() and not flashed.has(prop):
+			flashed[prop] = true
+			_emit({"t": "mol", "prop": prop, "start": true})
 	_begin_turn()
 	_flush()
 
@@ -342,7 +356,7 @@ func _begin_turn() -> void:
 	_tick_poison(player, "player", 0)
 	if _check_end():
 		return
-	energy = max_energy
+	energy = max_energy + (first_energy if turn == 1 else 0)
 	var auto := player.get_status("auto_block") + (_start_block if turn == 1 else 0)
 	if auto > 0:
 		_gain_block(player, "player", 0, auto)
@@ -473,10 +487,12 @@ func _apply_card_effect(effect: Dictionary, card: ResearchCard, target: int, mul
 				_add_status(player, "player", 0, String(effect.id), value)
 			else:
 				var amount := value
-				if String(effect.id) == "vulnerable":
+				if String(effect.id) == "vulnerable" and vulnerable_bonus != 0:
 					amount += vulnerable_bonus
-				elif String(effect.id) == "poison":
+					_emit({"t": "mol", "prop": "selectivity"})
+				elif String(effect.id) == "poison" and poison_bonus != 0:
 					amount = maxi(1, amount + poison_bonus)
+					_emit({"t": "mol", "prop": "stability"})
 				for i in (_alive_indices() if to == "all" else ([target] if target >= 0 else [])):
 					_add_status(enemies[i], "enemy", i, String(effect.id), amount)
 		"self_damage":

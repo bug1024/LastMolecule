@@ -2,7 +2,7 @@ class_name EventPopup
 extends Control
 ## 事件 / 节点决策 / 里程碑弹窗（纯 UI 层）：标题区（类型图标 + 标签 + 标题 + 说明）+ 一列选项卡片。
 ## 内容完全来自 game 组装的事件数据；玩家选择后通过 choice_selected 信号回传。
-## 支持 desc_args / label_args（字符串参数会先经 tr() 翻译）与选项的 tag_key、desc_key。
+## 支持 desc_args / label_args（字符串参数会先经 tr() 翻译）与选项的 tag_key、desc_key、desc_text（已拼好的文字）。
 
 signal choice_selected(event_id: String, choice_index: int)
 
@@ -120,6 +120,8 @@ func _build_choice(choice: Dictionary, index: int, state: ProjectState) -> Contr
 	var desc_key := String(choice.get("desc_key", ""))
 	if desc_key != "" and tr(desc_key) != desc_key:
 		col.add_child(UIKit.label(tr(desc_key), UIKit.TEXT_DIM, 14, true))
+	if not String(choice.get("desc_text", "")).is_empty():   # 逻辑层已拼好的动态说明（如片段属性、下一阶段考验）
+		col.add_child(UIKit.label(String(choice.desc_text), Color(0.78, 0.7, 1.0), 14, true))
 	var chips := effect_chips(choice.get("effects", {}))
 	if not chips.is_empty():
 		var flow := HFlowContainer.new()

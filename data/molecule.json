@@ -1,5 +1,5 @@
 {
-  "_comment": "分子设计（原型，只在标准新药项目启用）。骨架有 7 个带类型的位点：连接位 linker（核心结构）、环上取代位 ring、末端位 terminal；每类位点只能放允许该类型的片段。属性从 base 出发累加片段与组合效果，限制在 0–6。片段的 alert 为毒性警示 id（待验证的风险，不是确定有毒）。tags 用于组合规则。",
+  "_comment": "分子设计（原型，只在标准新药项目启用）。骨架有 7 个带类型的位点：连接位 linker（核心结构）、环上取代位 ring、末端位 terminal；每类位点只能放允许该类型的片段。属性从 base 出发累加片段与组合效果，限制在 0–6。组合的 card 为分子特性卡：组合成立时每场战斗加入牌组。片段的 alert 为毒性警示 id（待验证的风险，不是确定有毒）。tags 用于组合规则。",
   "base": { "potency": 1, "selectivity": 1, "stability": 1, "solubility": 1 },
   "range": [0, 6],
   "sites": [
@@ -27,9 +27,9 @@
     { "id": "acid", "sites": ["terminal"], "fx": { "solubility": 3, "potency": -2 }, "tags": ["polar"], "color": "#ff9db0" }
   ],
   "combos": [
-    { "id": "balance", "kind": "adjacent", "tags": ["lipophilic", "polar"], "fx": { "solubility": 1 } },
-    { "id": "stacking", "kind": "adjacent", "tags": ["aromatic", "aromatic"], "fx": { "potency": 2, "solubility": -1 } },
-    { "id": "shield", "kind": "adjacent", "tags": ["halogen", "soft_spot"], "fx": { "stability": 1 } },
+    { "id": "balance", "kind": "adjacent", "tags": ["lipophilic", "polar"], "fx": { "solubility": 1 }, "card": "sig_balance" },
+    { "id": "stacking", "kind": "adjacent", "tags": ["aromatic", "aromatic"], "fx": { "potency": 2, "solubility": -1 }, "card": "sig_stacking" },
+    { "id": "shield", "kind": "adjacent", "tags": ["halogen", "soft_spot"], "fx": { "stability": 1 }, "card": "sig_shield" },
     { "id": "greasy", "kind": "count", "tag": "lipophilic", "min": 3, "alert": "herg" }
   ],
   "starter_kit": ["fluoro", "methyl", "hydroxyl", "phenyl", "morpholine", "nitro", "amide", "sulfonamide", "tbutyl", "pyridine", "cyclopropyl", "acid"],
@@ -39,5 +39,15 @@
     "selective": { "L1": "amide", "L2": "sulfonamide", "R1": "hydroxyl", "R2": "fluoro", "R3": "pyridine", "T1": "morpholine", "T2": "acid" }
   },
   "tox_study": { "funding": -2, "months": 4, "clear_chance": 55, "confirm_risk": 8 },
-  "modify": { "core_efficacy": -8, "months": 2 }
+  "modify": { "core_efficacy": -8, "months": 2, "local_months": 1 },
+  "_exams": "阶段考验：进入该阶段后，Boss 战检查分子的某项短板。props 为属性之和需 ≥ min；alerts_max 为未排除的毒性警示数上限。通过：Boss 开局带 pass_vulnerable 层破绽；未通过：Boss 力量 +fail_strength。",
+  "exams": {
+    "临床前研究": { "alerts_max": 0 },
+    "一期临床试验": { "props": ["selectivity"], "min": 4 },
+    "二期临床试验": { "props": ["potency"], "min": 4 },
+    "三期临床试验": { "props": ["stability", "solubility"], "min": 7 }
+  },
+  "exam_pass_vulnerable": 1,
+  "exam_fail_strength": 3,
+  "fragment_choices": 3
 }

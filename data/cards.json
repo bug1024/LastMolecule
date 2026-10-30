@@ -125,6 +125,13 @@
     { "id": "proc_review", "type": "process", "kind": "skill", "rarity": "common", "cost": 1, "target": "self", "exhaust": true,
       "effects": [{ "op": "cleanse" }, { "op": "block", "value": 4 }, { "op": "process", "value": 1 }] },
 
+    { "id": "sig_stacking", "type": "molecular", "kind": "attack", "rarity": "rare", "cost": 1, "target": "enemy", "token": true, "signature": true,
+      "effects": [{ "op": "damage", "value": 4, "times": 2 }] },
+    { "id": "sig_balance", "type": "molecular", "kind": "skill", "rarity": "rare", "cost": 1, "target": "self", "token": true, "signature": true,
+      "effects": [{ "op": "block", "value": 6 }, { "op": "draw", "value": 1 }] },
+    { "id": "sig_shield", "type": "molecular", "kind": "skill", "rarity": "rare", "cost": 1, "target": "enemy", "token": true, "signature": true,
+      "effects": [{ "op": "block", "value": 4 }, { "op": "status", "to": "target", "id": "poison", "value": 3 }] },
+
     { "id": "noise", "type": "status", "kind": "status", "rarity": "common", "cost": 0, "target": "self", "unplayable": true, "ethereal": true, "token": true,
       "effects": [] },
     { "id": "ae_card", "type": "status", "kind": "status", "rarity": "common", "cost": 0, "target": "self", "unplayable": true, "token": true,

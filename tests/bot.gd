@@ -47,31 +47,56 @@ static func play(game: Node, max_steps: int) -> Dictionary:
 		"battles": battles, "steps": steps}
 
 
-## 分子设计：开局按预设方案摆放；里程碑修饰时不改（直接确认）
+## 分子设计：开局按预设方案摆放；里程碑修饰时按 _best_tweak 换一个取代基（找不到就不改）
 static func _design(game: Node) -> void:
 	if game.get_design_mode() == "initial":
 		game.molecule.apply_preset(mol_preset)
-	game.submit_molecule(game.molecule.sites.duplicate())
+		game.submit_molecule(game.molecule.sites.duplicate())
+		return
+	var tweak := _best_tweak(game)
+	game.submit_molecule(tweak if not tweak.is_empty() else game.molecule.sites.duplicate())
 
 
-## 看懂分子的玩家：溶解度差就要制剂卡、少拿临床卡；选择性好就要破绽卡；稳定性好就要中毒卡
+## 只换一个取代基（不动连接位），让下一阶段的分子考验通过；多个方案时取属性总和最高的
+static func _best_tweak(game: Node) -> Dictionary:
+	var mol: Molecule = game.molecule
+	var stage := String(game._next_stage())
+	if not bool(mol.exam_result(stage).get("has", false)) or bool(mol.exam_result(stage).passed):
+		return {}
+	var best := {}
+	var best_score := -1
+	for site in Molecule.config().get("sites", []):
+		if String(site.type) == "linker":
+			continue
+		for frag in mol.inventory:
+			if not Molecule.can_place(String(frag), String(site.id)):
+				continue
+			var trial := Molecule.from_dict(mol.to_dict())
+			var placement: Dictionary = trial.sites.duplicate()
+			placement[String(site.id)] = String(frag)
+			if not trial.apply_layout(placement) or not bool(trial.exam_result(stage).passed):
+				continue
+			var score := 0
+			for v in trial.properties().values():
+				score += int(v)
+			score -= trial.open_alerts() * 3
+			if score > best_score:
+				best_score = score
+				best = placement
+	return best
+
+
+## 看懂分子的玩家：拿契合分子强项的卡；溶解度差就要制剂卡、少拿临床卡
 static func _mol_score(game: Node, card: Dictionary) -> int:
 	if not mol_aware or game.molecule == null:
 		return 0
 	var p: Dictionary = game.molecule.properties()
-	var effects: Array = card.get("effects", [])
-	var score := 0
+	var score: int = game.molecule.strong_fits(card).size() * 2
 	if int(p.solubility) <= 1:
-		if effects.any(func(e: Dictionary) -> bool: return e.op == "formulate"):
+		if (card.get("effects", []) as Array).any(func(e: Dictionary) -> bool: return e.op == "formulate"):
 			score += 3
 		elif String(card.get("type", "")) == "clinical":
 			score -= 2
-	if int(p.selectivity) >= 4 and effects.any(func(e: Dictionary) -> bool: return e.op == "status" and e.get("id", "") == "vulnerable"):
-		score += 2
-	if int(p.stability) >= 4 and effects.any(func(e: Dictionary) -> bool: return e.op == "status" and e.get("id", "") == "poison"):
-		score += 2
-	if int(p.potency) >= 4 and String(card.get("kind", "")) == "attack":
-		score += 1
 	return score
 
 
@@ -135,6 +160,10 @@ static func _choose_event(game: Node) -> void:
 			preferred = 1
 		"milestone":
 			preferred = mini(decision_index, choices.size() - 2) if choices.size() > 2 else 0
+			if mol_aware and game.molecule != null and not _best_tweak(game).is_empty():
+				for i in choices.size():
+					if String(choices[i].get("action", "")) == "modify_molecule":
+						preferred = i
 		"final_review":
 			preferred = 0 if state.can_meet(choices[0].get("requires", {})) else (1 if state.funding > 4 else choices.size() - 1)
 			if preferred == 1 and state.data < game.get_final_data_min():
