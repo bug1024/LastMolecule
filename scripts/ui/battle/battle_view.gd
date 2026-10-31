@@ -56,6 +56,7 @@ var _mechanic: RichTextLabel
 var _mol: MoleculeView          # 设计了分子的项目：分子就是战场上的主角（代替烧瓶）；属性生效、被敌人针对时对应片段会闪
 var _mol_tag: Label
 var _strike_style := ""          # 最近一张牌的出招方式（命中特效跟着变）
+var _strike_color := Color.WHITE  # 甩出的片段颜色（命中特效用）
 var _fx: Control
 var _arrow: Control
 var _banner: Control
@@ -677,6 +678,11 @@ func _molecule_cast(card: ResearchCard, face: CardFace, target: int, color: Colo
 				_projectile(muzzle + Vector2(0, randf_range(-14, 14)), to + Vector2(randf_range(-18, 18), randf_range(-18, 18)), color, 0.6)
 				await _wait(0.07)
 			await _wait(0.1)
+		"fragment":
+			_mol_lean()
+			for i in targets:
+				_fragment_throw(_side_point("enemy", int(i)))
+			await _wait(0.22)
 		"wave":
 			_mol_recoil(18.0)
 			_sweep(home, color)
@@ -689,7 +695,7 @@ func _molecule_cast(card: ResearchCard, face: CardFace, target: int, color: Colo
 
 
 ## 卡牌的出招方式：打全体＝扫荡波，多段＝连射，上破绽＝锁定精准光束，AI＝数据光束，
-## 临床＝抛出药剂，实验＝掷出试剂瓶，其余分子设计牌＝分子亲自冲撞；只作用自己的牌为 self
+## 临床＝抛出药剂，实验＝掷出试剂瓶，分子设计牌＝甩出一个片段（重击才亲自冲撞）；只作用自己的牌为 self
 func _strike_style_for(card: ResearchCard) -> String:
 	if card.target == "self":
 		return "self"
@@ -713,7 +719,14 @@ func _strike_style_for(card: ResearchCard) -> String:
 		"experiment":
 			return "flask"
 		"molecular":
-			return "charge" if card.kind == "attack" else "bolt"
+			if card.kind != "attack":
+				return "bolt"
+			# 只有重击（基础伤害 ≥12）才让分子亲自冲撞，其余的分子设计攻击是甩出一个片段，分子基本不离开原位
+			var base := 0
+			for e in card.effects:
+				if String(e.get("op", "")) == "damage":
+					base = maxi(base, int(e.get("value", 0)))
+			return "charge" if base >= 12 else "fragment"
 	return "bolt"
 
 
@@ -725,7 +738,57 @@ func _mol_recoil(amount: float) -> void:
 	t.tween_property(_mol, "position", origin, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
-## 冲撞：分子带着残影冲到敌人面前，撞上后再退回原位
+## 前倾一下（甩片段）：位移很小，视觉重心不跟着跑
+func _mol_lean() -> void:
+	var origin := _mol.position
+	var t := create_tween()
+	t.tween_property(_mol, "position", origin + Vector2(22, -4), 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	t.tween_property(_mol, "position", origin, 0.2).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+
+
+## 甩出片段：从分子上随机一个片段的位置飞出一颗同色的原子，旋转着砸向目标
+func _fragment_throw(to: Vector2) -> void:
+	var molecule: Molecule = _game.molecule
+	var from := _player_point()
+	var col := Color(0.8, 0.75, 1.0)
+	if molecule != null and not molecule.sites.is_empty():
+		var site_ids: Array = molecule.sites.keys()
+		var site_id := String(site_ids[randi() % site_ids.size()])
+		for site in Molecule.config().get("sites", []):
+			if String(site.id) == site_id:
+				from = _mol.position + _mol.site_center(site)
+		col = Color.from_string(String(Molecule.fragment(String(molecule.sites[site_id])).get("color", "#c8b8ff")), col)
+		_mol.flash_sites([site_id], col.lightened(0.3))
+	_strike_color = col
+	var atom := Control.new()
+	atom.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_fx.add_child(atom)
+	var trail: Array = []
+	var state := [0.0]
+	atom.draw.connect(func() -> void:
+		for i in trail.size():
+			var k := float(i + 1) / trail.size()
+			atom.draw_circle(trail[i], 4.0 + 8.0 * k, Color(col, 0.08 + 0.25 * k))
+		if trail.is_empty():
+			return
+		var p: Vector2 = trail.back()
+		atom.draw_circle(p, 17.0, Color(col, 0.3))
+		atom.draw_circle(p, 12.0, col.darkened(0.2))
+		atom.draw_arc(p, 12.0, 0, TAU, 24, col.lightened(0.4), 2.5, true)
+		var spin: float = state[0] * TAU * 2.0
+		atom.draw_arc(p, 17.0, spin, spin + 1.2, 10, Color(1, 1, 1, 0.8), 2.0, true))
+	var arc := Vector2(0, -minf(70.0, from.distance_to(to) * 0.15))
+	var tween := atom.create_tween()
+	tween.tween_method(func(t: float) -> void:
+		state[0] = t
+		trail.append(from.lerp(to, t) + arc * 4.0 * t * (1.0 - t))
+		if trail.size() > 8:
+			trail.pop_front()
+		atom.queue_redraw(), 0.0, 1.0, 0.22).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tween.tween_callback(atom.queue_free)
+
+
+## 冲撞（只用于重击）：分子冲到敌人面前，撞上后再退回原位
 func _strike_charge(to: Vector2) -> void:
 	var origin := _mol.position
 	var hit_pos := origin + Vector2(to.x - _player_point().x - 150.0, (to.y - _player_point().y) * 0.4)
@@ -734,9 +797,6 @@ func _strike_charge(to: Vector2) -> void:
 	dash.tween_property(_mol, "position", hit_pos, 0.13).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_IN)
 	dash.tween_interval(0.16)
 	dash.tween_property(_mol, "position", origin, 0.3).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	for k in 4:   # 冲刺拖尾
-		get_tree().create_timer(0.08 + k * 0.03).timeout.connect(func() -> void:
-			_shockwave(_player_point(), Color(0.8, 0.75, 1.0, 0.6), 50.0, true))
 	await _wait(0.21)
 
 
@@ -907,6 +967,9 @@ func _impact(index: int, p: Vector2, amount: int) -> void:
 			_splash(p, Color(0.95, 0.75, 0.35), 16 + int(heavy))
 			_burst(p, Color(0.9, 0.97, 1.0), 20)
 			_slash(p, Color(0.9, 0.97, 1.0), 50.0)
+		"fragment": # 片段砸中：片段颜色的冲击和碎屑
+			_shockwave(p, _strike_color.lightened(0.3), 60.0 + heavy * 3.0)
+			_burst(p, _strike_color, 12 + int(heavy))
 		"volley":   # 连射：每段一个小冲击
 			_shockwave(p, Color(1.0, 0.95, 0.8), 40.0 + heavy * 1.5)
 			_burst(p, color, 6)
