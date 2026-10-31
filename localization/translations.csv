@@ -681,7 +681,7 @@ tutorial.title,怎么打？,How to fight
 tutorial.body,[img width=20 height=20 color=#ea5250]res://assets/icons/intent_attack.svg[/img] 红色剑：攻击牌，打敌人\n[img width=20 height=20 color=#4d94fa]res://assets/icons/intent_defend.svg[/img] 蓝色盾：护盾牌，挡住伤害\n[img width=20 height=20 color=#4dc780]res://assets/icons/role_skill.svg[/img] 绿色星：技能牌　[img width=20 height=20 color=#fabd40]res://assets/icons/role_power.svg[/img] 金色光：整场有效\n左上角黄球是要花的能量。敌人头顶的数字是它下回合要打你多少——数字大就先出蓝盾！,"[img width=20 height=20 color=#ea5250]res://assets/icons/intent_attack.svg[/img] Red sword: attack cards hit enemies\n[img width=20 height=20 color=#4d94fa]res://assets/icons/intent_defend.svg[/img] Blue shield: shield cards block damage\n[img width=20 height=20 color=#4dc780]res://assets/icons/role_skill.svg[/img] Green star: skills　[img width=20 height=20 color=#fabd40]res://assets/icons/role_power.svg[/img] Gold burst: lasts all battle\nThe yellow orb is the energy cost. The number over an enemy is how hard it will hit you next — if it's big, play shields first!"
 tutorial.ok,知道了,Got it
 help.tab.quick,快速上手,Quick Start
-help.quick,[b][color=#4fc896]一句话：打败每个阶段的大怪兽，让新药上市！[/color][/b]\n\n[b]卡牌看颜色就懂[/b]\n[img width=20 height=20 color=#ea5250]res://assets/icons/intent_attack.svg[/img] [color=#ea5250]红色 · 攻击牌[/color]：打敌人，数字是伤害\n[img width=20 height=20 color=#4d94fa]res://assets/icons/intent_defend.svg[/img] [color=#4d94fa]蓝色 · 护盾牌[/color]：挡伤害，数字是护盾\n[img width=20 height=20 color=#4dc780]res://assets/icons/role_skill.svg[/img] [color=#4dc780]绿色 · 技能牌[/color]：抽牌、加能量、给敌人上坏状态\n[img width=20 height=20 color=#fabd40]res://assets/icons/role_power.svg[/img] [color=#fabd40]金色 · 能力牌[/color]：打出后整场都有效\n卡牌左上角的黄色圆球是要花的[b]能量[/b]，每回合有 3 点。\n\n[b]看敌人头顶[/b]\n[img width=20 height=20 color=#ff7366]res://assets/icons/intent_attack.svg[/img] 红剑 + 数字：下回合要打你多少\n[img width=20 height=20 color=#73b3ff]res://assets/icons/intent_defend.svg[/img] 盾牌：它要加护盾\n[img width=20 height=20 color=#80f299]res://assets/icons/intent_buff.svg[/img] 向上箭头：它要变强\n[img width=20 height=20 color=#cc8cff]res://assets/icons/intent_debuff.svg[/img] 紫色水滴：要给你上坏状态\n\n[b]你的生命[/b]就是绿色血条（等于 100 − 安全风险）。血太少画面会变红，记得多出蓝盾，或去平台建设休息。\n每打赢几场，你的研发团队会[b]升级[/b]，烧瓶会变样，还会自带一些小能力。,"[b][color=#4fc896]In one line: beat each stage's big monster and get the medicine approved![/color][/b]\n\n[b]Read cards by color[/b]\n[img width=20 height=20 color=#ea5250]res://assets/icons/intent_attack.svg[/img] [color=#ea5250]Red · Attack[/color]: hits enemies, number is damage\n[img width=20 height=20 color=#4d94fa]res://assets/icons/intent_defend.svg[/img] [color=#4d94fa]Blue · Shield[/color]: blocks damage, number is shield\n[img width=20 height=20 color=#4dc780]res://assets/icons/role_skill.svg[/img] [color=#4dc780]Green · Skill[/color]: draw, energy, weaken enemies\n[img width=20 height=20 color=#fabd40]res://assets/icons/role_power.svg[/img] [color=#fabd40]Gold · Power[/color]: lasts the whole battle\nThe yellow orb in the corner is the [b]energy[/b] cost; you get 3 each turn.\n\n[b]Watch above enemies[/b]\n[img width=20 height=20 color=#ff7366]res://assets/icons/intent_attack.svg[/img] Red sword + number: how hard it hits next turn\n[img width=20 height=20 color=#73b3ff]res://assets/icons/intent_defend.svg[/img] Shield: it will block\n[img width=20 height=20 color=#80f299]res://assets/icons/intent_buff.svg[/img] Up arrow: it gets stronger\n[img width=20 height=20 color=#cc8cff]res://assets/icons/intent_debuff.svg[/img] Purple drop: it will curse you\n\n[b]Your life[/b] is the green bar (100 − safety risk). When it's low the screen turns red — play shields or rest at a Platform node.\nWin battles and your team [b]levels up[/b]: the flask changes shape and gains small built-in abilities."
+help.quick,[b][color=#4fc896]一句话：打败每个阶段的大怪兽，让新药上市！[/color][/b]\n\n[b]卡牌看颜色就懂[/b]\n[img width=20 height=20 color=#ea5250]res://assets/icons/intent_attack.svg[/img] [color=#ea5250]红色 · 攻击牌[/color]：打敌人，数字是伤害\n[img width=20 height=20 color=#4d94fa]res://assets/icons/intent_defend.svg[/img] [color=#4d94fa]蓝色 · 护盾牌[/color]：挡伤害，数字是护盾\n[img width=20 height=20 color=#4dc780]res://assets/icons/role_skill.svg[/img] [color=#4dc780]绿色 · 技能牌[/color]：抽牌、加能量、给敌人上坏状态\n[img width=20 height=20 color=#fabd40]res://assets/icons/role_power.svg[/img] [color=#fabd40]金色 · 能力牌[/color]：打出后整场都有效\n卡牌左上角的黄色圆球是要花的[b]能量[/b]，每回合有 3 点。\n\n[b]看敌人头顶[/b]\n[img width=20 height=20 color=#ff7366]res://assets/icons/intent_attack.svg[/img] 红剑 + 数字：下回合要打你多少\n[img width=20 height=20 color=#73b3ff]res://assets/icons/intent_defend.svg[/img] 盾牌：它要加护盾\n[img width=20 height=20 color=#80f299]res://assets/icons/intent_buff.svg[/img] 向上箭头：它要变强\n[img width=20 height=20 color=#cc8cff]res://assets/icons/intent_debuff.svg[/img] 紫色水滴：要给你上坏状态\n\n[b]你的生命[/b]就是绿色血条（等于 100 − 安全风险）。血太少画面会变红，记得多出蓝盾，或去平台建设休息。\n每打赢几场，你的研发团队会[b]升级[/b]，分子会进化出光晕和电子轨道，还会自带一些小能力。,"[b][color=#4fc896]In one line: beat each stage's big monster and get the medicine approved![/color][/b]\n\n[b]Read cards by color[/b]\n[img width=20 height=20 color=#ea5250]res://assets/icons/intent_attack.svg[/img] [color=#ea5250]Red · Attack[/color]: hits enemies, number is damage\n[img width=20 height=20 color=#4d94fa]res://assets/icons/intent_defend.svg[/img] [color=#4d94fa]Blue · Shield[/color]: blocks damage, number is shield\n[img width=20 height=20 color=#4dc780]res://assets/icons/role_skill.svg[/img] [color=#4dc780]Green · Skill[/color]: draw, energy, weaken enemies\n[img width=20 height=20 color=#fabd40]res://assets/icons/role_power.svg[/img] [color=#fabd40]Gold · Power[/color]: lasts the whole battle\nThe yellow orb in the corner is the [b]energy[/b] cost; you get 3 each turn.\n\n[b]Watch above enemies[/b]\n[img width=20 height=20 color=#ff7366]res://assets/icons/intent_attack.svg[/img] Red sword + number: how hard it hits next turn\n[img width=20 height=20 color=#73b3ff]res://assets/icons/intent_defend.svg[/img] Shield: it will block\n[img width=20 height=20 color=#80f299]res://assets/icons/intent_buff.svg[/img] Up arrow: it gets stronger\n[img width=20 height=20 color=#cc8cff]res://assets/icons/intent_debuff.svg[/img] Purple drop: it will curse you\n\n[b]Your life[/b] is the green bar (100 − safety risk). When it's low the screen turns red — play shields or rest at a Platform node.\nWin battles and your team [b]levels up[/b]: your molecule evolves a glow and electron orbits and gains small built-in abilities."
 player.tag,你 · Lv%d %s,You · Lv%d %s
 player.level.1,小烧瓶,Little Flask
 player.level.2,锥形瓶,Conical Flask
@@ -900,7 +900,7 @@ prop.stability,稳定性,Stability
 prop.solubility,溶解度,Solubility
 prop.alerts,毒性警示,Tox alerts
 prop.potency.tip,≤1：开局虚弱　≥3：开局力量 +1　≥5：+2,≤1: start Weak　≥3: +1 Strength　≥5: +2
-prop.selectivity.tip,≤1：早期战斗脱靶　≥3：破绽 +1　≥5：再加开局坚固 +1,≤1: off-target early　≥3: Weak Spot +1　≥5: also +1 Sturdy
+prop.selectivity.tip,≤1：早期战斗脱靶　≥3：破绽 +1　≥5：破绽 +2,≤1: off-target early　≥3: Weak Spot +1　≥5: Weak Spot +2
 prop.stability.tip,≤1：中毒 −1、力量减半　≥3：中毒 +1　≥5：再加敌人开局中毒 2,"≤1: Poison −1, Strength halved　≥3: Poison +1　≥5: enemies also start with 2 Poison"
 prop.solubility.tip,≤1：临床卡费用 +1　≥3：首回合多抽 1 张　≥5：再加能量 +1,≤1: Clinical +1 cost　≥3: turn-1 draw +1　≥5: also +1 energy
 prop.alerts.tip,每项未排除的警示：终审安全线 −5，临床前 Boss 考验不通过。可在平台建设做毒理验证。,Each open alert: final safety limit −5 and fails the preclinical boss exam. Test it at a Platform.
@@ -928,9 +928,9 @@ mol.modify_title,修饰分子,Modify the Molecule
 mol.modify,修饰分子,Modify the molecule
 mol.modify.desc,换取代基（环上 / 末端位）：耗时 1 个月，每个里程碑一次。更换核心结构（连接位）：疗效 −8、耗时 2 个月并要打一场验证试验，每个项目只能一次。,"Swap substituents (ring / terminal): 1 month, once per milestone. Change the core (linkers): efficacy −8, 2 months and a verification trial, once per program."
 mol.tag,分子,Molecule
-mol.preset.potent,高活性方案,Potent
-mol.preset.balanced,均衡方案,Balanced
-mol.preset.selective,高选择性方案,Selective
+mol.preset.potent,高活性,Potent
+mol.preset.balanced,均衡,Balanced
+mol.preset.selective,高选择性,Selective
 mol.presets,快速方案,Quick schemes
 mol.confirm,确认分子，开始研发,Confirm and Start
 mol.confirm_modify,确认修饰,Confirm Modification
@@ -964,7 +964,7 @@ mol.core,核心,Core
 card.sig_stacking,π-π 堆积,π-π Stacking
 card.sig_balance,极性平衡,Polarity Balance
 card.sig_shield,代谢屏蔽,Metabolic Shield
-mol.fx.vulnerable_plus,选择性极佳，副作用少：破绽 +1 层，开局坚固 +1,"Excellent selectivity, fewer side effects: Weak Spot +1, +1 Sturdy"
+mol.fx.vulnerable_plus,选择性极佳，精准命中：打出的破绽 +2 层,"Excellent selectivity, precise hits: Weak Spot +2"
 mol.fx.poison_plus,代谢非常稳定：中毒 +1 层，敌人开局带 2 层中毒,"Very stable: Poison +1, enemies start with 2 Poison"
 mol.fx.draw_plus,溶解度极佳：第一回合多抽 1 张、能量 +1,Excellent solubility: turn 1 draw +1 and energy +1
 mol.exam.alerts_fmt,未排除的毒性警示 %d 项（需全部排除）,%d open tox alerts (need 0)
@@ -988,7 +988,7 @@ frag.pick.tag,分子片段,Fragment
 frag.pick.sites,可放：%s,Fits: %s
 mol.battle_tip,你的分子正在起作用：,Your molecule at work:
 mol.short.strength,力量%+d,Str %+d
-mol.short.dexterity,坚固%+d,Sturdy %+d
+mol.short.start_block,开局护盾%d,Start Block %d
 mol.short.vulnerable_bonus,破绽%+d,Weak Spot %+d
 mol.short.poison_bonus,中毒%+d,Poison %+d
 mol.short.enemy_poison,敌人开局中毒%d,Enemies start Poison %d
@@ -1007,4 +1007,70 @@ mechanic.exploit.safe_alert,%s 专攻毒性警示，但你的分子没有未排�
 battle.fx.exploit.soft_spot,代谢软点被攻击！,Soft spot hit!
 battle.fx.exploit.lipophilic,亲脂片段被抓住！,Greasy fragment grabbed!
 battle.fx.exploit.alert,毒性警示被利用！,Tox alert exploited!
-player.tag_mol,候选分子 · 团队 Lv%d,Candidate · Team Lv%d
+player.tag_mol,你的分子 · Lv%d %s,Your Molecule · Lv%d %s
+disease.title,选择要攻克的疾病,Choose the Disease to Defeat
+disease.desc,这是公司的使命。之后的每一个项目，都是对抗它的一代新药——它会进化出耐药，你的分子也要一代代进化，直到它被攻克。,"This is your company's mission. Every program from now on is a new generation of drug against it — it will evolve resistance, and your molecules must evolve too, until it is defeated."
+disease.event_tag,公司使命,Mission
+disease.lung_cancer,非小细胞肺癌,Non-small Cell Lung Cancer
+disease.lung_cancer.desc,最常见的癌症之一。肿瘤靠 EGFR 激酶的信号疯狂生长；抑制它，肿瘤就会缩小——但它很会进化出耐药突变。,One of the most common cancers. Tumors grow wild on EGFR kinase signals; block it and they shrink — but it keeps evolving resistance.
+disease.hiv,艾滋病（HIV）,HIV / AIDS
+disease.hiv.desc,病毒靠逆转录酶把自己写进人体细胞。卡住这个酶，病毒就无法复制——可病毒变异得极快。,The virus uses reverse transcriptase to write itself into our cells. Jam the enzyme and it can't copy itself — but it mutates fast.
+disease.superbug,耐药细菌感染,Drug-resistant Infection
+disease.superbug.desc,超级细菌让老抗生素纷纷失效。靶点是细菌的 DNA 旋转酶：没有它，细菌就无法分裂。,"Superbugs are beating old antibiotics. The target is bacterial DNA gyrase: without it, bacteria can't divide."
+disease.target.lung_cancer,靶点 EGFR,Target: EGFR
+disease.target.hiv,靶点 逆转录酶,Target: RT
+disease.target.superbug,靶点 DNA 旋转酶,Target: Gyrase
+variant.egfr_wt,EGFR（野生型）,EGFR (wild type)
+variant.egfr_wt.desc,铰链区喜欢芳环，后面有个疏水口袋，前端伸向水的位置适合极性基团。,"The hinge likes an aromatic ring, there's a hydrophobic back pocket, and the solvent front suits a polar group."
+variant.egfr_t790m,EGFR T790M 突变,EGFR T790M
+variant.egfr_t790m.desc,「守门员」位置的苏氨酸变成了更大的甲硫氨酸：后口袋变小，大基团放不进去，小小的卤素反而正合适。,"The gatekeeper threonine became a bulkier methionine: the back pocket shrank, bulky groups no longer fit, a small halogen does."
+variant.egfr_c797s,EGFR C797S 突变,EGFR C797S
+variant.egfr_c797s.desc,上一代药物抓住的半胱氨酸变成了丝氨酸，老办法失效了：要从口袋另一侧找新的结合点。,The cysteine the last drug gripped became serine; the old trick fails. Find new contacts on the other side of the pocket.
+variant.rt_wt,逆转录酶（野生型）,RT (wild type)
+variant.rt_wt.desc,口袋里有一个酪氨酸可以和芳环堆叠，旁边是疏水区，入口处的赖氨酸能形成氢键。,"A tyrosine in the pocket stacks with aromatic rings, next to a hydrophobic patch; a lysine at the entrance can H-bond."
+variant.rt_k103n,逆转录酶 K103N 突变,RT K103N
+variant.rt_k103n.desc,入口的赖氨酸变成天冬酰胺，口袋入口被「卡住」：末端的大基团进不去，要换个方向找氢键。,The entrance lysine became asparagine and jams the door: bulky ends can't get in; find an H-bond elsewhere.
+variant.rt_y181c,逆转录酶 Y181C 突变,RT Y181C
+variant.rt_y181c.desc,那个酪氨酸变成了半胱氨酸：芳环再也堆叠不上，反而会撞上。柔性的小基团绕得过去。,The tyrosine became cysteine: aromatic rings no longer stack and now clash. Small flexible groups slip past.
+variant.gyr_wt,DNA 旋转酶（野生型）,Gyrase (wild type)
+variant.gyr_wt.desc,芳环夹在 DNA 碱基之间，旁边的位置非常喜欢氟原子（氟喹诺酮就是这样来的），末端适合极性基团。,"Aromatic rings slot between DNA bases, the next site loves fluorine (that's how fluoroquinolones work), polar ends help."
+variant.gyr_s83l,DNA 旋转酶 S83L 突变,Gyrase S83L
+variant.gyr_s83l.desc,丝氨酸变成更大的亮氨酸，末端空间变挤；需要新的极性接触点。,Serine became a bulkier leucine; the end got crowded. New polar contacts are needed.
+variant.gyr_d87n,DNA 旋转酶 D87N 突变,Gyrase D87N
+variant.gyr_d87n.desc,天冬氨酸变成天冬酰胺，口袋形状又变了：环上第二个位置容不下大基团。,Aspartate became asparagine and the pocket reshaped: the second ring site can't take bulky groups.
+pocket.want.aromatic,要芳环,wants aromatic
+pocket.want.lipophilic,要疏水,wants greasy
+pocket.want.polar,要极性,wants polar
+pocket.want.halogen,要卤素,wants halogen
+pocket.avoid.bulky,忌大基团,no bulky
+pocket.avoid.aromatic,忌芳环,no aromatic
+mol.pocket_title,靶点口袋：%s,Target pocket: %s
+mol.preset.lineage,上一代,Last gen
+enemy.placebo.lung_cancer,肺癌细胞,Lung Cancer Cells
+enemy.enroll_drag.lung_cancer,肿瘤免疫逃逸,Tumor Immune Escape
+enemy.resistant_clone.lung_cancer,耐药肿瘤克隆,Resistant Tumor Clone
+enemy.progression.lung_cancer,肿瘤进展,Tumor Progression
+enemy.placebo.hiv,被感染的 T 细胞,Infected T Cells
+enemy.enroll_drag.hiv,潜伏病毒库,Latent Reservoir
+enemy.resistant_clone.hiv,耐药病毒株,Resistant Strain
+enemy.progression.hiv,病毒载量反弹,Viral Rebound
+enemy.placebo.superbug,耐药菌落,Resistant Colony
+enemy.enroll_drag.superbug,细菌生物膜,Bacterial Biofilm
+enemy.resistant_clone.superbug,耐药突变株,Resistant Mutant
+enemy.progression.superbug,感染扩散,Spreading Infection
+ending.patients,这一代药物帮助了%s名患者（公司累计%s）。,This generation helped %s patients (%s in total).
+ending.resistance,但疾病进化出了耐药突变：%s。下一代分子要针对新的口袋重新设计。,But the disease evolved resistance: %s. The next molecule must be redesigned for the new pocket.
+ending.conquered,%s被攻克了。一代代分子，最终走到了这里。,%s has been defeated. Generation after generation of molecules led here.
+archive.lineage,分子谱系,Molecule Lineage
+archive.mission,公司使命：攻克%s · 累计帮助%s名患者,Mission: defeat %s · %s patients helped
+archive.mission_none,公司使命：还没选定。第一次立项时选择要攻克的疾病。,Mission: not chosen yet. Pick a disease at your first program.
+archive.lineage_empty,还没有获批的分子。每一代获批的药物都会记在这里，看得出它是怎么一代代进化来的。,"No approved molecules yet. Every approved generation is recorded here, so you can see how it evolved."
+archive.gen,第 %d 代 · %s,Gen %d · %s
+archive.gen_detail,%s · 帮助%s人,%s · helped %s
+mol.level.1,苗头分子,Hit Molecule
+mol.level.2,先导分子,Lead Molecule
+mol.level.3,优化分子,Optimized Lead
+mol.level.4,临床候选,Clinical Candidate
+mol.level.5,明星分子,Star Molecule
+player.tag_team,研发团队 Lv%d · 分子：%s,R&D Team Lv%d · Molecule: %s
+player.level_up_mol,分子进化！Lv%d %s,Molecule evolved! Lv%d %s

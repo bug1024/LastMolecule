@@ -1,6 +1,7 @@
 class_name Company
 extends RefCounted
-## 公司资产（跨局保留）：公司数据、流程等级、历史记录、研究证据与主线战役进度。
+## 公司资产（跨局保留）：公司数据、流程等级、历史记录、研究证据与主线战役进度，
+## 以及公司的使命：要攻克的疾病、一代代获批分子组成的分子谱系、累计帮助的患者。
 ## 研究证据：各类项目获批（或高质量终止）时首次获得，记录来源；集齐足够证据后解锁最终项目 LM-001，
 ## 并决定 LM-001 能选哪些研究路线（见 data/projects.json）。
 ## 配置来自 data/company.json；存档写入 user://company.json。
@@ -20,6 +21,9 @@ var history: Array = []       # 最近的项目记录（新的在前），见 se
 var best_years := 0           # 最快获批用时（年），0 表示尚未获批
 var evidence := {}            # 证据 id → {code, project_type, outcome, run}（同一种只记首次）
 var campaign := {}            # 主线战役：{ending, route, code, run}；空表示尚未完成
+var disease := ""             # 公司要攻克的疾病（第一次立项时选定，见 data/diseases.json）
+var lineage: Array = []       # 分子谱系：每一代获批药物 {code, run, project_type, variant, sites, patients, efficacy}
+var patients := 0             # 累计帮助的患者
 
 const HISTORY_LIMIT := 12
 
@@ -43,6 +47,9 @@ func load_save() -> void:
 	best_years = int(saved.get("best_years", 0))
 	evidence = saved.get("evidence", {})
 	campaign = saved.get("campaign", {})
+	disease = String(saved.get("disease", ""))
+	lineage = saved.get("lineage", [])
+	patients = int(saved.get("patients", 0))
 
 
 func save() -> void:
@@ -57,6 +64,7 @@ func save() -> void:
 		"start_funding_bonus": start_funding_bonus,
 		"history": history, "best_years": best_years,
 		"evidence": evidence, "campaign": campaign,
+		"disease": disease, "lineage": lineage, "patients": patients,
 	}, "  "))
 
 
@@ -157,6 +165,9 @@ func reset() -> void:
 	best_years = 0
 	evidence = {}
 	campaign = {}
+	disease = ""
+	lineage = []
+	patients = 0
 	save()
 
 
@@ -179,6 +190,31 @@ func final_unlocked() -> bool:
 
 func is_campaign_done() -> bool:
 	return not campaign.is_empty()
+
+
+## 下一代药物面对的靶点变体（每获批一代，疾病就进化一次）
+func generation() -> int:
+	return lineage.size()
+
+
+## 一代药物获批：记进分子谱系，累计帮助的患者
+func record_approval(entry: Dictionary) -> void:
+	lineage.append(entry.duplicate(true))
+	patients += int(entry.get("patients", 0))
+
+
+## 患者人数的显示：中文「6.3 万」，英文「63,000」
+static func format_people(n: int) -> String:
+	if TranslationServer.get_locale().begins_with("zh"):
+		if n >= 10000:
+			return ("%.1f" % (n / 10000.0)).trim_suffix(".0") + " 万"
+		return str(n)
+	var digits := str(n)
+	var out := ""
+	while digits.length() > 3:
+		out = "," + digits.right(3) + out
+		digits = digits.left(digits.length() - 3)
+	return digits + out
 
 
 ## 开局领取资金加成（只生效一次）

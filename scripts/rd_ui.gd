@@ -330,6 +330,7 @@ func _on_event_offered(event: Dictionary, is_gate: bool) -> void:
 func _on_molecule_design(mode: String) -> void:
 	_show_or_queue(func() -> void:
 		GameAudio.sfx("open")
+		_mol_editor.lineage_sites = _game_logic.lineage_sites() if mode == "initial" else {}
 		_mol_editor.edit(_game_logic.molecule, mode, _game_logic.preview_modify))
 
 

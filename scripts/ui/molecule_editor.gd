@@ -19,6 +19,9 @@ var _cost: Label
 var _confirm: Button
 var _cancel: Button
 var _presets: HBoxContainer
+var _target: Label               # 靶点口袋：变体名 + 它的故事（口袋热点直接画在骨架位点上）
+var _lineage_btn: Button
+var lineage_sites := {}          # 分子谱系里上一代的结构（有就显示「沿用上一代」）
 var _preview: Callable        # 修饰模式：func(placement) -> {kind, efficacy}
 
 
@@ -40,6 +43,11 @@ func edit(molecule: Molecule, edit_mode: String, preview: Callable = Callable())
 	_view.molecule = _work
 	_view.selected = "L1"
 	_presets.visible = mode == "initial"
+	_lineage_btn.visible = not lineage_sites.is_empty()
+	_target.visible = not molecule.disease.is_empty()
+	if _target.visible:
+		var vid := Molecule.variant_id(molecule.disease, molecule.variant)
+		_target.text = tr("mol.pocket_title") % tr("variant." + vid) + "　" + tr("variant.%s.desc" % vid)
 	_cancel.visible = mode == "modify"
 	_confirm.text = tr("mol.confirm" if mode == "initial" else "mol.confirm_modify")
 	_title_text(tr("mol.title" if mode == "initial" else "mol.modify_title"))
@@ -76,9 +84,11 @@ func _build(box: VBoxContainer) -> void:
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	left.add_theme_constant_override("separation", 8)
 	row.add_child(left)
+	_target = UIKit.label("", Color(0.82, 0.72, 1.0), 13, true)
+	left.add_child(_target)
 	_view = MoleculeView.new()
 	_view.interactive = true
-	_view.custom_minimum_size = Vector2(0, 280)
+	_view.custom_minimum_size = Vector2(0, 262)
 	_view.site_clicked.connect(_on_site)
 	left.add_child(_view)
 	left.add_child(UIKit.label(tr("mol.hint"), UIKit.TEXT_DIM, 13, true))
@@ -107,6 +117,12 @@ func _build(box: VBoxContainer) -> void:
 			_work.apply_preset(preset)
 			_refresh_all())
 		_presets.add_child(b)
+	_lineage_btn = UIKit.button(tr("mol.preset.lineage"), "", "normal", Vector2(0, 32))
+	_lineage_btn.add_theme_font_size_override("font_size", 14)
+	_lineage_btn.pressed.connect(func() -> void:
+		_work.apply_sites(lineage_sites)
+		_refresh_all())
+	_presets.add_child(_lineage_btn)
 	right.add_child(_presets)
 	right.add_child(UIKit.header(tr("mol.properties"), 16, accent.lightened(0.2)))
 	_props = VBoxContainer.new()

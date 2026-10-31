@@ -1,0 +1,74 @@
+{
+  "_comment": "公司要攻克的疾病（第一次立项时选定，整个战役不变）。每种疾病一个靶点；靶点有几代变体（耐药突变）：每获批一代药物，疾病就进化到下一个变体，结合口袋随之改变。pocket 是口袋热点：want 为该位点上的片段带这个标签时套用 fx（契合加成），avoid 为带这个标签时套用 fx（空间冲突等惩罚）。patients_per_efficacy：获批时帮助的患者数 = 疗效 × 它。enemy_names：二期等阶段的敌人换成这种疾病的说法。",
+  "diseases": [
+    {
+      "id": "lung_cancer", "color": "#ef7b6a", "icon": "status_vulnerable", "patients_per_efficacy": 900,
+      "enemy_names": { "placebo": "enemy.placebo.lung_cancer", "enroll_drag": "enemy.enroll_drag.lung_cancer", "resistant_clone": "enemy.resistant_clone.lung_cancer", "progression": "enemy.progression.lung_cancer" },
+      "variants": [
+        { "id": "egfr_wt", "pocket": [
+          { "site": "L1", "want": "aromatic", "fx": { "potency": 1 } },
+          { "site": "R1", "want": "lipophilic", "fx": { "potency": 1 } },
+          { "site": "T2", "want": "polar", "fx": { "selectivity": 1 } }
+        ] },
+        { "id": "egfr_t790m", "pocket": [
+          { "site": "L1", "want": "aromatic", "fx": { "potency": 1 } },
+          { "site": "R1", "want": "halogen", "fx": { "potency": 1 } },
+          { "site": "R1", "avoid": "bulky", "fx": { "potency": -2 } },
+          { "site": "T2", "want": "polar", "fx": { "selectivity": 1 } }
+        ] },
+        { "id": "egfr_c797s", "pocket": [
+          { "site": "L2", "want": "aromatic", "fx": { "potency": 1 } },
+          { "site": "R3", "want": "polar", "fx": { "selectivity": 1 } },
+          { "site": "R1", "avoid": "bulky", "fx": { "potency": -2 } },
+          { "site": "T1", "want": "polar", "fx": { "potency": 1 } }
+        ] }
+      ]
+    },
+    {
+      "id": "hiv", "color": "#8fb6ff", "icon": "status_poison", "patients_per_efficacy": 1200,
+      "enemy_names": { "placebo": "enemy.placebo.hiv", "enroll_drag": "enemy.enroll_drag.hiv", "resistant_clone": "enemy.resistant_clone.hiv", "progression": "enemy.progression.hiv" },
+      "variants": [
+        { "id": "rt_wt", "pocket": [
+          { "site": "R1", "want": "aromatic", "fx": { "potency": 1 } },
+          { "site": "R2", "want": "lipophilic", "fx": { "potency": 1 } },
+          { "site": "L1", "want": "polar", "fx": { "selectivity": 1 } }
+        ] },
+        { "id": "rt_k103n", "pocket": [
+          { "site": "R1", "want": "aromatic", "fx": { "potency": 1 } },
+          { "site": "L2", "want": "polar", "fx": { "potency": 1 } },
+          { "site": "T1", "avoid": "bulky", "fx": { "potency": -2 } },
+          { "site": "R2", "want": "lipophilic", "fx": { "selectivity": 1 } }
+        ] },
+        { "id": "rt_y181c", "pocket": [
+          { "site": "R1", "want": "halogen", "fx": { "potency": 1 } },
+          { "site": "R1", "avoid": "aromatic", "fx": { "potency": -2 } },
+          { "site": "L1", "want": "polar", "fx": { "selectivity": 1 } },
+          { "site": "R3", "want": "lipophilic", "fx": { "potency": 1 } }
+        ] }
+      ]
+    },
+    {
+      "id": "superbug", "color": "#9bd16a", "icon": "status_metallicize", "patients_per_efficacy": 2500,
+      "enemy_names": { "placebo": "enemy.placebo.superbug", "enroll_drag": "enemy.enroll_drag.superbug", "resistant_clone": "enemy.resistant_clone.superbug", "progression": "enemy.progression.superbug" },
+      "variants": [
+        { "id": "gyr_wt", "pocket": [
+          { "site": "L1", "want": "aromatic", "fx": { "potency": 1 } },
+          { "site": "R2", "want": "halogen", "fx": { "potency": 1 } },
+          { "site": "T1", "want": "polar", "fx": { "selectivity": 1 } }
+        ] },
+        { "id": "gyr_s83l", "pocket": [
+          { "site": "R2", "want": "halogen", "fx": { "potency": 1 } },
+          { "site": "T1", "avoid": "bulky", "fx": { "potency": -2 } },
+          { "site": "L2", "want": "polar", "fx": { "potency": 1 } },
+          { "site": "R3", "want": "polar", "fx": { "selectivity": 1 } }
+        ] },
+        { "id": "gyr_d87n", "pocket": [
+          { "site": "R1", "want": "halogen", "fx": { "potency": 1 } },
+          { "site": "L1", "want": "aromatic", "fx": { "potency": 1 } },
+          { "site": "R2", "avoid": "bulky", "fx": { "potency": -2 } },
+          { "site": "T2", "want": "polar", "fx": { "selectivity": 1 } }
+        ] }
+      ]
+    }
+  ]
+}

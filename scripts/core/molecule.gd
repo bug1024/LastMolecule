@@ -6,27 +6,73 @@ extends RefCounted
 ##
 ## 属性（0–6）如何改变战斗（effects()）。2 是中性值，≤1 有代价，≥3 有收益，≥5 收益更大：
 ##   活性      ≤1 开局虚弱；≥3 开局力量 +1；≥5 +2
-##   选择性    ≤1 发现 / 临床前战斗有脱靶规则；≥3 打出的破绽 +1；≥5 另外开局坚固 +1（副作用少）
+##   选择性    ≤1 发现 / 临床前战斗有脱靶规则；≥3 打出的破绽 +1；≥5 破绽 +2
 ##   稳定性    ≤1 中毒 −1，活性力量减半；≥3 施加的中毒 +1；≥5 另外敌人开局带 2 层中毒
 ##   溶解度    ≤1 临床策略卡费用 +1（制剂优化卡可抵消）；≥3 第一回合多抽 1 张；≥5 另外第一回合能量 +1
 ##   毒性警示  未排除或已确认的每一项：终审安全线 −5
+## 有靶点时（disease / variant，见 data/diseases.json），片段放在口袋热点上还会命中契合加成或空间冲突（pocket_fits）。
 ## 分子还决定：奖励卡池偏向（card_affinity）、分子特性卡（组合成立时加入战斗牌组）、
 ## 各阶段 Boss 战的「阶段考验」（exam_result，见 molecule.json 的 exams）。
 
 const PATH := "res://data/molecule.json"
+const DISEASE_PATH := "res://data/diseases.json"
 const PROPS := ["potency", "selectivity", "stability", "solubility"]
 
 var sites := {}        # 位点 id → 片段 id（空位不在字典里）
 var inventory: Array = []   # 未使用的片段 id（可重复）
 var alerts := {}       # 警示 id → "unknown" / "cleared" / "confirmed"
+var disease := ""      # 要攻克的疾病（data/diseases.json），空表示没有靶点（只用片段本身的属性）
+var variant := 0       # 靶点第几代变体（耐药突变）
 
 static var _cfg: Dictionary = {}
+static var _diseases: Dictionary = {}
 
 
 static func config() -> Dictionary:
 	if _cfg.is_empty():
 		_cfg = JsonData.load_dict(PATH)
 	return _cfg
+
+
+static func diseases() -> Array:
+	if _diseases.is_empty():
+		_diseases = JsonData.load_dict(DISEASE_PATH)
+	return _diseases.get("diseases", [])
+
+
+static func disease_cfg(id: String) -> Dictionary:
+	for d in diseases():
+		if String(d.get("id", "")) == id:
+			return d
+	return {}
+
+
+## 第 generation 代药物面对的靶点变体下标（获批几代，疾病就进化几次，到最后一个变体为止）
+static func variant_for(disease_id: String, generation: int) -> int:
+	return clampi(generation, 0, maxi(0, (disease_cfg(disease_id).get("variants", []) as Array).size() - 1))
+
+
+static func variant_id(disease_id: String, index: int) -> String:
+	var variants: Array = disease_cfg(disease_id).get("variants", [])
+	return String(variants[index].get("id", "")) if index < variants.size() else ""
+
+
+## 当前靶点口袋的热点 [{site, want / avoid, fx}]
+func pocket() -> Array:
+	var variants: Array = disease_cfg(disease).get("variants", [])
+	return variants[variant].get("pocket", []) if variant < variants.size() else []
+
+
+## 每个口袋热点现在是否命中：[{site, want / avoid, fx, hit}]（want 命中是加成；avoid 命中是冲突）
+func pocket_fits() -> Array:
+	var out: Array = []
+	for spot in pocket():
+		var tags: Array = fragment(String(sites.get(String(spot.site), ""))).get("tags", [])
+		var tag := String(spot.get("want", spot.get("avoid", "")))
+		var entry: Dictionary = spot.duplicate()
+		entry["hit"] = tags.has(tag)
+		out.append(entry)
+	return out
 
 
 static func fragment(id: String) -> Dictionary:
@@ -72,7 +118,11 @@ func apply_layout(placement: Dictionary) -> bool:
 
 ## 按预设方案摆放（取不到的片段跳过）
 func apply_preset(preset_id: String) -> void:
-	var preset: Dictionary = config().get("presets", {}).get(preset_id, {})
+	apply_sites(config().get("presets", {}).get(preset_id, {}))
+
+
+## 按给定结构摆放（预设方案、分子谱系里的上一代）；取不到或放不下的片段跳过
+func apply_sites(preset: Dictionary) -> void:
 	var pool: Array = inventory.duplicate()
 	for site_id in sites:
 		pool.append(sites[site_id])
@@ -99,6 +149,11 @@ func properties() -> Dictionary:
 		var fx: Dictionary = combo.get("fx", {})
 		for p in fx:
 			props[p] = int(props.get(p, 0)) + int(fx[p])
+	for fit in pocket_fits():   # 与靶点口袋的契合：命中热点加成，撞上空间冲突扣分
+		if bool(fit.hit):
+			var fit_fx: Dictionary = fit.get("fx", {})
+			for p in fit_fx:
+				props[p] = int(props.get(p, 0)) + int(fit_fx[p])
 	var lo := int(cfg.get("range", [0, 6])[0])
 	var hi := int(cfg.get("range", [0, 6])[1])
 	for p in PROPS:
@@ -168,11 +223,11 @@ func unknown_alerts() -> Array:
 
 
 ## 属性带来的战斗效果（game 拼进战斗上下文；stage 决定哪些只在特定阶段生效）
-## {strength, dexterity, weak, offtarget (bool), vulnerable_bonus, poison_bonus, enemy_poison, clinical_cost,
+## {strength, start_block, weak, offtarget (bool), vulnerable_bonus, poison_bonus, enemy_poison, clinical_cost,
 ##  first_draw, first_energy, lines: [{key, args, prop}]}
 func effects(stage: String) -> Dictionary:
 	var p := properties()
-	var fx := {"strength": 0, "dexterity": 0, "weak": 0, "offtarget": false, "vulnerable_bonus": 0, "poison_bonus": 0,
+	var fx := {"strength": 0, "start_block": 0, "weak": 0, "offtarget": false, "vulnerable_bonus": 0, "poison_bonus": 0,
 		"enemy_poison": 0, "clinical_cost": 0, "first_draw": 0, "first_energy": 0, "lines": []}
 	var lines: Array = []
 	var pot := int(p.potency)
@@ -193,8 +248,7 @@ func effects(stage: String) -> Dictionary:
 		fx.offtarget = true
 		lines.append({"key": "mol.fx.offtarget", "args": [], "prop": "selectivity"})
 	if sel >= 3:
-		fx.vulnerable_bonus = 1
-		fx.dexterity = 1 if sel >= 5 else 0
+		fx.vulnerable_bonus = 2 if sel >= 5 else 1
 		lines.append({"key": "mol.fx.vulnerable_plus" if sel >= 5 else "mol.fx.vulnerable", "args": [], "prop": "selectivity"})
 	if stab >= 3:
 		fx.poison_bonus = 1
@@ -341,7 +395,8 @@ static func _all_site_ids() -> Array:
 
 
 func to_dict() -> Dictionary:
-	return {"sites": sites.duplicate(), "inventory": inventory.duplicate(), "alerts": alerts.duplicate()}
+	return {"sites": sites.duplicate(), "inventory": inventory.duplicate(), "alerts": alerts.duplicate(),
+		"disease": disease, "variant": variant}
 
 
 static func from_dict(d: Dictionary) -> Molecule:
@@ -352,4 +407,6 @@ static func from_dict(d: Dictionary) -> Molecule:
 		m.inventory.append(String(id))
 	for k in d.get("alerts", {}):
 		m.alerts[String(k)] = String(d.alerts[k])
+	m.disease = String(d.get("disease", ""))
+	m.variant = int(d.get("variant", 0))
 	return m

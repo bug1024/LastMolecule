@@ -71,6 +71,8 @@ func _build() -> void:
 	molecule_art = MoleculeArt.new()
 	add_child(molecule_art)
 	mol_view = MoleculeView.new()
+	mol_view.face = true
+	mol_view.idle_bob = true
 	mol_view.visible = false
 	add_child(mol_view)
 	_mol_line = UIKit.label("", Color(0.82, 0.75, 1.0), 14)
@@ -239,6 +241,8 @@ func refresh(game, competition_summary: String, competition_text: String) -> voi
 		for p in Molecule.PROPS:
 			parts.append("%s %d" % [tr("prop." + p), int(props[p])])
 		parts.append("%s %d" % [tr("prop.alerts"), mol.open_alerts()])
+		if not mol.disease.is_empty():   # 先写这一代面对的靶点（耐药变体）
+			parts.push_front(tr("variant." + Molecule.variant_id(mol.disease, mol.variant)))
 		_mol_line.text = " · ".join(parts)
 		var exam: Dictionary = game.get_exam(state.stage)
 		_exam_line.visible = bool(exam.get("has", false))
@@ -273,7 +277,10 @@ func refresh(game, competition_summary: String, competition_text: String) -> voi
 	avatar.form = level
 	avatar.ratio = float(hp) / 100.0
 	var next: int = game.get_next_level_xp()
-	_team_label.text = tr("player.tag") % [level, tr("player.level.%d" % level)]
+	_team_label.text = tr("player.tag_team") % [level, tr("mol.level.%d" % level)] if game.molecule != null \
+		else tr("player.tag") % [level, tr("player.level.%d" % level)]
+	mol_view.form = level
+	mol_view.ratio = float(hp) / 100.0
 	_xp_bar.max_value = maxi(next, 1) if next > 0 else 1
 	_xp_bar.value = game.player_xp if next > 0 else 1
 	_xp_bar.tooltip_text = tr("player.xp") % [game.player_xp, next] if next > 0 else tr("player.max")

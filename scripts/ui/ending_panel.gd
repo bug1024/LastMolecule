@@ -101,6 +101,22 @@ func show_ending(outcome: String, reason_key: String, summary: Dictionary, state
 	settle_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	settle_label.custom_minimum_size = Vector2(560, 0)
 	_mid.add_child(settle_label)
+	if int(summary.get("patients", 0)) > 0:
+		# 这一代药物帮助的患者；疾病被攻克（战役结局）或进化出耐药（下一代要重新设计）
+		var lines: Array[String] = [tr("ending.patients") % [Company.format_people(int(summary.patients)),
+			Company.format_people(int(summary.get("patients_total", 0)))]]
+		var disease_name := tr("disease." + String(summary.get("disease", "")))
+		if not campaign.is_empty() and outcome == "approved":
+			lines.append(tr("ending.conquered") % disease_name)
+		elif not String(summary.get("next_variant", "")).is_empty():
+			lines.append(tr("ending.resistance") % tr("variant." + String(summary.next_variant)))
+		var mission := UIKit.label("\n".join(lines), Color(0.82, 0.72, 1.0), 15, true)
+		mission.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		mission.custom_minimum_size = Vector2(560, 0)
+		_mid.add_child(mission)
+		var strip := ArchivePanel.lineage_strip(summary.get("lineage", []))
+		strip.alignment = BoxContainer.ALIGNMENT_CENTER
+		_mid.add_child(strip)
 	if int(summary.level_after) > int(summary.level_before):
 		var up := UIKit.header(tr("ending.level_up") % summary.level_after, 18, UIKit.GOLD)
 		up.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

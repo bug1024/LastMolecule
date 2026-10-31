@@ -55,6 +55,7 @@ var _ai_chip: BattleHud.AiChip
 var _mechanic: RichTextLabel
 var _mol: MoleculeView          # 设计了分子的项目：分子就是战场上的主角（代替烧瓶）；属性生效、被敌人针对时对应片段会闪
 var _mol_tag: Label
+var _strike_style := ""          # 最近一张牌的出招方式（命中特效跟着变）
 var _fx: Control
 var _arrow: Control
 var _banner: Control
@@ -136,6 +137,7 @@ func _build() -> void:
 	add_child(_mechanic)
 	_mol = MoleculeView.new()
 	_mol.idle_bob = true
+	_mol.face = true
 	_mol.tooltip_text = " "
 	_mol.mouse_filter = Control.MOUSE_FILTER_PASS
 	_mol.size = Vector2(360, 230)
@@ -333,7 +335,7 @@ func _on_battle_started(encounter: Dictionary) -> void:
 	_player.set_mood("")
 	_player_tag.text = tr("player.tag") % [_game.get_player_level(), tr("player.level.%d" % _game.get_player_level())]
 	_shown_player_hp = _manager.player.hp
-	_title.text = tr("encounter." + String(encounter.get("id", kind))) if kind == "boss" else tr("enemy." + String(_manager.enemies[0].id))
+	_title.text = tr("encounter." + String(encounter.get("id", kind))) if kind == "boss" else tr(_manager.enemies[0].name_key)
 	if kind != "boss" and _manager.enemies.size() > 1:
 		_title.text = tr("encounter.group") % [_title.text, _manager.enemies.size()]
 	_kind_tag.text = tr("encounter.kind." + kind)
@@ -353,7 +355,11 @@ func _on_battle_started(encounter: Dictionary) -> void:
 	_mol_tag.visible = molecule != null
 	_player.visible = molecule == null   # 有分子时，站在战场上的是分子本身
 	if molecule != null:
-		_player_tag.text = tr("player.tag_mol") % _game.get_player_level()
+		var lv: int = _game.get_player_level()
+		_player_tag.text = tr("player.tag_mol") % [lv, tr("mol.level.%d" % lv)]
+		_mol.form = lv
+		_mol.set_mood("")
+		_mol.ratio = float(_manager.player.hp) / _manager.player.max_hp
 		_mol.set_molecule(molecule)
 		var props := molecule.properties()
 		_mol_tag.text = " ".join(Molecule.PROPS.map(func(p: String) -> String: return "%s%d" % [tr("prop." + p).left(1), int(props[p])])) \
@@ -380,7 +386,7 @@ func _on_battle_started(encounter: Dictionary) -> void:
 ## 分子效果的一行速览：「力量+1 · 破绽+1 · 首回合抽牌+1」
 func _mol_summary(fx: Dictionary) -> String:
 	var parts: Array[String] = []
-	for key in ["strength", "dexterity", "vulnerable_bonus", "poison_bonus", "enemy_poison", "first_draw", "first_energy", "clinical_cost"]:
+	for key in ["strength", "start_block", "vulnerable_bonus", "poison_bonus", "enemy_poison", "first_draw", "first_energy", "clinical_cost"]:
 		var v := int(fx.get(key, 0))
 		if v != 0:
 			parts.append(tr("mol.short." + key) % v)
@@ -475,6 +481,8 @@ func _play(ev: Dictionary) -> void:
 		"block":
 			var p := _side_point(String(ev.side), int(ev.index))
 			_float_text(tr("battle.fx.block") % int(ev.amount), p + Vector2(0, -40), Color(0.5, 0.75, 1.0), 22)
+			if String(ev.side) == "player" and _mol.visible:
+				_shockwave(p, Color(0.5, 0.75, 1.0), 120.0, true)   # 护盾：一圈蓝光向内收拢
 			_set_bar(String(ev.side), int(ev.index), -1, int(ev.block))
 			GameAudio.sfx("block")
 			await _wait(0.16)
@@ -508,6 +516,7 @@ func _play(ev: Dictionary) -> void:
 			GameAudio.sfx("deviation")
 			await _wait(0.45)
 		"enemy_turn":
+			_strike_style = ""   # 敌人回合里的伤害（中毒等）不沿用上一张牌的命中特效
 			await _show_banner(tr("battle.banner.enemy_turn"), "", Color(1.0, 0.55, 0.5), 0.4, false)
 		"enemy_move":
 			await _play_enemy_move(int(ev.index), ev.move)
@@ -555,18 +564,20 @@ func _play_damage(ev: Dictionary) -> void:
 		_burst(p, Color(1.0, 0.4, 0.35) if side == "player" else _enemy_color(index), 12 + mini(amount, 20))
 		if side == "player":
 			_player.hit()
-			_mol.hit()
+			_mol.hit(amount / 10.0)   # 片段被震开再弹回，表情吃痛
+			_shockwave(p, Color(1.0, 0.35, 0.3), 70.0 + minf(amount, 30) * 3.0)
 			GameAudio.sfx("hurt")
 			_screen_flash(0.18 + minf(amount, 30) * 0.01)
 		else:
 			_enemy_widgets[index].creature.hit()
+			_impact(index, p, amount)
 			GameAudio.sfx("hit_heavy" if amount >= 15 else "hit")
 		_shake(3.0 + minf(amount, 30) * 0.4, 0.22)
 	elif int(ev.blocked) > 0:
 		_float_text(tr("battle.fx.blocked"), p + Vector2(0, -80), Color(0.5, 0.75, 1.0), 22)
 		GameAudio.sfx("block")
 	_set_bar(side, index, int(ev.hp), int(ev.block))
-	await _wait(0.2)
+	await _wait(0.2 + (0.07 if amount >= 12 else 0.0))   # 重击多停一拍（顿帧感）
 
 
 ## 用事件里的数值更新血条（hp 为 -1 时保持当前显示）
@@ -576,6 +587,7 @@ func _set_bar(side: String, index: int, hp: int, block: int) -> void:
 		_shown_player_hp = shown
 		_player_bar.set_values(shown, _manager.player.max_hp, block)
 		_player.ratio = float(shown) / _manager.player.max_hp
+		_mol.ratio = _player.ratio
 		_player.shield = block
 	elif index < _enemy_widgets.size():
 		var bar := _enemy_widgets[index].bar
@@ -604,6 +616,378 @@ func _play_enemy_move(index: int, move: Dictionary) -> void:
 	await _wait(0.14)
 
 
+## 分子出招：卡牌化作光点飞进分子，再按卡牌的性质用不同方式打出去（见 _strike_style）；打自己的牌在分子周围亮一圈
+func _molecule_cast(card: ResearchCard, face: CardFace, target: int, color: Color) -> void:
+	var home := _player_point()
+	face.z_index = 50
+	face.set_state(true)
+	var tween := create_tween().set_parallel(true)
+	tween.tween_property(face, "position", home - face.size * 0.5 + Vector2(30, -20), 0.16).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+	tween.tween_property(face, "scale", Vector2(0.25, 0.25), 0.16)
+	tween.tween_property(face, "rotation", 0.0, 0.16)
+	tween.chain().tween_property(face, "modulate:a", 0.0, 0.06)
+	tween.chain().tween_callback(face.queue_free)
+	_layout_hand()
+	await _wait(0.16)
+	_strike_style = _strike_style_for(card)
+	if _strike_style == "self":
+		_shockwave(home, color, 110.0, true)
+		_burst(home, color, 12)
+		await _wait(0.1)
+		return
+	_mol.attack()
+	var targets: Array = [target] if target >= 0 else []
+	if targets.is_empty():
+		for i in _manager.enemies.size():
+			if _manager.enemies[i].is_alive():
+				targets.append(i)
+	if targets.is_empty():
+		return
+	var muzzle := home + Vector2(60, -10)
+	var to := _side_point("enemy", int(targets[0]))
+	match _strike_style:
+		"charge":
+			await _strike_charge(to)
+		"beam":
+			_mol_recoil(10.0)
+			for i in targets:
+				_beam(muzzle, _side_point("enemy", int(i)), color, false)
+			await _wait(0.12)
+		"lock":
+			await _crosshair(to, color)
+			_mol_recoil(14.0)
+			_beam(muzzle, to, Color(1.0, 0.95, 0.75), true)
+			await _wait(0.08)
+		"dose":
+			_mol_recoil(8.0)
+			for i in targets:
+				_lob(muzzle, _side_point("enemy", int(i)), color, "drop")
+			await _wait(0.3)
+		"flask":
+			_mol_recoil(8.0)
+			for i in targets:
+				_lob(muzzle, _side_point("enemy", int(i)), color, "flask")
+			await _wait(0.3)
+		"volley":
+			var hits := 1
+			for e in card.effects:
+				hits = maxi(hits, int(e.get("times", 1)))
+			for h in hits:
+				_mol_recoil(6.0)
+				_projectile(muzzle + Vector2(0, randf_range(-14, 14)), to + Vector2(randf_range(-18, 18), randf_range(-18, 18)), color, 0.6)
+				await _wait(0.07)
+			await _wait(0.1)
+		"wave":
+			_mol_recoil(18.0)
+			_sweep(home, color)
+			await _wait(0.22)
+		_:
+			_mol_recoil(12.0)
+			for i in targets:
+				_projectile(muzzle, _side_point("enemy", int(i)), color)
+			await _wait(0.2)
+
+
+## 卡牌的出招方式：打全体＝扫荡波，多段＝连射，上破绽＝锁定精准光束，AI＝数据光束，
+## 临床＝抛出药剂，实验＝掷出试剂瓶，其余分子设计牌＝分子亲自冲撞；只作用自己的牌为 self
+func _strike_style_for(card: ResearchCard) -> String:
+	if card.target == "self":
+		return "self"
+	if card.target == "all":
+		return "wave"
+	var hits := 1
+	var vulnerable := false
+	for e in card.effects:
+		hits = maxi(hits, int(e.get("times", 1)))
+		if String(e.get("op", "")) == "status" and String(e.get("id", "")) == "vulnerable":
+			vulnerable = true
+	if hits > 1:
+		return "volley"
+	if vulnerable:
+		return "lock"
+	match card.type:
+		"ai":
+			return "beam"
+		"clinical":
+			return "dose"
+		"experiment":
+			return "flask"
+		"molecular":
+			return "charge" if card.kind == "attack" else "bolt"
+	return "bolt"
+
+
+## 分子后坐一下（射击类出招）
+func _mol_recoil(amount: float) -> void:
+	var origin := _mol.position
+	var t := create_tween()
+	t.tween_property(_mol, "position", origin + Vector2(-amount, 0), 0.05)
+	t.tween_property(_mol, "position", origin, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+## 冲撞：分子带着残影冲到敌人面前，撞上后再退回原位
+func _strike_charge(to: Vector2) -> void:
+	var origin := _mol.position
+	var hit_pos := origin + Vector2(to.x - _player_point().x - 150.0, (to.y - _player_point().y) * 0.4)
+	var dash := create_tween()
+	dash.tween_property(_mol, "position", origin + Vector2(-24, 0), 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	dash.tween_property(_mol, "position", hit_pos, 0.13).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_IN)
+	dash.tween_interval(0.16)
+	dash.tween_property(_mol, "position", origin, 0.3).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	for k in 4:   # 冲刺拖尾
+		get_tree().create_timer(0.08 + k * 0.03).timeout.connect(func() -> void:
+			_shockwave(_player_point(), Color(0.8, 0.75, 1.0, 0.6), 50.0, true))
+	await _wait(0.21)
+
+
+## 光束：AI 是带锯齿和像素块的青色数据流；精准光束（precise）是一道又细又亮的直线
+func _beam(from: Vector2, to: Vector2, color: Color, precise: bool) -> void:
+	var ray := Control.new()
+	ray.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_fx.add_child(ray)
+	var col := Color(1.0, 0.95, 0.75) if precise else Color(0.45, 0.95, 1.0)
+	var seed_pts: Array = []
+	var n := 14
+	for i in n + 1:
+		seed_pts.append(randf_range(-1.0, 1.0))
+	var state := [0.0]
+	ray.draw.connect(func() -> void:
+		var t: float = state[0]
+		var a := 1.0 - t
+		var dir := (to - from).normalized()
+		var normal := Vector2(-dir.y, dir.x)
+		if precise:
+			ray.draw_line(from, to, Color(col, 0.35 * a), 14.0 * a + 2.0, true)
+			ray.draw_line(from, to, Color(1, 1, 1, a), 3.0, true)
+			return
+		var pts := PackedVector2Array()
+		for i in n + 1:
+			var p := from.lerp(to, float(i) / n)
+			if i > 0 and i < n:
+				p += normal * float(seed_pts[i]) * 14.0 * (0.4 + t)
+			pts.append(p)
+		ray.draw_polyline(pts, Color(col, 0.3 * a), 16.0 * a + 2.0, true)
+		ray.draw_polyline(pts, Color(col.lightened(0.5), a), 3.0, true)
+		for i in range(1, n, 2):   # 数据像素
+			var q := from.lerp(to, float(i) / n) + normal * float(seed_pts[i]) * 26.0
+			ray.draw_rect(Rect2(q - Vector2(4, 4), Vector2(8, 8)), Color(col, 0.8 * a)))
+	var tween := ray.create_tween()
+	tween.tween_method(func(t: float) -> void:
+		state[0] = t
+		ray.queue_redraw(), 0.0, 1.0, 0.32)
+	tween.tween_callback(ray.queue_free)
+
+
+## 锁定：准星从大到小收拢到目标上
+func _crosshair(at: Vector2, color: Color) -> void:
+	var mark := Control.new()
+	mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mark.position = at
+	_fx.add_child(mark)
+	var state := [0.0]
+	mark.draw.connect(func() -> void:
+		var t: float = state[0]
+		var r := lerpf(90.0, 34.0, minf(1.0, t * 1.4))
+		var col := Color(1.0, 0.85, 0.4, minf(1.0, t * 3.0) * (1.0 - maxf(0.0, t - 0.8) * 5.0))
+		mark.draw_arc(Vector2.ZERO, r, 0, TAU, 40, col, 2.5, true)
+		for k in 4:
+			var d := Vector2.from_angle(k * PI / 2 + t * 1.5)
+			mark.draw_line(d * (r - 12), d * (r + 14), col, 3.0, true)
+		mark.draw_circle(Vector2.ZERO, 3.0, col))
+	var tween := mark.create_tween()
+	tween.tween_method(func(t: float) -> void:
+		state[0] = t
+		mark.queue_redraw(), 0.0, 1.0, 0.3)
+	tween.tween_callback(mark.queue_free)
+	await _wait(0.22)
+
+
+## 抛物线投掷：drop＝一滴药剂（拖着小气泡），flask＝旋转的试剂瓶
+func _lob(from: Vector2, to: Vector2, color: Color, shape: String) -> void:
+	var item := Control.new()
+	item.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_fx.add_child(item)
+	var state := [0.0]
+	var arc := Vector2(0, -minf(130.0, from.distance_to(to) * 0.3))
+	item.draw.connect(func() -> void:
+		var t: float = state[0]
+		var p := from.lerp(to, t) + arc * 4.0 * t * (1.0 - t)
+		if shape == "drop":
+			for k in 4:   # 拖尾的小气泡
+				var tk := maxf(0.0, t - 0.06 * (k + 1))
+				var q := from.lerp(to, tk) + arc * 4.0 * tk * (1.0 - tk)
+				item.draw_circle(q, 4.0 - k * 0.7, Color(color.lightened(0.4), 0.6 - k * 0.12))
+			var pts := PackedVector2Array()
+			for k in 16:
+				var a := k * TAU / 16.0
+				var r := 11.0 * (1.0 + 0.6 * maxf(0.0, -sin(a)))
+				pts.append(p + Vector2(cos(a) * 11.0, sin(a) * r * 0.9 - (6.0 if sin(a) < 0 else 0.0)))
+			item.draw_colored_polygon(pts, color.lightened(0.15))
+			item.draw_circle(p + Vector2(-4, -2), 3.0, Color(1, 1, 1, 0.8))
+		else:
+			item.draw_set_transform(p, t * TAU * 1.5, Vector2(1.7, 1.7))
+			item.draw_rect(Rect2(-4, -18, 8, 10), Color(0.85, 0.92, 1.0, 0.9))
+			item.draw_rect(Rect2(-6, -20, 12, 3), Color(0.85, 0.92, 1.0, 0.9))
+			item.draw_circle(Vector2(0, 2), 11.0, Color(0.85, 0.92, 1.0, 0.9))
+			item.draw_circle(Vector2(0, 4), 8.0, color.lightened(0.1))
+			item.draw_circle(Vector2(-4, 0), 2.5, Color(1, 1, 1, 0.8))
+			item.draw_set_transform(Vector2.ZERO))
+	var tween := item.create_tween()
+	tween.tween_method(func(t: float) -> void:
+		state[0] = t
+		item.queue_redraw(), 0.0, 1.0, 0.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	tween.tween_callback(item.queue_free)
+
+
+## 扫荡波：一道弧形冲击波从分子横扫整个战场
+func _sweep(from: Vector2, color: Color) -> void:
+	var wave := Control.new()
+	wave.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	wave.position = from
+	_fx.add_child(wave)
+	var state := [0.0]
+	wave.draw.connect(func() -> void:
+		var t: float = state[0]
+		var r := lerpf(40.0, size.x, t)
+		for k in 3:
+			wave.draw_arc(Vector2.ZERO, r - k * 18.0, -0.7, 0.7, 40, Color(color.lightened(0.3), (1.0 - t) * (0.9 - k * 0.25)), 10.0 - k * 3.0, true))
+	var tween := wave.create_tween()
+	tween.tween_method(func(t: float) -> void:
+		state[0] = t
+		wave.queue_redraw(), 0.0, 1.0, 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_callback(wave.queue_free)
+
+
+## 能量弹：带拖尾的光点沿一道弧线飞向目标（scale 越小越快越细，用于连射）
+func _projectile(from: Vector2, to: Vector2, color: Color, scale_k := 1.0) -> void:
+	var bolt := Control.new()
+	bolt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_fx.add_child(bolt)
+	var trail: Array = []
+	bolt.draw.connect(func() -> void:
+		for i in trail.size():
+			var t := float(i + 1) / trail.size()
+			bolt.draw_circle(trail[i], (3.0 + 9.0 * t) * scale_k, Color(color.lightened(0.3), 0.12 + 0.35 * t))
+		if not trail.is_empty():
+			bolt.draw_circle(trail.back(), 16.0 * scale_k, Color(color, 0.35))
+			bolt.draw_circle(trail.back(), 8.0 * scale_k, Color(1, 1, 1, 0.95)))
+	var arc := Vector2(0, -minf(80.0, from.distance_to(to) * 0.18) * scale_k)
+	var tween := bolt.create_tween()
+	tween.tween_method(func(t: float) -> void:
+		trail.append(from.lerp(to, t) + arc * 4.0 * t * (1.0 - t))
+		if trail.size() > 9:
+			trail.pop_front()
+		bolt.queue_redraw(), 0.0, 1.0, 0.2 * (0.6 + 0.4 * scale_k)).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tween.tween_callback(bolt.queue_free)
+
+
+## 击中敌人：按出招方式换命中特效，伤害越高越猛；敌人都会被击退
+func _impact(index: int, p: Vector2, amount: int) -> void:
+	var color := _enemy_color(index).lightened(0.3)
+	var heavy := minf(amount, 30)
+	var knock := 10.0 + heavy * 0.8
+	match _strike_style:
+		"charge":   # 冲撞：大冲击波 + 震屏，击退更远
+			_shockwave(p, Color(0.85, 0.8, 1.0), 90.0 + heavy * 5.0)
+			_shockwave(p, Color(1, 1, 1), 50.0 + heavy * 2.0)
+			_burst(p, Color(0.8, 0.75, 1.0), 18 + int(heavy))
+			_shake(6.0 + heavy * 0.3, 0.2)
+			knock *= 1.8
+		"beam":     # 数据光束：青色电火花
+			_burst(p, Color(0.45, 0.95, 1.0), 16 + int(heavy))
+			_shockwave(p, Color(0.45, 0.95, 1.0), 50.0 + heavy * 2.0)
+		"lock":     # 精准命中：金色准星一闪 + 斩痕
+			_shockwave(p, Color(1.0, 0.85, 0.4), 70.0 + heavy * 3.0, true)
+			_slash(p, Color(1.0, 0.9, 0.6), 90.0 + heavy * 3.0)
+			_burst(p, Color(1.0, 0.85, 0.4), 12)
+		"dose":     # 药剂：溅开一圈药液和气泡
+			_splash(p, Color(0.55, 0.95, 0.5), 22 + int(heavy))
+			_shockwave(p, Color(0.55, 0.95, 0.5), 60.0 + heavy * 2.0)
+		"flask":    # 试剂瓶：玻璃碎片 + 彩色试剂
+			_splash(p, Color(0.95, 0.75, 0.35), 16 + int(heavy))
+			_burst(p, Color(0.9, 0.97, 1.0), 20)
+			_slash(p, Color(0.9, 0.97, 1.0), 50.0)
+		"volley":   # 连射：每段一个小冲击
+			_shockwave(p, Color(1.0, 0.95, 0.8), 40.0 + heavy * 1.5)
+			_burst(p, color, 6)
+			knock *= 0.5
+		_:
+			_shockwave(p, Color(1.0, 0.95, 0.8), 60.0 + heavy * 4.0)
+			_slash(p, Color(1.0, 0.97, 0.9), 70.0 + heavy * 3.0)
+			_burst(p, color, 10 + int(heavy))
+	var ew := _enemy_widgets[index]
+	var origin := ew.position
+	var kick := create_tween()
+	kick.tween_property(ew, "position", origin + Vector2(knock, -4), 0.05).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	kick.tween_property(ew, "position", origin, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+## 溅开的液滴：向四周飞、往下落的小圆点
+func _splash(pos: Vector2, color: Color, amount: int) -> void:
+	var p := CPUParticles2D.new()
+	p.position = pos
+	p.emitting = false
+	p.one_shot = true
+	p.amount = amount
+	p.lifetime = 0.7
+	p.explosiveness = 1.0
+	p.direction = Vector2(0, -1)
+	p.spread = 80.0
+	p.initial_velocity_min = 180.0
+	p.initial_velocity_max = 380.0
+	p.gravity = Vector2(0, 900)
+	p.scale_amount_min = 0.5
+	p.scale_amount_max = 1.2
+	p.texture = _spark_texture()
+	var ramp := Gradient.new()
+	ramp.set_color(0, Color(color.lightened(0.3), 1.0))
+	ramp.set_color(1, Color(color, 0.0))
+	p.color_ramp = ramp
+	_fx.add_child(p)
+	p.emitting = true
+	get_tree().create_timer(1.0).timeout.connect(p.queue_free)
+
+
+## 扩散（或 inward 时收拢）的光环
+func _shockwave(pos: Vector2, color: Color, radius: float, inward := false) -> void:
+	var ring := Control.new()
+	ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ring.position = pos
+	_fx.add_child(ring)
+	var state := [0.0]
+	ring.draw.connect(func() -> void:
+		var t: float = state[0]
+		var r := lerpf(radius, radius * 0.35, t) if inward else lerpf(12.0, radius, t)
+		ring.draw_arc(Vector2.ZERO, r, 0, TAU, 56, Color(color, 1.0 - t), 2.0 + 8.0 * (1.0 - t), true)
+		ring.draw_circle(Vector2.ZERO, r, Color(color, 0.12 * (1.0 - t))))
+	var tween := ring.create_tween()
+	tween.tween_method(func(t: float) -> void:
+		state[0] = t
+		ring.queue_redraw(), 0.0, 1.0, 0.38).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_callback(ring.queue_free)
+
+
+## 交叉斩痕：两道亮线一闪而过
+func _slash(pos: Vector2, color: Color, length: float) -> void:
+	var mark := Control.new()
+	mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mark.position = pos
+	_fx.add_child(mark)
+	var angle := randf_range(-0.4, 0.4)
+	var state := [0.0]
+	mark.draw.connect(func() -> void:
+		var t: float = state[0]
+		for a in [angle + 0.7, angle - 0.7]:
+			var d := Vector2.from_angle(a) * length * 0.5 * minf(1.0, t * 3.0)
+			mark.draw_line(-d, d, Color(color, 1.0 - t), 7.0 * (1.0 - t) + 1.0, true)
+			mark.draw_line(-d * 0.9, d * 0.9, Color(1, 1, 1, 1.0 - t), 2.0, true))
+	var tween := mark.create_tween()
+	tween.tween_method(func(t: float) -> void:
+		state[0] = t
+		mark.queue_redraw(), 0.0, 1.0, 0.3)
+	tween.tween_callback(mark.queue_free)
+
+
 func _play_death(side: String, index: int) -> void:
 	if side == "player":
 		_shake(16.0, 0.6)
@@ -625,6 +1009,10 @@ func _animate_card_out(card: ResearchCard, target: int) -> void:
 	_selected = null
 	_arrow.queue_redraw()
 	if face == null:
+		return
+	var color: Color = CardFace.TYPE_COLOR.get(card.type, Color.WHITE)
+	if _mol.visible:
+		await _molecule_cast(card, face, target, color)
 		return
 	var dest := _side_point("enemy", target) if target >= 0 else Vector2(size.x * 0.5, size.y * 0.42)
 	face.z_index = 50
@@ -777,6 +1165,7 @@ func _cancel_target() -> void:
 func _set_targeting(on: bool) -> void:
 	if _player and _player.mood != "sad":
 		_player.set_mood("focus" if on else "")   # 选目标时烧瓶专注地看着
+		_mol.set_mood("focus" if on else "")
 	for ew in _enemy_widgets:
 		ew.targetable = on and _manager.enemies[ew.index].is_alive()
 	_arrow.queue_redraw()
@@ -941,6 +1330,7 @@ func _refresh_top() -> void:
 	_draw_button.text = str(_manager.draw_pile.size())
 	_discard_button.text = str(_manager.discard_pile.size())
 	_player.ratio = float(_manager.player.hp) / _manager.player.max_hp
+	_mol.ratio = _player.ratio
 	_player.shield = _manager.player.block
 	var actions := _manager.get_actions()
 	_dose_button.visible = not actions.is_empty()
@@ -996,6 +1386,7 @@ func _show_end() -> void:
 	else:
 		GameAudio.sting("lose")
 		_player.set_mood("sad")
+		_mol.set_mood("sad")
 		await _show_banner(tr("battle.banner.defeat"), tr("battle.banner.defeat_sub"), Color(1.0, 0.45, 0.45), 0.0, true)
 		_continue.text = tr("battle.continue")
 	_continue.visible = true
@@ -1008,14 +1399,24 @@ func _play_level_up(level: int) -> void:
 	_pending_level = 0
 	GameAudio.sfx("level_up")
 	_player.level_up()
+	_mol.level_up()
 	_burst(_player_point(), Color(1.0, 0.85, 0.4), 50)
+	if _mol.visible:   # 分子进化：放大一下，长出新形态（光晕 → 电子轨道 → 金色核心 → 星光）
+		_mol.pivot_offset = _mol.size * 0.5
+		var grow := create_tween()
+		grow.tween_property(_mol, "scale", Vector2(1.2, 1.2), 0.25).set_trans(Tween.TRANS_BACK)
+		grow.tween_callback(func() -> void: _mol.form = level)
+		grow.tween_property(_mol, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	var tween := create_tween()
 	tween.tween_property(_player, "scale", Vector2(1.25, 1.25), 0.25).set_trans(Tween.TRANS_BACK)
 	tween.tween_callback(func() -> void: _player.form = level)
 	tween.tween_property(_player, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	_player.pivot_offset = _player.size * Vector2(0.5, 0.9)
-	_player_tag.text = tr("player.tag_mol") % level if _mol.visible else tr("player.tag") % [level, tr("player.level.%d" % level)]
-	await _show_banner(tr("player.level_up") % [level, tr("player.level.%d" % level)], PlayerHud.bonus_text(_game.get_player_bonus()),
+	_player_tag.text = tr("player.tag_mol") % [level, tr("mol.level.%d" % level)] if _mol.visible \
+		else tr("player.tag") % [level, tr("player.level.%d" % level)]
+	var up_title := tr("player.level_up_mol") % [level, tr("mol.level.%d" % level)] if _mol.visible \
+		else tr("player.level_up") % [level, tr("player.level.%d" % level)]
+	await _show_banner(up_title, PlayerHud.bonus_text(_game.get_player_bonus()),
 		Color(1.0, 0.85, 0.4), 1.2, true)
 
 

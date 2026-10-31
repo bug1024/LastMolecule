@@ -13,7 +13,7 @@
       "evidence": "foundation"
     },
     {
-      "id": "selective",
+      "id": "selective", "molecule": true,
       "difficulty": 2,
       "icon": "status_vulnerable",
       "evidence": "selectivity",
@@ -42,7 +42,7 @@
       }
     },
     {
-      "id": "chronic",
+      "id": "chronic", "molecule": true,
       "difficulty": 2,
       "icon": "status_metallicize",
       "evidence": "long_safety",
@@ -70,7 +70,7 @@
       }
     },
     {
-      "id": "final",
+      "id": "final", "molecule": true,
       "final": true,
       "code": "LM-001",
       "difficulty": 3,

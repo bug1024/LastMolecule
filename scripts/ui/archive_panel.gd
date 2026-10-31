@@ -1,7 +1,7 @@
 class_name ArchivePanel
 extends ModalPanel
 ## 公司档案：左栏是公司的「身份卡」（随获批进化的烧瓶、流程等级环、下个项目的开局 AI），
-## 右栏依次是四个关键数字、研究证据勋章（已获得 / 未获得）与主线进度、最近项目时间线。
+## 右栏依次是四个关键数字、研究证据勋章（已获得 / 未获得）与主线进度、公司使命与分子谱系、最近项目时间线。
 
 const EVIDENCE := ["foundation", "selectivity", "long_safety"]
 const OUTCOME_COLOR := {"approved": Color(0.31, 0.78, 0.56), "terminated": Color(0.95, 0.8, 0.4), "failed": Color(0.93, 0.42, 0.42)}
@@ -38,6 +38,10 @@ func _refresh() -> void:
 	right.add_child(_section("archive.evidence", "outcome_approved"))
 	right.add_child(_evidence_row(company))
 	right.add_child(_campaign_line(company))
+	right.add_child(_section("archive.lineage", "type_molecular"))
+	right.add_child(_mission_line(company))
+	if not company.lineage.is_empty():
+		right.add_child(lineage_strip(company.lineage))
 	right.add_child(_section("archive.history", "stat_year"))
 	right.add_child(_timeline(company))
 
@@ -182,6 +186,44 @@ func _campaign_line(company: Company) -> Control:
 	else:
 		text = tr("ending.final_progress") % [company.evidence.size(), need]
 	return UIKit.label("◆ " + text, UIKit.GOLD, 14, true)
+
+
+func _mission_line(company: Company) -> Control:
+	if company.disease.is_empty():
+		return UIKit.label(tr("archive.mission_none"), UIKit.TEXT_DIM, 14, true)
+	var text := tr("archive.mission") % [tr("disease." + company.disease), Company.format_people(company.patients)]
+	if company.lineage.is_empty():
+		text += "\n" + tr("archive.lineage_empty")
+	return UIKit.label(text, Color(0.82, 0.72, 1.0), 14, true)
+
+
+## 分子谱系：每一代获批分子的小结构图，下面写第几代、面对的靶点变体、编号与帮助的患者（最近 max_items 代）
+static func lineage_strip(lineage: Array, max_items := 5) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	for i in range(maxi(0, lineage.size() - max_items), lineage.size()):
+		var entry: Dictionary = lineage[i]
+		var col := VBoxContainer.new()
+		col.add_theme_constant_override("separation", 0)
+		var view := MoleculeView.new()
+		view.compact = true
+		view.custom_minimum_size = Vector2(124, 70)
+		var m := Molecule.new()
+		for k in entry.get("sites", {}):
+			m.sites[String(k)] = String(entry.sites[k])
+		view.molecule = m
+		col.add_child(view)
+		var vid := Molecule.variant_id(String(entry.get("disease", "")), int(entry.get("variant", 0)))
+		var head := UIKit.label(TranslationServer.translate("archive.gen") % [i + 1, TranslationServer.translate("variant." + vid)],
+			Color(0.82, 0.72, 1.0), 12)
+		head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		col.add_child(head)
+		var detail := UIKit.label(TranslationServer.translate("archive.gen_detail") % [String(entry.get("code", "")),
+			Company.format_people(int(entry.get("patients", 0)))], UIKit.TEXT_DIM, 11)
+		detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		col.add_child(detail)
+		row.add_child(col)
+	return row
 
 
 ## 最近项目时间线：左侧竖线串起结果色圆点，每项是「编号 · 类型 + 结果胶囊」和一行数据

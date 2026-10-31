@@ -22,11 +22,13 @@ func _expect(condition: bool, message: String) -> void:
 		push_error(message)
 
 
-## with_molecule 为 false 时跳过标准项目开局的分子设计（旧测试按没有分子的规则写）
+## 新公司开局先选疾病（取第一个）；with_molecule 为 false 时再跳过开局的分子设计（旧测试按没有分子的规则写）
 func _new_game(seed_value := 1024, with_molecule := false) -> Node:
 	var game := Game.new()
 	root.add_child(game)
 	game.reseed(seed_value)
+	if String(game._current_event.get("id", "")) == "disease":   # 新公司先选要攻克的疾病
+		game.resolve_event_choice("disease", _arg_int("--disease="))
 	if game.is_designing() and not with_molecule:
 		game.molecule = null
 		game._design_mode = ""
@@ -70,6 +72,7 @@ func _run() -> void:
 	_test_milestone_terminate()
 	_test_molecule()
 	_test_molecule_in_run()
+	_test_disease_campaign()
 	_test_bot_runs()
 	await _test_ui_smoke()
 	await _test_restart()
@@ -450,7 +453,7 @@ func _test_evidence_and_campaign() -> void:
 	_expect(routes == ["route_standard", "route_selective"], "Routes depend on the evidence the company holds")
 	var funds: int = f.state.funding
 	f.resolve_event_choice("route", 1)
-	_expect(f.route == "route_selective" and f.state.funding == funds - 8 and f.is_idle(), "Choosing a route applies its cost")
+	_expect(f.route == "route_selective" and f.state.funding == funds - 8 and (f.is_idle() or f.is_designing()), "Choosing a route applies its cost")
 	_expect(f.get_battle_rules().is_empty(), "The selectivity route removes the off-target rule")
 	f.state.stage = "三期临床试验"
 	_expect(String(f.get_boss_info().id) == "boss_final" and int(f.get_battle_rules().get("enemy_ramp_every", 0)) == 2,
@@ -771,7 +774,7 @@ func _test_run_save() -> void:
 	_expect(c._battle_manager.is_battle_active(), "Quitting mid-battle restarts that battle on continue")
 	var d := Game.new()
 	root.add_child(d)
-	_expect(not d.resumed and (not RunSave.exists() or int(RunSave.read().get("phase", -1)) == d.RoundPhase.DESIGN),
+	_expect(not d.resumed and (not RunSave.exists() or int(RunSave.read().get("phase", -1)) in [d.RoundPhase.DESIGN, d.RoundPhase.WAITING_EVENT]),
 		"Starting a new project discards the old save")
 	for g in [a, b, c, d]:
 		g.free()
@@ -1084,6 +1087,54 @@ func _test_molecule_in_run() -> void:
 	game.free()
 
 
+func _test_disease_campaign() -> void:
+	# 靶点口袋：同一个片段放在热点上加成、撞上突变后的空间冲突扣分
+	var m := Molecule.create()
+	m.apply_layout({"L1": "phenyl"})
+	var plain: int = m.properties().potency
+	m.disease = "lung_cancer"
+	m.variant = 0
+	_expect(int(m.properties().potency) == plain + 1 and bool(m.pocket_fits()[0].hit), "An aromatic ring on the EGFR hinge hotspot adds potency")
+	m.apply_layout({"L1": "pyridine", "R1": "phenyl"})
+	var wt: int = m.properties().potency
+	m.variant = 1
+	_expect(int(m.properties().potency) < wt, "After T790M, a bulky group in the shrunken back pocket clashes")
+	m.apply_layout({"L1": "pyridine", "R1": "fluoro"})
+	_expect(m.pocket_fits().any(func(f: Dictionary) -> bool: return f.site == "R1" and f.has("want") and bool(f.hit)),
+		"A small halogen fits the mutated back pocket")
+	_expect(Molecule.variant_for("lung_cancer", 0) == 0 and Molecule.variant_for("lung_cancer", 9) == 2, "Variants advance per approval and stop at the last one")
+	_expect(Molecule.from_dict(m.to_dict()).disease == "lung_cancer" and Molecule.from_dict(m.to_dict()).variant == 1, "Target survives save/load")
+	# 新公司：先选疾病，再设计分子；分子面对这种疾病当前的靶点变体
+	var game := Game.new()
+	root.add_child(game)
+	game.reseed(5)
+	_expect(String(game._current_event.get("id", "")) == "disease" and game._event_is_gate, "A new company first chooses the disease to defeat")
+	game.resolve_event_choice("disease", 1)
+	_expect(game.company.disease == "hiv" and game.is_designing() and game.molecule.disease == "hiv" and game.molecule.variant == 0,
+		"After choosing, the molecule is designed against that disease's target")
+	game.molecule.apply_preset("balanced")
+	game.submit_molecule(game.molecule.sites.duplicate())
+	# 二期的敌人换成这种疾病的说法
+	game.state.stage = "二期临床试验"
+	game._battle_manager.start_battle({"id": "fight", "kind": "fight", "enemies": ["placebo"]}, game.build_deck(), [],
+		{"hp": 80, "enemy_names": Molecule.disease_cfg("hiv").enemy_names})
+	_expect(game._battle_manager.enemies[0].name_key == "enemy.placebo.hiv", "Phase II enemies are named after the disease")
+	game._battle_manager._active = false
+	# 获批：分子进谱系、累计患者；疾病进化出下一个耐药变体
+	var ended: Array = []
+	game.run_ended.connect(func(_o: String, _r: String, summary: Dictionary) -> void: ended.append(summary))
+	game.state.efficacy = 70
+	game._finish("approved", "msg.marketing_approved")
+	var summary: Dictionary = ended[0]
+	_expect(game.company.lineage.size() == 1 and game.company.patients == 70 * 1200 and int(summary.patients) == 70 * 1200,
+		"An approval records the molecule in the lineage and counts patients helped")
+	_expect(String(summary.next_variant) == "rt_k103n" and Molecule.variant_for("hiv", game.company.generation()) == 1,
+		"The disease evolves resistance after each approval")
+	_expect(game.lineage_sites() == game.molecule.sites, "The next generation can start from the last molecule")
+	_expect(Company.format_people(84000) in ["8.4 万", "84,000"], "Patient counts are formatted for display")
+	game.free()
+
+
 func _choice_index(game: Node, action: String) -> int:
 	var choices: Array = game._current_event.get("choices", [])
 	for i in choices.size():
@@ -1267,7 +1318,8 @@ func _test_restart() -> void:
 	scene._advance_button.pressed.emit()
 	await scene_changed
 	var restarted: Node = current_scene.get_node("GameLogic")
-	_expect((restarted.is_idle() or restarted.is_designing()) and restarted.state.funding == 40 and restarted.state.year == 1,
+	_expect((restarted.is_idle() or restarted.is_designing() or String(restarted._current_event.get("id", "")) == "disease")
+		and restarted.state.funding == 40 and restarted.state.year == 1,
 		"Restart button must reload a clean project with initial resources")
 	_expect(restarted.state.abilities.is_empty() and restarted.get_map().get_layer_index() == -1,
 		"Restart must reset abilities and map progress")

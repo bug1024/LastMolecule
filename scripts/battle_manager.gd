@@ -88,7 +88,7 @@ func _ready() -> void:
 ## ctx：{hp, max_hp, strength（来自疗效与团队等级）, hp_scale（Boss 血量倍率）, boss_strength（竞品加成）, dose_max,
 ##       start_block / first_draw / dexterity（团队等级自带能力）,
 ##       分子：weak / vulnerable_bonus / poison_bonus / enemy_poison / first_energy / extra_lines,
-##       阶段考验：boss_exam_strength / boss_exam_vulnerable}
+##       阶段考验：boss_exam_strength / boss_exam_vulnerable, 分子弱点 exposure, 疾病专属敌人名 enemy_names}
 func start_battle(enc: Dictionary, deck: Array, abilities: Array, ctx: Dictionary) -> void:
 	encounter = enc
 	_abilities = abilities
@@ -121,6 +121,9 @@ func start_battle(enc: Dictionary, deck: Array, abilities: Array, ctx: Dictionar
 		if def.is_empty():
 			continue
 		var e := Enemy.from_dict(def, rng, float(ctx.get("hp_scale", 1.0)) if is_boss else 1.0)
+		var rename := String(ctx.get("enemy_names", {}).get(String(enemy_id), ""))
+		if not rename.is_empty():   # 疾病专属的叫法（如二期的「肺癌细胞」）
+			e.name_key = rename
 		if is_boss and int(ctx.get("boss_strength", 0)) > 0:
 			e.add_status("strength", int(ctx.boss_strength))
 		if is_boss and int(ctx.get("boss_exam_strength", 0)) > 0:   # 分子没通过阶段考验：Boss 更强

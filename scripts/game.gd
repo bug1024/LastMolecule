@@ -125,9 +125,7 @@ func _ready() -> void:
 		_map.generate(state.stage, rng)
 		if bool(_type_cfg.get("molecule", false)):
 			molecule = Molecule.create()
-			_queue_design("initial")
-		elif not (_type_cfg.get("routes", []) as Array).is_empty():
-			_queue_route_choice()
+		_next_opening_step()
 	_battle_manager = BattleManager.new()
 	_battle_manager.rng = rng
 	_battle_manager.tier_provider = _ai_tier
@@ -695,9 +693,9 @@ func _start_battle(kind: String) -> void:
 		"hp_scale": _boss_hp_scale(),
 		"boss_strength": competition.boss_strength_bonus,
 		"dose_max": int(_encounters.get("dose_max", 4)),
-		"start_block": int(bonus.get("start_block", 0)),
+		"start_block": int(bonus.get("start_block", 0)) + int(mol.get("start_block", 0)),
 		"first_draw": int(bonus.get("first_draw", 0)) + int(mol.get("first_draw", 0)),
-		"dexterity": int(bonus.get("dexterity", 0)) + int(mol.get("dexterity", 0)),
+		"dexterity": int(bonus.get("dexterity", 0)),
 		"rules": rules,
 		"weak": int(mol.get("weak", 0)),
 		"vulnerable_bonus": int(mol.get("vulnerable_bonus", 0)),
@@ -708,6 +706,7 @@ func _start_battle(kind: String) -> void:
 		"boss_exam_vulnerable": int(exam_ctx.get("vulnerable", 0)),
 		"extra_lines": lines,
 		"exposure": _molecule_exposure(),
+		"enemy_names": Molecule.disease_cfg(company.disease).get("enemy_names", {}) if molecule != null else {},
 	})
 
 
@@ -909,8 +908,10 @@ func submit_molecule(placement: Dictionary) -> String:
 		return "mol.err.layout"
 	if _design_mode == "initial":
 		_design_mode = ""
+		run_flags["designed"] = true
 		state_synced.emit(state)
-		_finish_node()
+		if not _next_opening_step():
+			_finish_node()
 		return ""
 	_design_mode = ""
 	if kind == "none":
@@ -1004,6 +1005,40 @@ func next_exam_text() -> String:
 	return tr("mol.exam.next_pass" if bool(exam.passed) else "mol.exam.next_fail") % exam_label(exam)
 
 
+## 开局要做的选择，按顺序：公司第一次立项先选要攻克的疾病 → 最终项目选研究路线 → 设计分子。
+## 排上了一个选择返回 true；都做完了返回 false
+func _next_opening_step() -> bool:
+	if molecule != null and company.disease.is_empty():
+		_queue_disease_choice()
+		return true
+	if not (_type_cfg.get("routes", []) as Array).is_empty() and route.is_empty():
+		_queue_route_choice()
+		return true
+	if molecule != null and not bool(run_flags.get("designed", false)):
+		molecule.disease = company.disease
+		molecule.variant = Molecule.variant_for(company.disease, company.generation())
+		_queue_design("initial")
+		return true
+	return false
+
+
+func _queue_disease_choice() -> void:
+	var choices: Array = []
+	for d in Molecule.diseases():
+		var key := "disease." + String(d.id)
+		choices.append({"label_key": key, "desc_key": key + ".desc", "tag_key": "disease.target." + String(d.id),
+			"effects": {}, "action": "disease", "disease": String(d.id)})
+	_current_event = {"id": "disease", "tag_key": "disease.event_tag", "title_key": "disease.title", "desc_key": "disease.desc", "choices": choices}
+	_event_is_gate = true
+	_phase = RoundPhase.WAITING_EVENT
+	_autosave()
+
+
+## 分子谱系里最近一代获批分子的结构（编辑器「沿用上一代」用；没有则为空）
+func lineage_sites() -> Dictionary:
+	return (company.lineage.back().get("sites", {}) as Dictionary).duplicate() if not company.lineage.is_empty() else {}
+
+
 ## 最终项目开场：按公司已有的研究证据选择研究路线
 func _queue_route_choice() -> void:
 	var choices: Array = []
@@ -1071,7 +1106,13 @@ func _run_action(action: String, choice: Dictionary) -> void:
 		"route":
 			route = String(choice.get("route", ""))
 			decisions.append("route:" + route)
-			_finish_node()
+			if not _next_opening_step():
+				_finish_node()
+		"disease":
+			company.disease = String(choice.get("disease", ""))
+			company.save()
+			if not _next_opening_step():
+				_finish_node()
 		"card_reward":
 			_offer_card_pick("add", _sample_cards(_plan_card_choices))
 		"buy":
@@ -1191,7 +1232,23 @@ func _finish(outcome: String, reason_key: String) -> void:
 	var ending := _campaign_ending(outcome)
 	if not ending.is_empty() and not company.is_campaign_done():
 		company.campaign = {"ending": ending, "route": route, "code": project_code, "run": company.runs + 1}   # 只记首次完成
+	var helped := 0
+	var next_variant := ""
+	if outcome == "approved" and molecule != null and not molecule.disease.is_empty():
+		# 一代药物获批：记进分子谱系；疾病随之进化出下一个耐药变体
+		helped = int(state.efficacy * int(Molecule.disease_cfg(molecule.disease).get("patients_per_efficacy", 1000)))
+		company.record_approval({"code": project_code, "run": company.runs + 1, "project_type": project_type,
+			"disease": molecule.disease, "variant": molecule.variant, "sites": molecule.sites.duplicate(),
+			"patients": helped, "efficacy": state.efficacy})
+		var nv := Molecule.variant_for(molecule.disease, company.generation())
+		if nv != molecule.variant:
+			next_variant = Molecule.variant_id(molecule.disease, nv)
 	var summary := company.settle_run(state.data, outcome, state.funding, record)
+	summary["patients"] = helped
+	summary["patients_total"] = company.patients
+	summary["next_variant"] = next_variant
+	summary["disease"] = company.disease
+	summary["lineage"] = company.lineage.duplicate(true)
 	summary["evidence"] = evidence_id
 	summary["evidence_new"] = evidence_new
 	summary["campaign_ending"] = ending
