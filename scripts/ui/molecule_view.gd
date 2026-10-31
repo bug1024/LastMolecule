@@ -4,7 +4,8 @@ extends Control
 ## 片段画成带颜色的原子徽章并写上名字；带毒性警示的片段旁有警示标记。
 ## interactive 时可以点位点（site_clicked），选中的位点发光；编辑器和研发总览共用。
 ## compact 用于小图：位点缩小、不写名字。flash(prop) 让给这项属性加分的片段闪一下；flash_sites 让指定位点闪一下；
-## hit / cheer / attack 是战斗里分子作为主角的反馈；face 打开时核心环上画一张会变表情的脸，
+## 原子用 Shading 画成有明暗的立体小球；名字和口袋提示只在编辑器（interactive）里写。
+## hit / cheer / attack 是战斗里分子作为主角的反馈；face 打开时核心里亮着两点会随情绪变化的「眼光」，
 ## form（1–5，随研发团队等级）让分子长出光晕、电子轨道与星光——分子在「进化」。
 
 signal site_clicked(site_id: String)
@@ -31,6 +32,7 @@ var _blink := 0.0
 var _next_blink := 2.5
 var _glow_burst := 0.0  # 进化时的闪光
 var _jolt := {}         # 位点 → [偏移, 速度]：受击时片段被震开再弹回
+var _offset := Vector2.ZERO   # 本帧整体位移（抖动 / 浮动 / 跳跃）
 
 const SITE_R := 28.0
 const TYPE_MARK := {"linker": "连", "ring": "环", "terminal": "端"}
@@ -133,7 +135,9 @@ func _process(delta: float) -> void:
 
 
 func _site_r() -> float:
-	return maxf(7.0, _scale() * 0.36) if compact else minf(SITE_R, _scale() * 0.62)
+	if compact:
+		return maxf(7.0, _scale() * 0.36)
+	return minf(SITE_R, _scale() * (0.62 if interactive else 0.44))
 
 
 func _scale() -> float:
@@ -177,34 +181,26 @@ func _draw() -> void:
 	var cfg := Molecule.config()
 	var center := size * Vector2(0.5, 0.52)
 	var k := _scale()
-	var bond := Color(0.7, 0.8, 0.9, 0.55)
 	var offset := Vector2(sin(_time * 70.0) * 6.0 * _hit, 0)
 	if idle_bob:
 		offset.y += sin(_time * 2.0) * 3.0
 	offset.y -= absf(sin(_time * 9.0)) * 10.0 * _cheer
+	_offset = offset
 	draw_set_transform(offset)
 	if _cheer > 0:
-		draw_circle(center, k * 1.9, Color(0.55, 1.0, 0.75, 0.16 * _cheer))
+		Shading.glow(self, center, k * 2.6, Color(0.55, 1.0, 0.75, 0.3 * _cheer))
 	if face and not compact:
 		_draw_form(center, k)
-	# 核心六元环
-	var ring := PackedVector2Array()
-	for i in 7:
-		var a := PI / 6 + i * TAU / 6
-		ring.append(center + Vector2(cos(a), sin(a)) * k * 0.82)
-	draw_polyline(ring, Color(0.75, 0.85, 0.95, 0.85), 2.0 if compact else 3.0, true)
-	var inner := PackedVector2Array()
-	for i in 7:
-		var a := PI / 6 + i * TAU / 6
-		inner.append(center + Vector2(cos(a), sin(a)) * k * 0.55)
-	draw_polyline(inner, Color(0.75, 0.85, 0.95, 0.25), 2.0, true)
 	var font := get_theme_default_font()
-	if face and not compact:
-		_draw_face(center, k)
-	elif not compact:
-		var core_text := tr("mol.core")
-		var tw := font.get_string_size(core_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
-		draw_string(font, center + Vector2(-tw * 0.5, 5), core_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.7, 0.8, 0.9, 0.7))
+	var bw := maxf(2.0, k * (0.1 if compact else 0.12))      # 键的粗细
+	var bond_col := Color(0.62, 0.7, 0.8)
+	# 核心：6 个碳原子组成的芳香环
+	var ring_pts: Array[Vector2] = []
+	for i in 6:
+		ring_pts.append(center + Vector2.from_angle(PI / 6 + i * TAU / 6) * k * 0.82)
+	for i in 6:
+		Shading.bond(self, ring_pts[i], ring_pts[(i + 1) % 6], bw, bond_col)
+	draw_arc(center, k * 0.52, 0, TAU, 40, Color(0.7, 0.82, 0.95, 0.3), maxf(1.0, bw * 0.35), true)
 	# 键：环上位点和连接位接在核心环上，末端位接在连接位上
 	var by_id := {}
 	for site in cfg.get("sites", []):
@@ -217,8 +213,17 @@ func _draw() -> void:
 				anchor = _pos(by_id["L1" if float(site.pos[0]) < 0 else "L2"])
 			_:
 				anchor = center + (c - center).normalized() * k * 0.82
-		draw_line(anchor, c, bond, 2.0 if compact else 3.0, true)
-	# 位点
+		var filled := molecule != null and molecule.sites.has(String(site.id))
+		Shading.bond(self, anchor, c, bw * (1.0 if filled else 0.6), Color(bond_col, 1.0 if filled else 0.35))
+	for p in ring_pts:
+		Shading.sphere(self, p, k * (0.13 if compact else 0.15), Color(0.42, 0.47, 0.55))
+	if face and not compact:
+		_draw_core(center, k)
+	elif not compact:
+		var core_text := tr("mol.core")
+		var tw := font.get_string_size(core_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
+		draw_string(font, center + Vector2(-tw * 0.5, 5), core_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.7, 0.8, 0.9, 0.7))
+	# 位点：片段画成立体原子；名字只在编辑器里写
 	var r := _site_r()
 	for site in cfg.get("sites", []):
 		var id := String(site.id)
@@ -227,48 +232,45 @@ func _draw() -> void:
 		var is_sel := interactive and id == selected
 		if is_sel:
 			var pulse := 0.5 + 0.5 * sin(_time * 5.0)
-			draw_circle(c, r + 8 + pulse * 3, Color(UIKit.ACCENT, 0.18))
+			Shading.glow(self, c, r + 16 + pulse * 4, Color(UIKit.ACCENT, 0.4))
 			draw_arc(c, r + 6, 0, TAU, 40, Color(UIKit.ACCENT, 0.9), 2.5, true)
 		elif interactive and id == _hover:
 			draw_arc(c, r + 5, 0, TAU, 40, Color(1, 1, 1, 0.4), 1.5, true)
 		if frag_id.is_empty():
+			if not interactive:
+				draw_circle(c, r * 0.35, Color(0.4, 0.46, 0.54, 0.5))   # 空位：只留一个小氢原子似的点
+				continue
 			draw_circle(c, r, Color(0.06, 0.08, 0.11, 0.95))
 			for d in 16:
 				var a0 := d * TAU / 16.0
 				draw_arc(c, r, a0, a0 + TAU / 32.0, 4, Color(0.6, 0.68, 0.76, 0.6), 1.5, true)
-			if compact:
-				continue
 			var mark := String(TYPE_MARK.get(String(site.type), "?"))
 			var mw := font.get_string_size(mark, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
 			draw_string(font, c + Vector2(-mw * 0.5, 6), mark, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.6, 0.68, 0.76, 0.8))
 			continue
 		var frag := Molecule.fragment(frag_id)
 		var col := Color.from_string(String(frag.get("color", "#9fb4c8")), Color(0.6, 0.7, 0.8))
-		draw_circle(c, r + 3, Color(col, 0.2))
-		draw_circle(c, r, col.darkened(0.45))
-		draw_arc(c, r, 0, TAU, 40, col.lightened(0.2), 2.5, true)
-		for prop in _flash:   # 效果生效时，给这项属性加分的片段外圈发亮
+		for prop in _flash:   # 效果生效时，给这项属性加分的片段发亮
 			if int(frag.get("fx", {}).get(prop, 0)) > 0:
 				var f := float(_flash[prop])
-				draw_circle(c, r + 4 + (1.0 - f) * 10, Color(col.lightened(0.4), 0.45 * f))
-				draw_arc(c, r + 3, 0, TAU, 32, Color(1, 1, 1, f), 2.5, true)
+				Shading.glow(self, c, r * (1.6 + (1.0 - f) * 0.8), Color(col.lightened(0.4), 0.7 * f))
 		if _site_flash.has(id):
 			var sf: Array = _site_flash[id]
 			var t := float(sf[0])
-			draw_circle(c, r + 5 + (1.0 - t) * 14, Color(sf[1], 0.5 * t))
-			draw_arc(c, r + 3, 0, TAU, 32, Color(sf[1], t), 3.0, true)
-		if compact:
-			if not String(frag.get("alert", "")).is_empty():
-				_draw_alert(c + Vector2(r * 0.9, -r * 0.9), 0.6)
+			Shading.glow(self, c, r * (1.7 + (1.0 - t) * 0.9), Color(sf[1], 0.8 * t))
+			draw_arc(c, r + 3, 0, TAU, 32, Color(sf[1], t), 2.5, true)
+		Shading.sphere(self, c, r, col)
+		if not String(frag.get("alert", "")).is_empty():
+			_draw_alert(c + Vector2(r * 0.85, -r * 0.85), 0.6 if compact else (1.0 if interactive else 0.75))
+		if not interactive:
 			continue
 		var frag_name := tr("frag." + frag_id)
 		var fs := roundi((15.0 if frag_name.length() <= 3 else 12.0) * r / SITE_R)
 		var nw := font.get_string_size(frag_name, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-		draw_string_outline(font, c + Vector2(-nw * 0.5, fs * 0.36), frag_name, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 3, Color(0, 0, 0, 0.7))
+		draw_string_outline(font, c + Vector2(-nw * 0.5, fs * 0.36), frag_name, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 4, Color(0, 0, 0, 0.75))
 		draw_string(font, c + Vector2(-nw * 0.5, fs * 0.36), frag_name, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.WHITE)
-		if not String(frag.get("alert", "")).is_empty():
-			_draw_alert(c + Vector2(r * 0.8, -r * 0.8))
-	_draw_pocket(font)
+	if interactive:
+		_draw_pocket(font)
 
 
 ## 靶点口袋热点：位点外一圈虚线（绿＝想要的标签，红＝空间冲突），下方写提示；命中时实线发亮
@@ -350,62 +352,44 @@ func _draw_star(p: Vector2, r: float, col: Color) -> void:
 	draw_colored_polygon(pts, col)
 
 
-## 核心环上的脸：idle / worried / hurt / happy / fierce / focus / sad；会眨眼
-func _draw_face(center: Vector2, size_k: float) -> void:
-	var k := size_k * 1.7                  # 脸撑满核心六元环
-	var e := k * 0.17                      # 两眼的水平间距（半）
-	var eye_y := center.y - k * 0.08
-	var ink := Color(0.08, 0.1, 0.14)
-	var white := Color(0.95, 0.98, 1.0)
-	var mouth := Vector2(center.x, center.y + k * 0.2)
+## 核心：一颗深色玻璃质感的球，里面亮着两点「眼光」——形状和颜色随情绪变（没有嘴巴，不走卡通路线）
+const CORE_COLOR := {"idle": Color(0.45, 0.9, 1.0), "worried": Color(1.0, 0.8, 0.4), "hurt": Color(1.0, 0.4, 0.38),
+	"happy": Color(0.5, 1.0, 0.72), "fierce": Color(1.0, 0.58, 0.32), "focus": Color(0.8, 0.95, 1.0), "sad": Color(0.45, 0.6, 0.95)}
+
+
+func _draw_core(center: Vector2, k: float) -> void:
 	var kind := expression()
-	draw_circle(center, size_k * 0.78, Color(0.6, 0.8, 1.0, 0.12))   # 脸的底色
-	var blink := _blink > 0 and kind in ["idle", "worried", "focus"]
+	var col: Color = CORE_COLOR.get(kind, CORE_COLOR.idle)
+	var pulse := 0.5 + 0.5 * sin(_time * 2.4)
+	Shading.glow(self, center, k * (0.95 + 0.08 * pulse), Color(col, 0.35))
+	Shading.sphere(self, center, k * 0.44, Color(0.16, 0.22, 0.32))
+	draw_arc(center, k * 0.44, 0, TAU, 40, Color(col, 0.55), 1.5, true)
+	var e := k * 0.15
+	var y := center.y - k * 0.02
+	var lw := maxf(2.0, k * 0.055)
 	for side in [-1, 1]:
-		var c := Vector2(center.x + side * e, eye_y)
+		var c := Vector2(center.x + side * e, y)
+		Shading.glow(self, c, k * 0.14, Color(col, 0.55))
 		match kind:
-			"hurt":   # > <
-				draw_line(c + Vector2(-k * 0.07 * side, -k * 0.06), c + Vector2(k * 0.06 * side, 0), white, 2.5, true)
-				draw_line(c + Vector2(k * 0.06 * side, 0), c + Vector2(-k * 0.07 * side, k * 0.06), white, 2.5, true)
-			"happy":   # ^ ^
-				draw_arc(c + Vector2(0, k * 0.03), k * 0.07, PI * 1.1, PI * 1.9, 10, white, 2.5, true)
-			"sad":
-				draw_arc(c, k * 0.06, PI * 0.1, PI * 0.9, 10, white, 2.5, true)
-			_:
-				if blink:
-					draw_line(c - Vector2(k * 0.06, 0), c + Vector2(k * 0.06, 0), white, 2.5, true)
-				else:
-					var h := k * (0.05 if kind in ["focus", "fierce"] else 0.085)
-					_ellipse(c, Vector2(k * 0.065, h), white)
-					_ellipse(c + Vector2(k * 0.01, h * 0.15), Vector2(k * 0.035, minf(h, k * 0.05)), ink)
-					draw_circle(c + Vector2(-k * 0.015, -h * 0.35), k * 0.015, white)
-		# 眉毛：担心向上皱、凶狠向下压
-		match kind:
-			"worried", "sad":
-				draw_line(c + Vector2(-k * 0.07, -k * 0.12 + side * k * 0.03), c + Vector2(k * 0.07, -k * 0.12 - side * k * 0.03), white, 2.0, true)
+			"happy":
+				draw_arc(c + Vector2(0, k * 0.03), k * 0.06, PI * 1.15, PI * 1.85, 10, col.lightened(0.4), lw, true)
+			"hurt":
+				draw_line(c + Vector2(-k * 0.05 * side, -k * 0.05), c + Vector2(k * 0.05 * side, 0), col.lightened(0.4), lw, true)
+				draw_line(c + Vector2(k * 0.05 * side, 0), c + Vector2(-k * 0.05 * side, k * 0.05), col.lightened(0.4), lw, true)
 			"fierce":
-				draw_line(c + Vector2(-k * 0.07, -k * 0.13 - side * k * 0.04), c + Vector2(k * 0.07, -k * 0.13 + side * k * 0.04), white, 2.5, true)
-	match kind:
-		"happy":
-			draw_arc(mouth, k * 0.11, PI * 0.1, PI * 0.9, 14, white, 3.0, true)
-			for side in [-1, 1]:
-				draw_circle(Vector2(center.x + side * k * 0.3, mouth.y - k * 0.04), k * 0.05, Color(1.0, 0.55, 0.6, 0.45))
-		"hurt":
-			_ellipse(mouth + Vector2(0, k * 0.02), Vector2(k * 0.05, k * 0.06), ink)
-		"fierce":
-			draw_line(mouth + Vector2(-k * 0.08, 0), mouth + Vector2(k * 0.08, -k * 0.01), white, 3.0, true)
-		"worried":
-			var pts := PackedVector2Array()
-			for i in 7:
-				pts.append(mouth + Vector2(-k * 0.09 + i * k * 0.03, sin(i * 1.6) * k * 0.015))
-			draw_polyline(pts, white, 2.0, true)
-		"sad":
-			draw_arc(mouth + Vector2(0, k * 0.1), k * 0.09, PI * 1.15, PI * 1.85, 12, white, 2.5, true)
-			draw_circle(Vector2(center.x + e + k * 0.02, eye_y + k * 0.12 + fmod(_time * 0.3, 0.1) * k), k * 0.025, Color(0.6, 0.85, 1.0))
-		"focus":
-			draw_line(mouth + Vector2(-k * 0.05, 0), mouth + Vector2(k * 0.05, 0), white, 2.5, true)
-		_:
-			draw_arc(mouth, k * 0.08, PI * 0.2, PI * 0.8, 12, white, 2.5, true)
+				draw_line(c + Vector2(-k * 0.055, -k * 0.03 * side), c + Vector2(k * 0.055, k * 0.03 * side), col.lightened(0.4), lw * 1.2, true)
+			"sad":
+				draw_arc(c + Vector2(0, -k * 0.02), k * 0.055, PI * 0.15, PI * 0.85, 10, Color(col.lightened(0.3), 0.8), lw, true)
+			"focus":
+				draw_line(c - Vector2(k * 0.055, 0), c + Vector2(k * 0.055, 0), col.lightened(0.4), lw, true)
+			_:
+				if _blink > 0:
+					draw_line(c - Vector2(k * 0.045, 0), c + Vector2(k * 0.045, 0), col.lightened(0.4), lw, true)
+				else:
+					var tilt: float = 0.25 * side if kind == "worried" else 0.0
+					draw_set_transform(c + _offset, tilt)
+					_ellipse(Vector2.ZERO, Vector2(k * 0.035, k * 0.075), col.lightened(0.45))
+					draw_set_transform(_offset)
 
 
 func _ellipse(c: Vector2, radii: Vector2, col: Color) -> void:

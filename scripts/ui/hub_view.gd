@@ -281,6 +281,8 @@ func refresh(game, competition_summary: String, competition_text: String) -> voi
 		else tr("player.tag") % [level, tr("player.level.%d" % level)]
 	mol_view.form = level
 	mol_view.ratio = float(hp) / 100.0
+	avatar.visible = game.molecule == null   # 有分子时它就是主角，卡通烧瓶不再出场
+	queue_redraw()
 	_xp_bar.max_value = maxi(next, 1) if next > 0 else 1
 	_xp_bar.value = game.player_xp if next > 0 else 1
 	_xp_bar.tooltip_text = tr("player.xp") % [game.player_xp, next] if next > 0 else tr("player.max")
@@ -355,11 +357,12 @@ func _draw() -> void:
 			draw_rect(tube, Color(0.7, 0.85, 0.95, 0.25))
 			draw_rect(Rect2(tube.position + Vector2(0, 22), Vector2(9, 18)), Color([UIKit.ACCENT, UIKit.ACCENT_BLUE, UIKit.GOLD, UIKit.DANGER][i], 0.55))
 		draw_rect(Rect2(rack + Vector2(-40, -18), Vector2(78, 6)), Color(0.4, 0.48, 0.55))
-	# 阴影：烧瓶脚下
-	var feet := Vector2(w * 0.3, bench_y + 4)
-	draw_set_transform(feet, 0.0, Vector2(1.0, 0.22))
-	draw_circle(Vector2.ZERO, 70, Color(0, 0, 0, 0.35))
-	draw_set_transform(Vector2.ZERO)
+	# 阴影：烧瓶脚下（烧瓶不出场时不画）
+	if avatar != null and avatar.visible:
+		var feet := Vector2(w * 0.3, bench_y + 4)
+		draw_set_transform(feet, 0.0, Vector2(1.0, 0.22))
+		draw_circle(Vector2.ZERO, 70, Color(0, 0, 0, 0.35))
+		draw_set_transform(Vector2.ZERO)
 
 
 func _glass_panel() -> PanelContainer:

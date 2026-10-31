@@ -1,9 +1,10 @@
 class_name CreatureView
 extends Control
-## 程序绘制的敌人形象：细胞 / 团块 / 尖刺 / 晶体 / 毒云五种形态，带呼吸、眨眼、受击闪白与死亡消散。
+## 程序绘制的敌人形象：细胞 / 团块 / 尖刺 / 晶体 / 毒云五种形态，用 Shading 画出明暗、膜、细胞器与刺突等细节，
+## 带呼吸、眨眼、受击闪白与死亡消散。
 ## 另有最终 Boss 专用的 molecule 形态：就是标题页上那颗 LM-001 分子（多环结构 + 金色光环 + 核心里的脸），
 ## 受伤时外圈原子逐个熄灭，生命低于一半时转得更快并泛红。
-## 眼睛朝向左侧（玩家方向）；精英与 Boss 额外画怒眉和獠牙。
+## 眼睛朝向左侧（玩家方向）；精英与 Boss 的上眼睑压低。
 
 var shape := "blob"
 var color := Color(0.6, 0.5, 0.9)
@@ -87,80 +88,116 @@ func _wobble_points(c: Vector2, r: float, amp: float, lobes: int, speed: float) 
 	return pts
 
 
+## 团块（聚集体、酶、外排泵等）：有明暗的胶质身体 + 半透明外膜 + 体内漂浮的颗粒和表面孔洞
 func _draw_blob(c: Vector2, r: float, body: Color, alpha: float) -> void:
+	var outer := _wobble_points(c, r * 1.06, 0.06, 3, 1.3)
+	draw_colored_polygon(outer, Color(body.lightened(0.3), 0.18 * alpha))
 	var pts := _wobble_points(c, r, 0.06, 3, 1.3)
-	draw_colored_polygon(pts, body.darkened(0.15))
-	draw_colored_polygon(_wobble_points(c + Vector2(-r * 0.1, -r * 0.12), r * 0.78, 0.05, 4, 1.7), body)
-	draw_circle(c + Vector2(-r * 0.35, -r * 0.4), r * 0.16, Color(1, 1, 1, 0.25 * alpha))
+	Shading.shaded_polygon(self, pts, c, r, body)
+	for i in 7:   # 体内颗粒（有深度：小而暗的在后）
+		var a := _seed * 3.0 + i * 0.9 + _time * 0.25 * (1.0 if i % 2 == 0 else -1.0)
+		var d := r * (0.25 + 0.4 * fmod(i * 0.37 + _seed, 1.0))
+		var gr := r * (0.06 + 0.035 * (i % 3))
+		Shading.sphere(self, c + Vector2(cos(a), sin(a) * 0.8) * d, gr, Color(body.lightened(0.25), 0.75 * alpha), 0.6)
+	for i in 4:   # 表面孔洞
+		var a := _seed + i * 1.7
+		_ellipse(c + Vector2(cos(a), sin(a)) * r * 0.72, Vector2(r * 0.07, r * 0.045), Color(body.darkened(0.55), 0.6 * alpha))
 	pts.append(pts[0])
-	draw_polyline(pts, body.darkened(0.45), 3.0, true)
+	draw_polyline(pts, Color(body.lightened(0.35), 0.55 * alpha), 2.0, true)
 
 
+## 细胞：纤毛、双层膜、有明暗的胞质、细胞核（带核仁）、线粒体与囊泡
 func _draw_cell(c: Vector2, r: float, body: Color, alpha: float) -> void:
-	for i in 18:
-		var a := TAU * i / 18.0 + _time * 0.3
-		var base := c + Vector2(cos(a), sin(a)) * r
-		var tip := c + Vector2(cos(a + 0.15 * sin(_time * 3 + i)), sin(a + 0.15 * sin(_time * 3 + i))) * r * 1.18
-		draw_line(base, tip, body.darkened(0.3), 2.0, true)
+	for i in 26:   # 纤毛：柔软弯曲的细线
+		var a := TAU * i / 26.0 + _time * 0.15
+		var base := c + Vector2.from_angle(a) * r * 1.02
+		var sway := 0.22 * sin(_time * 3.0 + i * 0.8)
+		var mid := c + Vector2.from_angle(a + sway * 0.5) * r * 1.13
+		var tip := c + Vector2.from_angle(a + sway) * r * 1.24
+		draw_polyline(PackedVector2Array([base, mid, tip]), Color(body.lightened(0.2), 0.55 * alpha), 1.5, true)
 	var pts := _wobble_points(c, r, 0.04, 5, 1.0)
-	draw_colored_polygon(pts, Color(body.lightened(0.1), 0.85 * alpha))
-	pts.append(pts[0])
-	draw_polyline(pts, body.darkened(0.4), 3.5, true)
-	draw_colored_polygon(_wobble_points(c + Vector2(r * 0.28, r * 0.25), r * 0.32, 0.08, 3, 2.0), body.darkened(0.35))
-	for i in 5:
-		var a := _seed + i * 1.3 + _time * 0.4
-		draw_circle(c + Vector2(cos(a), sin(a)) * r * 0.6, r * 0.07, Color(body.lightened(0.4), 0.8 * alpha))
+	Shading.shaded_polygon(self, pts, c, r, Color(body.lightened(0.05), 0.92 * alpha))
+	var membrane := pts.duplicate()
+	membrane.append(pts[0])
+	draw_polyline(membrane, Color(body.lightened(0.45), 0.7 * alpha), 2.5, true)
+	draw_polyline(_wobble_points(c, r * 0.93, 0.04, 5, 1.0) + PackedVector2Array([_wobble_points(c, r * 0.93, 0.04, 5, 1.0)[0]]),
+		Color(body.darkened(0.3), 0.5 * alpha), 1.5, true)
+	for i in 3:   # 线粒体
+		var a := _seed + i * 2.1 + _time * 0.2
+		var p := c + Vector2(cos(a), sin(a)) * r * 0.55
+		draw_set_transform(p, a + 0.6)
+		_ellipse(Vector2.ZERO, Vector2(r * 0.13, r * 0.06), Color(body.darkened(0.35), 0.85 * alpha))
+		draw_line(Vector2(-r * 0.09, 0), Vector2(r * 0.09, 0), Color(body.lightened(0.3), 0.6 * alpha), 1.2, true)
+		draw_set_transform(Vector2.ZERO)
+	for i in 5:   # 囊泡
+		var a := _seed * 2.0 + i * 1.25 - _time * 0.3
+		draw_arc(c + Vector2(cos(a), sin(a)) * r * 0.68, r * 0.045, 0, TAU, 12, Color(body.lightened(0.5), 0.7 * alpha), 1.2, true)
+	var nucleus := c + Vector2(r * 0.26, r * 0.22)
+	Shading.sphere(self, nucleus, r * 0.3, Color(body.darkened(0.4), alpha), 0.6)
+	Shading.sphere(self, nucleus + Vector2(r * 0.05, r * 0.03), r * 0.1, Color(body.darkened(0.65), alpha), 0.4)
 
 
+## 尖刺（脱靶激酶、活性氧、DNA 损伤……）：有明暗的衣壳球 + 一圈带球头的刺突蛋白 + 淡淡的表面网格
 func _draw_spiky(c: Vector2, r: float, body: Color, alpha: float) -> void:
-	var spikes := 12
-	var rot := _time * 0.25
+	var spikes := 14
+	var rot := _time * 0.2
 	for i in spikes:
 		var a := rot + TAU * i / spikes
-		var length := r * (1.45 + 0.08 * sin(_time * 3.0 + i))
-		var left := c + Vector2(cos(a - 0.16), sin(a - 0.16)) * r * 0.85
-		var right := c + Vector2(cos(a + 0.16), sin(a + 0.16)) * r * 0.85
-		var tip := c + Vector2(cos(a), sin(a)) * length
-		draw_colored_polygon(PackedVector2Array([left, tip, right]), body.darkened(0.25))
-		draw_circle(tip, r * 0.06, Color(body.lightened(0.5), alpha))
-	draw_circle(c, r * 0.92, body.darkened(0.1))
-	draw_circle(c + Vector2(-r * 0.08, -r * 0.1), r * 0.75, body)
-	draw_circle(c + Vector2(-r * 0.3, -r * 0.35), r * 0.15, Color(1, 1, 1, 0.25 * alpha))
-	draw_arc(c, r * 0.92, 0, TAU, 48, body.darkened(0.45), 3.0, true)
+		var length := r * (1.38 + 0.06 * sin(_time * 3.0 + i))
+		var base := c + Vector2.from_angle(a) * r * 0.85
+		var tip := c + Vector2.from_angle(a) * length
+		draw_line(base, tip, Color(body.darkened(0.35), alpha), r * 0.07, true)
+		draw_line(base, tip, Color(body.lightened(0.2), 0.6 * alpha), r * 0.025, true)
+		Shading.sphere(self, tip, r * 0.1, Color(body.lightened(0.15), alpha), 0.7)
+	Shading.sphere(self, c, r * 0.9, body)
+	for i in 6:   # 衣壳表面的六边形网格
+		var a := rot * 0.5 + i * TAU / 6.0
+		var p := c + Vector2.from_angle(a) * r * 0.45
+		var hex := PackedVector2Array()
+		for k in 7:
+			hex.append(p + Vector2.from_angle(k * TAU / 6.0) * r * 0.2)
+		draw_polyline(hex, Color(body.lightened(0.4), 0.22 * alpha), 1.2, true)
 
 
+## 晶体（hERG 通道、结合口袋……）：渐变的多面体刻面 + 内部折射线 + 星芒高光
 func _draw_crystal(c: Vector2, r: float, body: Color, alpha: float) -> void:
 	var sides := 6
 	var rot := _time * 0.15 + _seed
 	var outer: Array[Vector2] = []
 	for i in sides:
-		var a := rot + TAU * i / sides
-		var stretch := Vector2(1.0, 1.25)
-		outer.append(c + Vector2(cos(a), sin(a)) * r * stretch)
+		outer.append(c + Vector2.from_angle(rot + TAU * i / sides) * r * Vector2(1.0, 1.25))
+	var top := c + Vector2(-r * 0.12, -r * 0.18)   # 偏心的顶点，让刻面更立体
 	for i in sides:
-		var shade := 0.25 + 0.5 * (0.5 + 0.5 * sin(rot * 2.0 + i * 1.7))
-		var tri := PackedVector2Array([c, outer[i], outer[(i + 1) % sides]])
-		draw_colored_polygon(tri, body.darkened(0.5).lerp(body.lightened(0.35), shade))
+		var tri := PackedVector2Array([top, outer[i], outer[(i + 1) % sides]])
+		var light := 0.5 + 0.5 * cos(rot + TAU * (i + 0.5) / sides + 2.3)
+		Shading.shaded_polygon(self, tri, c, r * 1.2, body.darkened(0.35).lerp(body.lightened(0.4), light))
 	for i in sides:
-		draw_line(c, outer[i], Color(1, 1, 1, 0.25 * alpha), 1.5, true)
-		draw_line(outer[i], outer[(i + 1) % sides], body.darkened(0.5), 3.0, true)
-	for i in 3:
-		var a := _time * 0.8 + i * TAU / 3.0
-		draw_circle(c + Vector2(cos(a), sin(a) * 0.4) * r * 1.4, r * 0.08, Color(body.lightened(0.4), 0.7 * alpha))
+		draw_line(top, outer[i], Color(1, 1, 1, 0.3 * alpha), 1.5, true)
+		draw_line(outer[i], outer[(i + 1) % sides], Color(body.lightened(0.5), 0.8 * alpha), 2.0, true)
+	for i in 3:   # 内部折射线
+		var a := rot * 2.0 + i * 2.0
+		draw_line(c + Vector2.from_angle(a) * r * 0.2, c + Vector2.from_angle(a + 0.8) * r * 0.75, Color(1, 1, 1, 0.12 * alpha), 1.0, true)
+	var tw := 0.5 + 0.5 * sin(_time * 3.0 + _seed)
+	var star := outer[0].lerp(top, 0.3)
+	draw_line(star - Vector2(r * 0.18 * tw, 0), star + Vector2(r * 0.18 * tw, 0), Color(1, 1, 1, 0.8 * alpha), 1.5, true)
+	draw_line(star - Vector2(0, r * 0.18 * tw), star + Vector2(0, r * 0.18 * tw), Color(1, 1, 1, 0.8 * alpha), 1.5, true)
+	Shading.glow(self, star, r * 0.15, Color(1, 1, 1, 0.6 * tw * alpha))
 
 
+## 毒云（器官毒性、细胞因子风暴……）：几团半透明、有明暗的烟团 + 内部辉光 + 向上飘散的颗粒
 func _draw_cloud(c: Vector2, r: float, body: Color, alpha: float) -> void:
+	Shading.glow(self, c, r * 1.4, Color(body, 0.35 * alpha))
 	for i in 9:
 		var a := TAU * i / 9.0 + _time * 0.2
 		var d := r * (0.55 + 0.12 * sin(_time * 1.3 + i))
 		var p := c + Vector2(cos(a) * d * 1.2, sin(a) * d * 0.8)
-		draw_circle(p, r * (0.48 + 0.06 * sin(_time * 2.0 + i * 2.0)), Color(body.darkened(0.2), 0.75 * alpha))
-	draw_circle(c, r * 0.72, body)
-	for i in 10:
-		var t := fmod(_time * 0.35 + i * 0.1, 1.0)
+		Shading.sphere(self, p, r * (0.46 + 0.06 * sin(_time * 2.0 + i * 2.0)), Color(body.darkened(0.15), 0.6 * alpha), 0.3)
+	Shading.sphere(self, c, r * 0.72, Color(body, 0.9 * alpha), 0.5)
+	for i in 14:
+		var t := fmod(_time * 0.35 + i * 0.07, 1.0)
 		var a := i * 2.4 + _seed
 		var p := c + Vector2(cos(a), sin(a)) * r * (0.6 + t * 0.9) + Vector2(0, -t * r * 0.6)
-		draw_circle(p, r * 0.05 * (1.0 - t), Color(body.lightened(0.4), (1.0 - t) * 0.8 * alpha))
+		Shading.glow(self, p, r * 0.08 * (1.0 - t) + 2.0, Color(body.lightened(0.5), (1.0 - t) * 0.8 * alpha))
 
 
 ## 与标题页 / 总览的 MoleculeArt 同一套多环结构（6 个苯环 + 侧链），归一化到单位半径
@@ -232,30 +269,30 @@ func _draw_molecule(c: Vector2, r: float, body: Color, alpha: float) -> void:
 	draw_arc(c, r * 0.5, 0, TAU, 40, Color(1.0, 0.85, 0.4, 0.9 * alpha), 3.0, true)
 
 
+## 眼睛：有光泽的眼球 + 带颜色的虹膜和竖瞳，朝向玩家（左）；精英和 Boss 是向内下斜的细长杏眼，显得凶；不画嘴
 func _draw_face(c: Vector2, r: float, alpha: float) -> void:
-	var eye_r := r * (0.16 if menace == 0 else 0.14)
+	var eye_r := r * (0.15 if menace == 0 else 0.14)
 	var gap := r * 0.3
-	var look := Vector2(-eye_r * 0.35, eye_r * 0.1)
+	var look := Vector2(-eye_r * 0.3, eye_r * 0.08)
+	var iris := color.lightened(0.55) if menace == 0 else Color(1.0, 0.75, 0.3)
+	var squint := 1.0 if menace == 0 else 0.55
 	for side in [-1, 1]:
 		var e := c + Vector2(side * gap, 0)
-		var open := 1.0 - _blink
-		_ellipse(e, Vector2(eye_r, eye_r * maxf(open, 0.08)), Color(1, 1, 1, 0.95 * alpha))
-		if open > 0.3:
-			draw_circle(e + look, eye_r * 0.5, Color(0.08, 0.06, 0.1, alpha))
-			draw_circle(e + look + Vector2(-eye_r * 0.18, -eye_r * 0.2), eye_r * 0.15, Color(1, 1, 1, alpha))
-		if menace > 0:
-			var inner := e + Vector2(-side * eye_r * 0.2, -eye_r * 1.25)
-			var outer := e + Vector2(side * eye_r * 1.2, -eye_r * 1.75)
-			draw_line(inner, outer, Color(0.08, 0.05, 0.08, alpha), 4.0, true)
-	var mouth := c + Vector2(0, r * 0.38)
-	if menace == 2:
-		var w := r * 0.42
-		var pts := PackedVector2Array()
-		for i in 7:
-			pts.append(mouth + Vector2(-w + w * 2 * i / 6.0, (6.0 if i % 2 == 0 else -2.0) + 3.0 * sin(_time * 4.0)))
-		draw_polyline(pts, Color(0.08, 0.05, 0.08, alpha), 4.0, true)
-	else:
-		draw_arc(mouth + Vector2(0, 8), r * 0.18, PI * 1.15, PI * 1.85, 12, Color(0.08, 0.05, 0.08, alpha), 3.0, true)
+		var open := (1.0 - _blink) * squint
+		Shading.glow(self, e, eye_r * 1.9, Color(0, 0, 0, 0.35 * alpha))
+		draw_set_transform(e, side * 0.28 if menace > 0 else 0.0)
+		_ellipse(Vector2.ZERO, Vector2(eye_r * 1.1, eye_r * maxf(open, 0.08)), Color(0.95, 0.96, 0.92, alpha))
+		if open > 0.2:
+			var h := eye_r * minf(0.6, open)
+			_ellipse(look, Vector2(eye_r * 0.6, h), Color(iris, alpha))
+			_ellipse(look, Vector2(eye_r * 0.15, h * 0.85), Color(0.05, 0.04, 0.06, alpha))
+			draw_circle(look + Vector2(-eye_r * 0.22, -h * 0.4), eye_r * 0.13, Color(1, 1, 1, 0.9 * alpha))
+		var rim := PackedVector2Array()
+		for k in 25:
+			var a := TAU * k / 24.0
+			rim.append(Vector2(cos(a) * eye_r * 1.1, sin(a) * eye_r * maxf(open, 0.08)))
+		draw_polyline(rim, Color(0, 0, 0, 0.55 * alpha), 1.5, true)
+		draw_set_transform(Vector2.ZERO)
 
 
 func _ellipse(center: Vector2, radii: Vector2, col: Color) -> void:

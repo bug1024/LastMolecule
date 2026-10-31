@@ -353,7 +353,7 @@ func _on_battle_started(encounter: Dictionary) -> void:
 	_mechanic.visible = not mech_lines.is_empty()
 	var molecule: Molecule = _game.molecule
 	_mol.visible = molecule != null
-	_mol_tag.visible = molecule != null
+	_mol_tag.visible = false   # 分子效果放在悬停提示里，战场上不再堆文字
 	_player.visible = molecule == null   # 有分子时，站在战场上的是分子本身
 	if molecule != null:
 		var lv: int = _game.get_player_level()
