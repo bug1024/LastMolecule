@@ -32,6 +32,7 @@ var _research_bar: ProgressBar = null   # 标题区的前期研究进度条
 ## 由 rd_ui 注入 GameLogic 并构建地图画布与侧栏
 func bind(game) -> void:
 	_game = game
+	UIKit.decorate_panel(_panel)
 	_panel.custom_minimum_size = Vector2(1180, 0)
 	_advance_button.visible = false
 	var body := HBoxContainer.new()
@@ -45,7 +46,7 @@ func bind(game) -> void:
 	side.add_theme_constant_override("separation", 10)
 	body.add_child(side)
 	var boss_panel := PanelContainer.new()
-	boss_panel.add_theme_stylebox_override("panel", UIKit.panel_style(Color(0.16, 0.06, 0.08, 0.9), Color(0.93, 0.35, 0.4, 0.7), 12))
+	boss_panel.add_theme_stylebox_override("panel", UIKit.panel_style(Color(UIKit.PAPER, 0.9), Color(0.93, 0.35, 0.4, 0.7), 12))
 	_boss_box = HBoxContainer.new()
 	_boss_box.add_theme_constant_override("separation", 10)
 	boss_panel.add_child(_boss_box)
@@ -86,7 +87,7 @@ func _build_header() -> void:
 	_research_bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_research_bar.show_percentage = false
 	_research_bar.add_theme_stylebox_override("fill", UIKit.filled(UIKit.ACCENT_BLUE, UIKit.ACCENT_BLUE, 4))
-	_research_bar.add_theme_stylebox_override("background", UIKit.filled(Color(0.1, 0.12, 0.16), Color(0.25, 0.3, 0.36), 4))
+	_research_bar.add_theme_stylebox_override("background", UIKit.filled(UIKit.PAPER, Color(0.25, 0.3, 0.36), 4))
 	chip.add_child(_research_bar)
 	parent.remove_child(_pos_label)
 	chip.add_child(_pos_label)
@@ -128,7 +129,7 @@ func refresh() -> void:
 	var s: ProjectState = _game.get_state()
 	var map: ResearchMap = _game.get_map()
 	_stage_label.text = "· " + tr("stage." + map.get_stage())
-	_stage_label.add_theme_color_override("font_color", BattleView.STAGE_TINT.get(s.stage, Color(0.5, 0.7, 0.8)).lightened(0.45))
+	_stage_label.add_theme_color_override("font_color", UIKit.TEAL)
 	_research_bar.max_value = maxi(_game.get_progress_gate(), 1)
 	_research_bar.value = mini(s.research_progress, _game.get_progress_gate())
 	_pos_label.text = tr("ui.map_progress") % [mini(s.research_progress, _game.get_progress_gate()), _game.get_progress_gate()]
@@ -139,7 +140,7 @@ func refresh() -> void:
 	var hp_color: Color = UIKit.ACCENT if hp > 60 else (UIKit.GOLD if hp > 30 else UIKit.DANGER)
 	_hp_label.add_theme_color_override("font_color", hp_color.lightened(0.15))
 	_hp_bar.add_theme_stylebox_override("fill", UIKit.filled(hp_color, hp_color, 4))
-	_hp_bar.add_theme_stylebox_override("background", UIKit.filled(Color(0.1, 0.12, 0.16), Color(0.25, 0.3, 0.36), 4))
+	_hp_bar.add_theme_stylebox_override("background", UIKit.filled(UIKit.PAPER, Color(0.25, 0.3, 0.36), 4))
 	_canvas.rest_heal = _game.get_rest_heal()
 	_canvas.tint = BattleView.STAGE_TINT.get(s.stage, Color(0.2, 0.5, 0.5))
 	_year_label.text = tr("ui.year") % s.year
@@ -171,7 +172,7 @@ func _fill_boss(boss: Dictionary, title: String) -> void:
 	col.add_theme_constant_override("separation", 2)
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	col.add_child(UIKit.label(tr("map.boss_preview"), UIKit.DANGER, 13))
-	col.add_child(UIKit.header(title, 19, Color(1, 0.88, 0.85)))
+	col.add_child(UIKit.header(title, 19, UIKit.INK))
 	var desc := UIKit.label(tr("encounter." + String(boss.get("id", "")) + ".desc"), UIKit.TEXT, 13, true)
 	desc.custom_minimum_size = Vector2(220, 0)
 	col.add_child(desc)
@@ -242,7 +243,7 @@ func competition_text() -> String:
 		lines.append("")
 		lines.append("[b]" + tr("ui.news_title") + "[/b]")
 		for item in comp.news.slice(0, 3):
-			lines.append("[color=#c8b26a]· " + _format_line(item) + "[/color]")
+			lines.append("[color=#87602c]· " + _format_line(item) + "[/color]")
 	return "\n".join(lines)
 
 

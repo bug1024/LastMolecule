@@ -23,7 +23,7 @@ func _build(box: VBoxContainer) -> void:
 	logo.custom_minimum_size = Vector2(72, 72)
 	logo.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	box.add_child(logo)
-	var game_title := UIKit.header(tr("ui.title"), 32, Color(0.93, 0.98, 0.96))
+	var game_title := UIKit.header(tr("ui.title"), 32, UIKit.INK)
 	game_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(game_title)
 	var english := UIKit.label("THE LAST MOLECULE", UIKit.ACCENT, 14)

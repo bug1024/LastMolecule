@@ -54,29 +54,18 @@ func _draw() -> void:
 	var breathe := 1.0 + 0.03 * sin(_time * 2.0 + _seed)
 	var r := radius * breathe * (1.0 - dying * 0.4)
 	var alpha := 1.0 - dying
-	var body := color.lerp(Color.WHITE, flash * 0.85)
+	var body := color.lerp(Color(0.44, 0.47, 0.39), 0.45).lerp(Color.WHITE, flash * 0.85)
 	body.a = alpha
 	draw_set_transform(Vector2.ZERO)
 	_ellipse(c + Vector2(0, r * 1.05), Vector2(r * 0.9, r * 0.18), Color(0, 0, 0, 0.35 * alpha))
 	for i in 4:
 		draw_circle(c, r * (1.5 - i * 0.12), Color(color, 0.03 * alpha))
-	match shape:
-		"spiky":
-			_draw_spiky(c, r, body, alpha)
-		"crystal":
-			_draw_crystal(c, r, body, alpha)
-		"cloud":
-			_draw_cloud(c, r, body, alpha)
-		"cell":
-			_draw_cell(c, r, body, alpha)
-		"molecule":
-			_draw_molecule(c, r, body, alpha)
-		_:
-			_draw_blob(c, r, body, alpha)
-	if shape == "molecule":
-		_draw_face(c + Vector2(0, -r * 0.06), r * 0.72, alpha)   # 脸缩小放进分子核心
-	else:
-		_draw_face(c + Vector2(-r * 0.12, -r * 0.08), r, alpha)
+	var cells := {"blob": 1, "cell": 1, "crystal": 2, "cloud": 3, "spiky": 4, "molecule": 5}
+	var cell: int = cells.get(shape, 0)
+	var rect := Rect2(c - Vector2(r * 1.45, r * 1.28), Vector2(r * 2.9, r * 2.56))
+	if not UIKit.atlas(self, "specimens", cell, rect, Color(1, 1 - flash * 0.15, 1 - flash * 0.25, alpha)):
+		_draw_cell(c, r, body, alpha)
+
 
 
 func _wobble_points(c: Vector2, r: float, amp: float, lobes: int, speed: float) -> PackedVector2Array:

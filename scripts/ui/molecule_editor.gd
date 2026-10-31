@@ -30,7 +30,7 @@ func _init() -> void:
 	title_key = "mol.title"
 	subtitle_key = "mol.subtitle"
 	icon_name = "type_molecular"
-	accent = Color(0.7, 0.55, 1.0)
+	accent = UIKit.TEAL
 	panel_width = 1140
 
 
@@ -84,7 +84,7 @@ func _build(box: VBoxContainer) -> void:
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	left.add_theme_constant_override("separation", 8)
 	row.add_child(left)
-	_target = UIKit.label("", Color(0.82, 0.72, 1.0), 13, true)
+	_target = UIKit.label("", UIKit.ACCENT_BLUE, 13, true)
 	left.add_child(_target)
 	_view = MoleculeView.new()
 	_view.interactive = true
@@ -128,7 +128,7 @@ func _build(box: VBoxContainer) -> void:
 	_props = VBoxContainer.new()
 	_props.add_theme_constant_override("separation", 4)
 	right.add_child(_props)
-	_combos = UIKit.label("", Color(0.75, 0.85, 1.0), 13, true)
+	_combos = UIKit.label("", UIKit.ACCENT_BLUE, 13, true)
 	right.add_child(_combos)
 	_alerts = VBoxContainer.new()
 	right.add_child(_alerts)
@@ -208,9 +208,9 @@ func _fragment_chip(id: String, count: int) -> Control:
 	var col := Color.from_string(String(frag.get("color", "#9fb4c8")), Color.GRAY)
 	var fits := not _view.selected.is_empty() and Molecule.can_place(id, _view.selected)
 	var btn := Button.new()
-	btn.custom_minimum_size = Vector2(212, 58)
+	btn.custom_minimum_size = Vector2(212, 86)
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	var sb := UIKit.panel_style(Color(col, 0.12) if fits else Color(0.07, 0.09, 0.12, 0.8), Color(col, 0.7) if fits else Color(0.3, 0.34, 0.4, 0.5), 10)
+	var sb := UIKit.panel_style(Color(col, 0.12) if fits else Color(UIKit.PAPER, 0.8), Color(col, 0.7) if fits else Color(0.3, 0.34, 0.4, 0.5), 10)
 	for state_name in ["normal", "focus"]:
 		btn.add_theme_stylebox_override(state_name, sb)
 	var hover := sb.duplicate() as StyleBoxFlat
@@ -220,25 +220,39 @@ func _fragment_chip(id: String, count: int) -> Control:
 	btn.pressed.connect(_place.bind(id))
 	var col_box := VBoxContainer.new()
 	col_box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	col_box.offset_left = 10
+	col_box.offset_right = -7
+	col_box.offset_left = 56
 	col_box.offset_top = 5
 	col_box.add_theme_constant_override("separation", 0)
 	col_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	btn.add_child(col_box)
+	var miniature := Control.new()
+	miniature.position = Vector2(3, 6)
+	miniature.size = Vector2(50, 54)
+	miniature.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	miniature.draw.connect(func() -> void:
+		var cell := 2 if "ring" in frag.get("sites", []) else 4
+		UIKit.atlas(miniature, "research-illustrations", cell, Rect2(Vector2.ZERO, miniature.size)))
+	btn.add_child(miniature)
 	var name_row := HBoxContainer.new()
 	name_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var dot := ColorRect.new()
 	dot.color = col
 	dot.custom_minimum_size = Vector2(8, 8)
 	dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	dot.visible = false
 	name_row.add_child(dot)
 	name_row.add_child(UIKit.header(" " + tr("frag." + id) + ("  ×%d" % count if count > 1 else ""), 14, Color.WHITE if fits else UIKit.TEXT_DIM))
 	if not String(frag.get("alert", "")).is_empty():
 		name_row.add_child(UIKit.label(" ⚠", UIKit.GOLD, 13))
 	col_box.add_child(name_row)
-	col_box.add_child(UIKit.label(Molecule.fx_text(frag.get("fx", {})), Color(0.8, 0.86, 0.92) if fits else Color(0.55, 0.6, 0.66), 12))
+	var effect := UIKit.label(Molecule.fx_text(frag.get("fx", {})), UIKit.ACCENT_BLUE, 12, true)
+	effect.custom_minimum_size = Vector2(140, 0)
+	effect.max_lines_visible = 2
+	effect.tooltip_text = effect.text
+	col_box.add_child(effect)
 	var site_names: Array = (frag.get("sites", []) as Array).map(func(t: String) -> String: return tr("site." + t).split(" ")[0])
-	col_box.add_child(UIKit.label(" / ".join(site_names), Color(0.55, 0.62, 0.7), 11))
+	col_box.add_child(UIKit.label(" / ".join(site_names), UIKit.ACCENT_BLUE, 11))
 	for node in col_box.find_children("*", "Control", true, false):
 		(node as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
 	btn.disabled = not fits

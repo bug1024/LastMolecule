@@ -189,11 +189,9 @@ func _draw() -> void:
 	draw_set_transform(offset)
 	if _cheer > 0:
 		Shading.glow(self, center, k * 2.6, Color(0.55, 1.0, 0.75, 0.3 * _cheer))
-	if face and not compact:
-		_draw_form(center, k)
 	var font := get_theme_default_font()
 	var bw := maxf(2.0, k * (0.1 if compact else 0.12))      # 键的粗细
-	var bond_col := Color(0.62, 0.7, 0.8)
+	var bond_col := Color(0.49, 0.39, 0.24)
 	# 核心：6 个碳原子组成的芳香环
 	var ring_pts: Array[Vector2] = []
 	for i in 6:
@@ -216,13 +214,13 @@ func _draw() -> void:
 		var filled := molecule != null and molecule.sites.has(String(site.id))
 		Shading.bond(self, anchor, c, bw * (1.0 if filled else 0.6), Color(bond_col, 1.0 if filled else 0.35))
 	for p in ring_pts:
-		Shading.sphere(self, p, k * (0.13 if compact else 0.15), Color(0.42, 0.47, 0.55))
-	if face and not compact:
-		_draw_core(center, k)
+		Shading.sphere(self, p, k * (0.13 if compact else 0.15), Color(0.26, 0.24, 0.20))
+	if UIKit.art("specimens") != null and not compact:
+		UIKit.atlas(self, "specimens", 5, Rect2(center - Vector2(k * 1.35, k), Vector2(k * 2.7, k * 2)))
 	elif not compact:
 		var core_text := tr("mol.core")
 		var tw := font.get_string_size(core_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
-		draw_string(font, center + Vector2(-tw * 0.5, 5), core_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.7, 0.8, 0.9, 0.7))
+		draw_string(font, center + Vector2(-tw * 0.5, 5), core_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UIKit.TEXT_DIM)
 	# 位点：片段画成立体原子；名字只在编辑器里写
 	var r := _site_r()
 	for site in cfg.get("sites", []):
@@ -240,13 +238,13 @@ func _draw() -> void:
 			if not interactive:
 				draw_circle(c, r * 0.35, Color(0.4, 0.46, 0.54, 0.5))   # 空位：只留一个小氢原子似的点
 				continue
-			draw_circle(c, r, Color(0.06, 0.08, 0.11, 0.95))
+			draw_circle(c, r, UIKit.PAPER_DARK)
 			for d in 16:
 				var a0 := d * TAU / 16.0
-				draw_arc(c, r, a0, a0 + TAU / 32.0, 4, Color(0.6, 0.68, 0.76, 0.6), 1.5, true)
+				draw_arc(c, r, a0, a0 + TAU / 32.0, 4, Color(UIKit.BRASS, 0.6), 1.5, true)
 			var mark := String(TYPE_MARK.get(String(site.type), "?"))
 			var mw := font.get_string_size(mark, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
-			draw_string(font, c + Vector2(-mw * 0.5, 6), mark, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.6, 0.68, 0.76, 0.8))
+			draw_string(font, c + Vector2(-mw * 0.5, 6), mark, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, UIKit.TEXT_DIM)
 			continue
 		var frag := Molecule.fragment(frag_id)
 		var col := Color.from_string(String(frag.get("color", "#9fb4c8")), Color(0.6, 0.7, 0.8))
@@ -259,7 +257,7 @@ func _draw() -> void:
 			var t := float(sf[0])
 			Shading.glow(self, c, r * (1.7 + (1.0 - t) * 0.9), Color(sf[1], 0.8 * t))
 			draw_arc(c, r + 3, 0, TAU, 32, Color(sf[1], t), 2.5, true)
-		Shading.sphere(self, c, r, col)
+		_draw_fragment(c, r, col, String(site.type))
 		if not String(frag.get("alert", "")).is_empty():
 			_draw_alert(c + Vector2(r * 0.85, -r * 0.85), 0.6 if compact else (1.0 if interactive else 0.75))
 		if not interactive:
@@ -267,8 +265,8 @@ func _draw() -> void:
 		var frag_name := tr("frag." + frag_id)
 		var fs := roundi((15.0 if frag_name.length() <= 3 else 12.0) * r / SITE_R)
 		var nw := font.get_string_size(frag_name, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-		draw_string_outline(font, c + Vector2(-nw * 0.5, fs * 0.36), frag_name, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 4, Color(0, 0, 0, 0.75))
-		draw_string(font, c + Vector2(-nw * 0.5, fs * 0.36), frag_name, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.WHITE)
+		draw_string_outline(font, c + Vector2(-nw * 0.5, minf(r + fs + 3, size.y - c.y - 9)), frag_name, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 0, UIKit.PAPER_LIGHT)
+		draw_string(font, c + Vector2(-nw * 0.5, minf(r + fs + 3, size.y - c.y - 9)), frag_name, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, UIKit.INK)
 	if interactive:
 		_draw_pocket(font)
 
@@ -288,11 +286,11 @@ func _draw_pocket(font: Font) -> void:
 		if fits.is_empty():
 			continue
 		var c := _pos(site)
-		var y := r + 13.0
+		var y := -r - 18.0
 		for fit in fits:
 			var want: bool = fit.has("want")
 			var hit: bool = bool(fit.hit)
-			var col := (Color(0.45, 0.95, 0.6) if want else Color(1.0, 0.45, 0.4))
+			var col := (UIKit.TEAL if want else UIKit.DANGER)
 			var rr := r + (7.0 if want else 11.0)
 			if hit:
 				draw_arc(c, rr, 0, TAU, 40, Color(col, 0.95), 2.5, true)
@@ -303,7 +301,7 @@ func _draw_pocket(font: Font) -> void:
 			var label := tr("pocket.%s.%s" % ["want" if want else "avoid", String(fit.get("want", fit.get("avoid", "")))])
 			var fs := 11
 			var w := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-			draw_string_outline(font, c + Vector2(-w * 0.5, y), label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 3, Color(0, 0, 0, 0.85))
+			draw_string_outline(font, c + Vector2(-w * 0.5, y), label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 0, UIKit.PAPER_LIGHT)
 			draw_string(font, c + Vector2(-w * 0.5, y), label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, col if (hit == want) else Color(col, 0.75))
 			y += 13.0
 
@@ -405,3 +403,27 @@ func _draw_alert(p: Vector2, k := 1.0) -> void:
 	draw_colored_polygon(tri, UIKit.GOLD)
 	draw_line(p + Vector2(0, -3) * k, p + Vector2(0, 2) * k, Color(0.1, 0.08, 0.02), 2.0 * k)
 	draw_circle(p + Vector2(0, 4.5) * k, 1.2 * k, Color(0.1, 0.08, 0.02))
+
+
+## Fragment miniatures use the actual site positions; outer atoms and bonds give them a specimen silhouette.
+func _draw_fragment(c: Vector2, r: float, col: Color, kind: String) -> void:
+	var carbon := Color(0.22, 0.20, 0.16)
+	var metal := Color(0.61, 0.49, 0.31)
+	if compact:
+		Shading.sphere(self, c, r, col)
+		return
+	var points: Array[Vector2] = []
+	if kind == "ring":
+		for i in 6:
+			points.append(c + Vector2.from_angle(PI / 6 + i * TAU / 6) * r * 0.82)
+	else:
+		points = [c + Vector2(-r * 0.72, r * 0.25), c, c + Vector2(r * 0.72, -r * 0.35)]
+	for i in points.size() - (0 if kind == "ring" else 1):
+		Shading.bond(self, points[i], points[(i + 1) % points.size()], maxf(3, r * 0.16), metal)
+	for i in points.size():
+		Shading.sphere(self, points[i], r * 0.27, col.lerp(metal, 0.3) if i == 1 else carbon, 1.3)
+		var dir := (points[i] - c).normalized()
+		if dir.length() > 0:
+			var hydrogen := points[i] + dir * r * 0.4
+			Shading.bond(self, points[i], hydrogen, 2, metal)
+			Shading.sphere(self, hydrogen, r * 0.17, UIKit.PAPER_LIGHT, 1)

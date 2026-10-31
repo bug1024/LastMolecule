@@ -76,7 +76,7 @@ text = "ui.title"
 [node name="ProjectLabel" type="Label" parent="Layout/VBox/TopBar/Names"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.58, 0.64, 0.72, 1)
+theme_override_colors/font_color = Color(0.30, 0.27, 0.21, 1)
 theme_override_font_sizes/font_size = 14
 text = "project.name"
 
@@ -87,7 +87,7 @@ size_flags_horizontal = 3
 [node name="CompanyLabel" type="Label" parent="Layout/VBox/TopBar"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.45, 0.75, 1, 1)
+theme_override_colors/font_color = Color(0.30, 0.27, 0.21, 1)
 theme_override_font_sizes/font_size = 14
 
 [node name="HelpButton" type="Button" parent="Layout/VBox/TopBar"]

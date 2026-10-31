@@ -69,15 +69,15 @@ func _draw() -> void:
 			var pulse := 0.5 + 0.5 * sin(_time * 4.0)
 			for k in 3:
 				draw_circle(c, r + 6 + k * 4 + pulse * 3, Color(color, 0.10 - k * 0.025))
-			fill = color.lerp(Color(0.08, 0.1, 0.14), 0.3)
-			border = Color(1, 1, 1, 0.9)
-			icon_tint = Color.WHITE
+			fill = color.lerp(UIKit.PAPER, 0.3)
+			border = UIKit.TEAL
+			icon_tint = UIKit.INK
 		"current", "visited":
-			fill = color.lerp(Color(0.08, 0.1, 0.14), 0.62)
+			fill = color.lerp(UIKit.PAPER, 0.62)
 			border = color.lerp(Color.WHITE, 0.2) if state == "current" else Color(color, 0.7)
-			icon_tint = Color(1, 1, 1, 0.85)
+			icon_tint = UIKit.INK
 		_:
-			fill = color.lerp(Color(0.07, 0.09, 0.12), 0.85)
+			fill = color.lerp(UIKit.PAPER, 0.85)
 			border = Color(color, 0.35)
 			icon_tint = Color(color.lightened(0.2), 0.55)
 	draw_colored_polygon(pts, fill)
@@ -88,14 +88,14 @@ func _draw() -> void:
 	if state == "visited":
 		# 已完成：右下角小勾
 		var tick := c + Vector2(r * 0.62, r * 0.55)
-		draw_circle(tick, 7, Color(0.05, 0.07, 0.1))
+		draw_circle(tick, 7, UIKit.PAPER)
 		draw_polyline(PackedVector2Array([tick + Vector2(-3.5, 0), tick + Vector2(-1, 3), tick + Vector2(4, -3)]), UIKit.ACCENT, 2.0, true)
 	var font := get_theme_default_font()
 	var fs := 14 if type == "boss" else 13
-	var text_color: Color = Color.WHITE if state == "reachable" else (Color(1, 1, 1, 0.8) if state != "locked" else Color(color.lightened(0.25), 0.7))
+	var text_color: Color = UIKit.INK if state != "locked" else UIKit.TEXT_DIM
 	var lines := label_text.split("\n")
 	for i in lines.size():
 		var y := c.y + r + 8 + fs + i * (fs + 2)
 		var w := font.get_string_size(lines[i], HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-		draw_string_outline(font, Vector2(c.x - w * 0.5, y), lines[i], HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 4, Color(0, 0, 0, 0.8))
+		draw_string_outline(font, Vector2(c.x - w * 0.5, y), lines[i], HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 0, UIKit.PAPER)
 		draw_string(font, Vector2(c.x - w * 0.5, y), lines[i], HORIZONTAL_ALIGNMENT_LEFT, -1, fs, text_color)

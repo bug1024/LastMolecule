@@ -3,16 +3,16 @@
 [ext_resource type="Script" path="res://scripts/event_popup.gd" id="1_ev"]
 
 [sub_resource type="StyleBoxFlat" id="EventPanelStyle"]
-bg_color = Color(0.11, 0.13, 0.18, 1)
+bg_color = Color(0.918, 0.859, 0.753, 1)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.3, 0.34, 0.42, 1)
-corner_radius_top_left = 14
-corner_radius_top_right = 14
-corner_radius_bottom_right = 14
-corner_radius_bottom_left = 14
+border_color = Color(0.584, 0.443, 0.239, 0.7)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
 shadow_color = Color(0, 0, 0, 0.5)
 shadow_size = 14
 
@@ -62,7 +62,7 @@ theme_override_constants/separation = 12
 [node name="TagLabel" type="Label" parent="Center/Panel/Margin/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.95, 0.72, 0.3, 1)
+theme_override_colors/font_color = Color(0.30, 0.27, 0.21, 1)
 theme_override_font_sizes/font_size = 13
 text = "ui.event_tag"
 horizontal_alignment = 1
@@ -70,7 +70,7 @@ horizontal_alignment = 1
 [node name="TitleLabel" type="Label" parent="Center/Panel/Margin/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_color = Color(0.30, 0.27, 0.21, 1)
 theme_override_font_sizes/font_size = 24
 text = "event.default_title"
 horizontal_alignment = 1
@@ -82,7 +82,7 @@ layout_mode = 2
 unique_name_in_owner = true
 layout_mode = 2
 custom_minimum_size = Vector2(0, 64)
-theme_override_colors/font_color = Color(0.8, 0.84, 0.9, 1)
+theme_override_colors/font_color = Color(0.30, 0.27, 0.21, 1)
 theme_override_font_sizes/font_size = 16
 text = "..."
 horizontal_alignment = 1

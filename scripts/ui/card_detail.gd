@@ -34,7 +34,7 @@ func _build(card: ResearchCard, mods: Dictionary, ai_info: Dictionary) -> void:
 	root.gui_input.connect(_on_input)
 	add_child(root)
 	var dim := ColorRect.new()
-	dim.color = Color(0.01, 0.02, 0.04, 0.82)
+	dim.color = Color(0.12, 0.09, 0.06, 0.82)
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(dim)
@@ -67,7 +67,7 @@ func _text_panel(card: ResearchCard, mods: Dictionary, ai_info: Dictionary) -> C
 	box.add_theme_constant_override("separation", 10)
 	margin.add_child(box)
 	var role_color: Color = CardFace.ROLE_COLOR.get(card.role(), Color.GRAY)
-	box.add_child(UIKit.header(tr(card.name) + ("+" if card.upgraded else ""), 28, Color(0.6, 1.0, 0.7) if card.upgraded else Color(0.95, 0.97, 1.0)))
+	box.add_child(UIKit.header(tr(card.name) + ("+" if card.upgraded else ""), 28, UIKit.ACCENT_BLUE if card.upgraded else UIKit.INK))
 	var type_name := tr(card.type_name if not card.type_name.is_empty() else "card.type." + card.type)
 	var sub := "%s · %s · %s" % [tr("role." + card.role()), type_name, tr("rarity." + card.rarity)]
 	if not card.unplayable:

@@ -27,7 +27,7 @@ func show_event(event: Dictionary, is_gate: bool, state: ProjectState) -> void:
 	_header_icon.modulate = Color(0.45, 0.85, 0.95) if is_gate else Color(0.95, 0.72, 0.30)
 	_title.text = tr(String(event.get("title_key", "event.default_title")))
 	_tag.text = tr(String(event.get("tag_key", "ui.gate_tag" if is_gate else "ui.event_tag")))
-	_tag.add_theme_color_override("font_color", Color(0.45, 0.85, 0.95) if is_gate else Color(0.95, 0.72, 0.30))
+	_tag.add_theme_color_override("font_color", UIKit.ACCENT_BLUE if is_gate else UIKit.DANGER)
 	_desc.text = _format(String(event.get("desc_key", "")), event.get("desc_args", []))
 	for child in _choices_box.get_children():
 		child.queue_free()
@@ -121,7 +121,7 @@ func _build_choice(choice: Dictionary, index: int, state: ProjectState) -> Contr
 	if desc_key != "" and tr(desc_key) != desc_key:
 		col.add_child(UIKit.label(tr(desc_key), UIKit.TEXT_DIM, 14, true))
 	if not String(choice.get("desc_text", "")).is_empty():   # 逻辑层已拼好的动态说明（如片段属性、下一阶段考验）
-		col.add_child(UIKit.label(String(choice.desc_text), Color(0.78, 0.7, 1.0), 14, true))
+		col.add_child(UIKit.label(String(choice.desc_text), UIKit.ACCENT_BLUE, 14, true))
 	var chips := effect_chips(choice.get("effects", {}))
 	if not chips.is_empty():
 		var flow := HFlowContainer.new()
@@ -185,7 +185,7 @@ func _chip(text: String, color: Color) -> Control:
 
 
 func _card_style(accent: Color, hover: bool, enabled: bool) -> StyleBoxFlat:
-	var sb := UIKit.panel_style(Color(0.07, 0.09, 0.13, 0.95) if not hover else accent.lerp(Color(0.07, 0.09, 0.13), 0.82),
+	var sb := UIKit.panel_style(Color(UIKit.PAPER, 0.95) if not hover else accent.lerp(UIKit.PAPER, 0.82),
 		Color(accent, 0.9 if hover else (0.45 if enabled else 0.2)), 12)
 	sb.set_border_width_all(2 if hover else 1)
 	if hover:
@@ -246,3 +246,7 @@ func _requires_text(requires: Dictionary) -> String:
 func _on_choice_pressed(index: int) -> void:
 	visible = false
 	choice_selected.emit(_event_id, index)
+
+
+func _ready() -> void:
+	UIKit.decorate_panel($Center/Panel)

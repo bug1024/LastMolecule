@@ -22,6 +22,7 @@ func _init(icon_name: String, title_key: String, accent: Color) -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	_restyle(false)
+	UIKit.decorate_panel(self)
 	var margin := MarginContainer.new()
 	for side in ["left", "right"]:
 		margin.add_theme_constant_override("margin_" + side, 12)

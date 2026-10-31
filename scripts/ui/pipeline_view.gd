@@ -6,9 +6,9 @@ var stages: Array = []      # 阶段 id 列表
 var current := 0
 var _time := 0.0
 
-const DONE := Color(0.31, 0.78, 0.56)
-const NOW := Color(0.45, 0.85, 0.95)
-const TODO := Color(0.3, 0.36, 0.44)
+const DONE := UIKit.TEAL
+const NOW := UIKit.GOLD
+const TODO := UIKit.TEXT_DIM
 
 
 func set_stages(stage_ids: Array, current_index: int) -> void:
@@ -51,7 +51,7 @@ func _draw() -> void:
 		if i == current:
 			var pulse := 0.5 + 0.5 * sin(_time * 3.0)
 			draw_circle(p, 18 + 4 * pulse, Color(NOW, 0.12))
-		draw_circle(p, 12, Color(0.06, 0.08, 0.11))
+		draw_circle(p, 12, UIKit.PAPER)
 		draw_arc(p, 12, 0, TAU, 32, color, 3.0, true)
 		if i < current:
 			draw_polyline(PackedVector2Array([p + Vector2(-5, 0), p + Vector2(-1, 4), p + Vector2(6, -4)]), color, 2.5, true)
@@ -61,4 +61,4 @@ func _draw() -> void:
 		var fs := 14
 		var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_CENTER, -1, fs).x
 		draw_string(font, Vector2(p.x - w * 0.5, y + 38), text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs,
-			Color(1, 1, 1) if i == current else (DONE.lightened(0.2) if i < current else TODO.lightened(0.25)))
+			UIKit.INK if i == current else (DONE if i < current else TODO))

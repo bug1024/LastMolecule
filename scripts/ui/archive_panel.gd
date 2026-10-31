@@ -50,18 +50,18 @@ func _refresh() -> void:
 func _identity(company: Company) -> Control:
 	var card := PanelContainer.new()
 	card.custom_minimum_size = Vector2(240, 0)
-	var sb := UIKit.panel_style(Color(0.05, 0.08, 0.11, 0.9), Color(accent, 0.3), 14)
+	var sb := UIKit.panel_style(Color(UIKit.PAPER, 0.9), Color(accent, 0.3), 14)
 	sb.set_content_margin_all(16)
 	card.add_theme_stylebox_override("panel", sb)
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 10)
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	card.add_child(col)
-	var avatar := PlayerAvatar.new()
+	var avatar := MoleculeArt.new()
 	col.add_child(avatar)
 	avatar.custom_minimum_size = Vector2(200, 150)   # 高一些的形态带铁架台和机械臂，按高度缩放以免超出卡片
 	avatar.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	avatar.form = 1 + company.approvals
+	avatar.stage_index = mini(5, 1 + company.approvals)
 	var level := company.process_level()
 	var next := company.next_level_threshold()
 	var ring := Control.new()
@@ -74,7 +74,7 @@ func _identity(company: Company) -> Control:
 		var font := ring.get_theme_default_font()
 		var text := "Lv%d" % level
 		var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x
-		ring.draw_string(font, c + Vector2(-w * 0.5, 9), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Color(0.92, 0.98, 0.95)))
+		ring.draw_string(font, c + Vector2(-w * 0.5, 9), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 24, UIKit.INK))
 	col.add_child(ring)
 	var level_text := UIKit.label(tr("archive.level_short") + (tr("archive.level_next") % [company.data, next] if next > 0 else ""), UIKit.TEXT_DIM, 13, true)
 	level_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -145,7 +145,7 @@ func _evidence_row(company: Company) -> Control:
 		var color: Color = {"foundation": UIKit.ACCENT, "selectivity": Color(0.75, 0.55, 1.0), "long_safety": UIKit.ACCENT_BLUE}[id]
 		var medal := PanelContainer.new()
 		medal.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		var sb := UIKit.panel_style(Color(color, 0.12) if got else Color(0.08, 0.1, 0.13, 0.8), Color(color, 0.7) if got else Color(0.3, 0.34, 0.4, 0.4), 12)
+		var sb := UIKit.panel_style(Color(color, 0.12) if got else Color(UIKit.PAPER, 0.8), Color(color, 0.7) if got else Color(0.3, 0.34, 0.4, 0.4), 12)
 		sb.set_content_margin_all(10)
 		medal.add_theme_stylebox_override("panel", sb)
 		var line := HBoxContainer.new()
@@ -194,7 +194,7 @@ func _mission_line(company: Company) -> Control:
 	var text := tr("archive.mission") % [tr("disease." + company.disease), Company.format_people(company.patients)]
 	if company.lineage.is_empty():
 		text += "\n" + tr("archive.lineage_empty")
-	return UIKit.label(text, Color(0.82, 0.72, 1.0), 14, true)
+	return UIKit.label(text, UIKit.ACCENT_BLUE, 14, true)
 
 
 ## 分子谱系：每一代获批分子的小结构图，下面写第几代、面对的靶点变体、编号与帮助的患者（最近 max_items 代）
@@ -256,7 +256,7 @@ func _history_row(entry: Dictionary, first: bool, last: bool) -> Control:
 			rail.draw_line(Vector2(x, 0), Vector2(x, mid), Color(0.3, 0.38, 0.45, 0.6), 2.0)
 		if not last:
 			rail.draw_line(Vector2(x, mid), Vector2(x, rail.size.y), Color(0.3, 0.38, 0.45, 0.6), 2.0)
-		rail.draw_circle(Vector2(x, mid), 7, Color(0.05, 0.07, 0.1))
+		rail.draw_circle(Vector2(x, mid), 7, UIKit.PAPER)
 		rail.draw_circle(Vector2(x, mid), 5, color))
 	row.add_child(rail)
 	var code := String(entry.get("project_code", ""))

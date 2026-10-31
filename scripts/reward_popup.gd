@@ -16,11 +16,11 @@ signal reward_claimed(card_id: String, ability_id: String)
 @onready var _hint_label: Label = %HintLabel
 @onready var _confirm_button: Button = %ConfirmButton
 
-const PANEL_BG := Color(0.11, 0.13, 0.18)
-const TEXT_DIM := Color(0.72, 0.76, 0.83)
-const TEXT_GOOD := Color(0.35, 0.8, 0.55)
-const TEXT_WARN := Color(0.95, 0.55, 0.45)
-const TEXT_GOLD := Color(0.95, 0.8, 0.4)
+const PANEL_BG := UIKit.PAPER
+const TEXT_DIM := UIKit.TEXT_DIM
+const TEXT_GOOD := UIKit.ACCENT
+const TEXT_WARN := UIKit.DANGER
+const TEXT_GOLD := UIKit.GOLD
 
 var _selected_card_id := ""
 var _selected_ability_id := ""
@@ -29,6 +29,7 @@ var _ability_count := 0
 
 
 func _ready() -> void:
+	UIKit.decorate_panel($Center/Panel)
 	_confirm_button.pressed.connect(_on_confirm_pressed)
 
 
@@ -144,7 +145,7 @@ func _make_empty_label(text: String) -> Label:
 func _make_label(text: String, color: Color, font_size: int) -> Label:
 	var label := Label.new()
 	label.text = text
-	label.add_theme_color_override("font_color", color)
+	label.add_theme_color_override("font_color", UIKit.ink(color))
 	label.add_theme_font_size_override("font_size", font_size)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return label

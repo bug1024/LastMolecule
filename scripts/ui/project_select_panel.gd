@@ -36,7 +36,7 @@ func _build(box: VBoxContainer) -> void:
 	_list.custom_minimum_size = Vector2(380, 0)
 	row.add_child(_list)
 	var detail := PanelContainer.new()
-	detail.add_theme_stylebox_override("panel", UIKit.panel_style(Color(0.05, 0.065, 0.09, 0.9), Color(0.22, 0.29, 0.37), 12))
+	detail.add_theme_stylebox_override("panel", UIKit.panel_style(Color(UIKit.PAPER, 0.9), Color(0.22, 0.29, 0.37), 12))
 	detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	detail.custom_minimum_size = Vector2(0, 240)
 	row.add_child(detail)
@@ -81,7 +81,7 @@ func _type_row(t: Dictionary, recommended: bool, locked: bool, company: Company)
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	if locked:
 		panel.modulate = Color(1, 1, 1, 0.55)
-		panel.add_theme_stylebox_override("panel", UIKit.panel_style(Color(0.06, 0.07, 0.09, 0.9), Color(0.2, 0.22, 0.26), 12))
+		panel.add_theme_stylebox_override("panel", UIKit.panel_style(Color(UIKit.PAPER, 0.9), Color(0.2, 0.22, 0.26), 12))
 	else:
 		panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		panel.gui_input.connect(func(event: InputEvent) -> void:
@@ -107,7 +107,7 @@ func _type_row(t: Dictionary, recommended: bool, locked: bool, company: Company)
 	row.add_child(text)
 	var name_row := HBoxContainer.new()
 	name_row.add_theme_constant_override("separation", 8)
-	name_row.add_child(UIKit.header(("%s · " % String(t.get("code", "")) if is_final else "") + tr("project.type." + id), 20, UIKit.GOLD if is_final else Color(0.93, 0.96, 0.98)))
+	name_row.add_child(UIKit.header(("%s · " % String(t.get("code", "")) if is_final else "") + tr("project.type." + id), 20, UIKit.GOLD if is_final else UIKit.INK))
 	var stars := "★".repeat(int(t.get("difficulty", 1))) + "☆".repeat(maxi(0, 3 - int(t.get("difficulty", 1))))
 	name_row.add_child(UIKit.label(stars, UIKit.GOLD, 14))
 	if recommended:
@@ -127,7 +127,7 @@ func _select(id: String) -> void:
 	_picked = id
 	for type_id in _rows:
 		var on: bool = type_id == id
-		var sb := UIKit.panel_style(Color(0.09, 0.16, 0.14, 0.95) if on else Color(0.07, 0.09, 0.12, 0.9),
+		var sb := UIKit.panel_style(Color(UIKit.PAPER, 0.95) if on else Color(UIKit.PAPER, 0.9),
 			UIKit.ACCENT if on else Color(0.22, 0.29, 0.37), 12)
 		sb.set_border_width_all(3 if on else 1)
 		(_rows[type_id] as PanelContainer).add_theme_stylebox_override("panel", sb)

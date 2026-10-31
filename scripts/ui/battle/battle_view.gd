@@ -91,7 +91,6 @@ func _ready() -> void:
 
 func _build() -> void:
 	_bg = MoleculeBackground.new()
-	_bg.molecule_count = 14
 	_bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(_bg)
 	_floor = Control.new()
@@ -111,8 +110,9 @@ func _build() -> void:
 	_shake_root.add_child(_player_bar)
 	_player_tag = UIKit.header("", 16, PlayerAvatar.GREEN)
 	_player_tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_player_tag.add_theme_constant_override("outline_size", 6)
-	_player_tag.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	_player_tag.add_theme_color_override("font_color", UIKit.PAPER_LIGHT)
+	_player_tag.add_theme_constant_override("outline_size", 0)
+	_player_tag.add_theme_color_override("font_outline_color", UIKit.PAPER_LIGHT)
 	_shake_root.add_child(_player_tag)
 	_player_status = StatusRow.new()
 	_shake_root.add_child(_player_status)
@@ -124,6 +124,7 @@ func _build() -> void:
 
 	_title = UIKit.header("", 24)
 	_title.position = Vector2(24, 12)
+	_title.add_theme_color_override("font_color", UIKit.PAPER_LIGHT)
 	add_child(_title)
 	_kind_tag = UIKit.label("", UIKit.GOLD, 14)
 	add_child(_kind_tag)
@@ -133,20 +134,20 @@ func _build() -> void:
 	add_child(_ai_chip)
 	_mechanic = UIKit.rich("", 14)
 	_mechanic.custom_minimum_size = Vector2(560, 0)
-	_mechanic.position = Vector2(24, 50)
+	_mechanic.position = Vector2(24, 67)
 	_mechanic.size = Vector2(560, 60)
 	add_child(_mechanic)
 	_mol = MoleculeView.new()
 	_mol.idle_bob = true
-	_mol.face = true
+	_mol.face = false
 	_mol.tooltip_text = " "
 	_mol.mouse_filter = Control.MOUSE_FILTER_PASS
-	_mol.size = Vector2(360, 230)
+	_mol.size = Vector2(430, 260)
 	_shake_root.add_child(_mol)
-	_mol_tag = UIKit.label("", Color(0.78, 0.68, 1.0), 13, true)
+	_mol_tag = UIKit.label("", UIKit.ACCENT_BLUE, 13, true)
 	_mol_tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_mol_tag.add_theme_constant_override("outline_size", 5)
-	_mol_tag.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	_mol_tag.add_theme_constant_override("outline_size", 0)
+	_mol_tag.add_theme_color_override("font_outline_color", UIKit.PAPER_LIGHT)
 	_shake_root.add_child(_mol_tag)
 
 	_energy_orb = Control.new()
@@ -155,16 +156,17 @@ func _build() -> void:
 	_energy_orb.tooltip_text = tr("battle.energy_tip")
 	_energy_orb.draw.connect(_draw_energy)
 	add_child(_energy_orb)
-	_energy_label = UIKit.header("", 28)
+	_energy_label = UIKit.header("", 26)
+	_energy_label.add_theme_color_override("font_color", UIKit.PAPER_LIGHT)
 	_energy_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_energy_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_energy_label.size = Vector2(90, 90)
-	_energy_label.add_theme_constant_override("outline_size", 6)
-	_energy_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	_energy_label.add_theme_constant_override("outline_size", 0)
+	_energy_label.add_theme_color_override("font_outline_color", UIKit.PAPER_LIGHT)
 	_energy_orb.add_child(_energy_label)
 	_rule_label = UIKit.label("", UIKit.GOLD, 14, true)
 	_rule_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_rule_label.size = Vector2(150, 62)
+	_rule_label.size = Vector2(800, 42)
 	_rule_label.tooltip_text = tr("battle.rule_tip")
 	_rule_label.mouse_filter = Control.MOUSE_FILTER_PASS
 	add_child(_rule_label)
@@ -251,7 +253,7 @@ func _layout() -> void:
 	_player_bar.size = Vector2(190, 26)
 	_player_status.position = Vector2(w * 0.1 + 14, 418)
 	_dose_button.position = Vector2(w * 0.1 - 6, 102)
-	_mol.position = Vector2(w * 0.1 - 80, 126)
+	_mol.position = Vector2(w * 0.08 - 35, 100)
 	_mol_tag.size = Vector2(_mol.size.x + 40, 44)
 	_mol_tag.position = Vector2(_mol.position.x - 20, 440)
 	_kind_tag.position = Vector2(24 + _title.get_combined_minimum_size().x + 14, 20)
@@ -259,7 +261,7 @@ func _layout() -> void:
 	_turn_badge.size = _turn_badge.custom_minimum_size
 	_ai_chip.position = Vector2(w - _ai_chip.custom_minimum_size.x - 20, 12)
 	_energy_orb.position = Vector2(34, h - 250)
-	_rule_label.position = Vector2(4, h - 156)
+	_rule_label.position = Vector2(w * 0.5 - 400, h - 278)
 	_draw_button.position = Vector2(24, h - 70)
 	_discard_button.position = Vector2(w - 134, h - 70)
 	_end_button.position = Vector2(w - 168, h - 290)
@@ -276,28 +278,32 @@ func _layout() -> void:
 
 func _draw_floor() -> void:
 	var w := _floor.size.x
-	var y := 420.0
-	var tint: Color = STAGE_TINT.get(_game.state.stage if _game else "", Color(0.3, 0.4, 0.5))
-	for i in 10:
-		var r := Vector2(w * 0.55 - i * 30, 70 - i * 6)
-		var pts := PackedVector2Array()
-		for k in 40:
-			var a := TAU * k / 40.0
-			pts.append(Vector2(w * 0.5, y) + Vector2(cos(a) * r.x, sin(a) * r.y))
-		_floor.draw_colored_polygon(pts, Color(tint, 0.035))
-	_floor.draw_line(Vector2(0, y), Vector2(w, y), Color(tint.lightened(0.4), 0.12), 2.0)
+	var background := UIKit.art("battle-desk")
+	if background:
+		_floor.draw_texture_rect(background, Rect2(Vector2.ZERO, _floor.size), false)
+	_floor.draw_rect(Rect2(0, 0, w, 58), Color(0.045, 0.10, 0.09, 0.98))
+	_floor.draw_line(Vector2(0, 58), Vector2(w, 58), UIKit.BRASS, 1)
+	if _rule_label and _rule_label.visible:
+		_floor.draw_style_box(UIKit.panel_style(), Rect2(_rule_label.position - Vector2(8, 0), _rule_label.size + Vector2(16, 0)))
+	var pedestal := UIKit.art("pedestal")
+	if pedestal:
+		_floor.draw_texture_rect(pedestal, Rect2(w * 0.1 - 35, 315, 300, 100), false)
 
 
 func _draw_energy() -> void:
 	var c := _energy_orb.size * 0.5
-	var full := _manager != null and _manager.energy > 0
-	var color := Color(0.98, 0.72, 0.3) if full else Color(0.4, 0.4, 0.45)
-	for i in 6:
-		_energy_orb.draw_circle(c, 44 - i * 2, Color(color, 0.05))
-	_energy_orb.draw_circle(c, 34, color.darkened(0.55))
-	_energy_orb.draw_circle(c, 30, color.darkened(0.15))
-	_energy_orb.draw_circle(c + Vector2(-9, -10), 10, Color(1, 1, 1, 0.25))
-	_energy_orb.draw_arc(c, 34, 0, TAU, 48, color.lightened(0.3), 3.0, true)
+	var active := _manager != null and _manager.energy > 0
+	_energy_orb.draw_circle(c + Vector2(2, 4), 43, Color(0.1, 0.07, 0.03, 0.3))
+	_energy_orb.draw_circle(c, 42, UIKit.BRASS.darkened(0.25))
+	_energy_orb.draw_circle(c, 38, UIKit.TEAL.darkened(0.45))
+	_energy_orb.draw_arc(c, 40, 0, TAU, 64, Color(0.77, 0.64, 0.38), 2, true)
+	_energy_orb.draw_arc(c, 34, 0, TAU, 64, Color(0.77, 0.64, 0.38, 0.5), 1, true)
+	for i in 32:
+		var a := i * TAU / 32.0
+		_energy_orb.draw_line(c + Vector2.from_angle(a) * 35, c + Vector2.from_angle(a) * (31 if i % 4 == 0 else 33), Color(UIKit.PAPER, 0.6), 1, true)
+	if active:
+		for i in mini(_manager.energy, 5):
+			Shading.sphere(_energy_orb, c + Vector2((i - 1) * 15, 22), 3, Color(0.5, 0.9, 0.8))
 
 
 # ---------- 战斗开始 ----------
@@ -341,7 +347,6 @@ func _on_battle_started(encounter: Dictionary) -> void:
 		_title.text = tr("encounter.group") % [_title.text, _manager.enemies.size()]
 	_kind_tag.text = tr("encounter.kind." + kind)
 	_kind_tag.add_theme_color_override("font_color", {"boss": UIKit.DANGER, "elite": UIKit.GOLD}.get(kind, UIKit.TEXT_DIM))
-	_bg.glow_color = STAGE_TINT.get(_game.state.stage, Color(0.2, 0.5, 0.5))
 	var mech_lines: Array[String] = []
 	for line in _manager.get_mechanic_lines():
 		if String(line.get("key", "")).begins_with("mol.fx."):
@@ -407,7 +412,7 @@ func _show_tip() -> void:
 	if _tip != null:
 		_tip.queue_free()
 	_tip = PanelContainer.new()
-	_tip.add_theme_stylebox_override("panel", UIKit.panel_style(Color(0.06, 0.08, 0.12, 0.98), UIKit.GOLD, 14))
+	_tip.add_theme_stylebox_override("panel", UIKit.panel_style(Color(UIKit.PAPER, 0.98), UIKit.GOLD, 14))
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.55)
 	dim.z_index = 100
@@ -1133,8 +1138,8 @@ func _layout_hand(instant := false) -> void:
 		var face: CardFace = _faces[cards[i]]
 		var offset := i - (n - 1) * 0.5
 		var x := center_x + offset * spacing - card_w * 0.5
-		var y := base_y + absf(offset) * absf(offset) * 2.0
-		var rot := deg_to_rad(offset * 3.0)
+		var y := base_y + absf(offset) * absf(offset) * 0.5
+		var rot := deg_to_rad(offset * 1.3)
 		var s := Vector2.ONE
 		if hover_i >= 0 and i != hover_i:
 			x += 30.0 * signf(i - hover_i) / maxf(1.0, absf(i - hover_i))
@@ -1487,7 +1492,7 @@ func _show_banner(text: String, sub: String, color: Color, hold: float, big: boo
 	for child in _banner.get_children():
 		child.queue_free()
 	var strip := ColorRect.new()
-	strip.color = Color(0, 0, 0, 0.62)
+	strip.color = Color(UIKit.PAPER_LIGHT, 0.97)
 	strip.size = Vector2(size.x, 150 if big else 96)
 	strip.position = Vector2(0, size.y * 0.42 - strip.size.y * 0.5)
 	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1496,11 +1501,11 @@ func _show_banner(text: String, sub: String, color: Color, hold: float, big: boo
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.size = Vector2(size.x, 60)
 	label.position = Vector2(0, strip.position.y + (18 if big else 12))
-	label.add_theme_constant_override("outline_size", 8)
-	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	label.add_theme_constant_override("outline_size", 0)
+	label.add_theme_color_override("font_outline_color", UIKit.PAPER_LIGHT)
 	_banner.add_child(label)
 	if not sub.is_empty():
-		var sub_label := UIKit.label(sub, Color(1, 1, 1, 0.85), 20 if big else 16)
+		var sub_label := UIKit.label(sub, Color(UIKit.INK, 0.85), 20 if big else 16)
 		sub_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		sub_label.size = Vector2(size.x, 30)
 		sub_label.position = Vector2(0, label.position.y + (66 if big else 44))
@@ -1522,8 +1527,8 @@ func _show_banner(text: String, sub: String, color: Color, hold: float, big: boo
 
 func _float_text(text: String, pos: Vector2, color: Color, font_size: int) -> void:
 	var label := UIKit.header(text, font_size, color)
-	label.add_theme_constant_override("outline_size", 7)
-	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
+	label.add_theme_constant_override("outline_size", 0)
+	label.add_theme_color_override("font_outline_color", UIKit.PAPER_LIGHT)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_fx.add_child(label)
 	var w := label.get_combined_minimum_size()
