@@ -107,7 +107,7 @@ func _draw() -> void:
 				elif open:
 					_curve(from, to, UIKit.GOLD, 3.0, true)
 				else:
-					_curve(from, to, Color(0.55, 0.62, 0.72, 0.28), 2.0, false)
+					_curve(from, to, Color(UIKit.TEXT_DIM, 0.45), 1.5, false)
 	# 当前位置：头顶的小烧瓶
 	if not _path.is_empty():
 		var current: MapNode = _nodes[_path.size() - 1][int(_path.back())]

@@ -87,7 +87,7 @@ func _build_abilities(abilities: Array) -> void:
 func _build_card_panel(card: Dictionary) -> Control:
 	var model := ResearchCard.from_dict(card)
 	model.type_name = String(card.get("type_name", ""))
-	var face := CardFace.create(model, 0.9)
+	var face := CardFace.create(model, 1.15)
 	face.set_meta("card_id", String(card.get("id", "")))
 	face.set_meta("name", tr(model.name))
 	face.pick_style = true

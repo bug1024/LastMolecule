@@ -16,7 +16,7 @@ const ACCENT_BLUE := Color("3c626c")
 const GOLD := Color("87602c")
 const DANGER := Color("a34235")
 const TEXT := INK
-const TEXT_DIM := Color("746750")
+const TEXT_DIM := Color("5e5341")   # 次要文字：在米色纸上仍要读得清（对比度约 5:1）
 
 # Keep legacy callers legible on paper while preserving their semantic hue.
 static func ink(color: Color) -> Color:
@@ -118,6 +118,9 @@ static func panel_style(bg := PAPER, border := Color(BRASS, 0.6), radius := 4) -
 	sb.set_border_width_all(1)
 	sb.set_corner_radius_all(mini(radius, 4))
 	sb.set_content_margin_all(14)
+	sb.shadow_color = Color(0.22, 0.13, 0.05, 0.22)   # 纸叠在纸上：一层暖色投影把面板托起来
+	sb.shadow_size = 5
+	sb.shadow_offset = Vector2(0, 2)
 	return sb
 
 

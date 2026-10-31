@@ -60,8 +60,8 @@ const MIN_FONT := 14   # 基准字号下限：0.9 倍时约 12.6px
 const LONG_PRESS := 0.5
 # 牌面布局（基准坐标）
 const NAME_RECT := Rect2(6, 6, 168, 34)
-const ART_RECT := Rect2(12, 43, 156, 88)
-const BODY_RECT := Rect2(10, 135, 160, 105)
+const ART_RECT := Rect2(14, 44, 152, 100)   # 和 record.png 卡框里的插画窗口对齐
+const BODY_RECT := Rect2(10, 146, 160, 96)
 
 
 static func create(model: ResearchCard, scale_factor := 1.0, mods := {}, ai_info := {}) -> CardFace:
@@ -359,7 +359,11 @@ func _draw() -> void:
 func _draw_art_tags(art: Rect2, role_color: Color) -> void:
 	var font := get_theme_default_font()
 	var fs := _px(10)
-	draw_string(font, art.position + Vector2(4, 12) * face_scale, _type_text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, UIKit.TEXT_DIM)
+	# 类型标签：贴在插画左下角的小纸签，压在图上也读得清
+	var tw := font.get_string_size(_type_text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	var tag := Rect2(art.position + Vector2(3, art.size.y - fs - 9 * face_scale), Vector2(tw + 10 * face_scale, fs + 6 * face_scale))
+	draw_style_box(_box(Color(UIKit.PAPER_LIGHT, 0.92), Color(UIKit.BRASS, 0.7), 3, 1), tag)
+	draw_string(font, tag.position + Vector2(5 * face_scale, fs + 1 * face_scale), _type_text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, UIKit.INK)
 	var code := card.id.to_upper().left(16)
 	draw_string(font, Vector2(12, BASE.y - 5) * face_scale, code, HORIZONTAL_ALIGNMENT_LEFT, -1, _px(8), Color(UIKit.TEXT_DIM, 0.75))
 	if _ai_multiplier >= 0.0:
@@ -380,10 +384,44 @@ func _draw_ai_chip(art: Rect2) -> void:
 	draw_string(font, pill.position + Vector2(6 * k, h * 0.5 + fs * 0.36), text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, col.lightened(0.25))
 
 
+## 插画：先按卡牌的作用挑图（攻击＝结合、护盾＝防护、AI＝推理……），再按卡牌 id 取不同的局部取景、
+## 左右翻转，让同类型的牌也各长各样，手牌里不会排一排一模一样的图
 func _draw_art(art: Rect2, accent: Color) -> void:
-	var cells := {"molecular": 0, "clinical": 1, "experiment": 3, "process": 4, "ai": 5, "status": 2}
-	var cell: int = cells.get(card.type, 2)
-	UIKit.atlas(self, "research-illustrations", cell, art)
+	var tex := UIKit.art("research-illustrations")
+	if tex == null:
+		return
+	var cell := _art_cell()
+	var cell_size := tex.get_size() / Vector2(3, 2)
+	var h := absi(hash(card.id))
+	var zoom := 0.62 + float(h % 23) / 100.0                  # 取景 62%–84%
+	var aspect := art.size.x / art.size.y
+	var region_size := Vector2(cell_size.x * zoom, cell_size.x * zoom / aspect)
+	region_size.y = minf(region_size.y, cell_size.y)
+	var slack := cell_size - region_size
+	var offset := Vector2(float((h / 23) % 100) / 100.0, float((h / 2300) % 100) / 100.0) * slack
+	var region := Rect2(Vector2(cell % 3, cell / 3) * cell_size + offset, region_size)
+	if (h / 7) % 2 == 1:   # 翻转：用负宽度的目标矩形
+		draw_texture_rect_region(tex, Rect2(art.position + Vector2(art.size.x, 0), Vector2(-art.size.x, art.size.y)), region)
+	else:
+		draw_texture_rect_region(tex, art, region)
+
+
+func _art_cell() -> int:
+	var ops: Array = card.effects.map(func(e: Dictionary) -> String: return String(e.get("op", "")))
+	if card.type == "ai":
+		return 5
+	if card.kind != "attack" and (ops.has("block") or ops.has("double_block")) and not ops.has("damage"):
+		return 1
+	match card.type:
+		"clinical":
+			return 4
+		"experiment":
+			return 3
+		"molecular":
+			return 0 if card.kind == "attack" else 2
+		"process":
+			return 4 if ops.has("formulate") else 2
+	return 2
 
 
 func _box(bg: Color, border: Color, radius: int, width: int) -> StyleBoxFlat:

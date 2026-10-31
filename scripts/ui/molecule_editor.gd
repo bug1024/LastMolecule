@@ -230,9 +230,8 @@ func _fragment_chip(id: String, count: int) -> Control:
 	miniature.position = Vector2(3, 6)
 	miniature.size = Vector2(50, 54)
 	miniature.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	miniature.draw.connect(func() -> void:
-		var cell := 2 if "ring" in frag.get("sites", []) else 4
-		UIKit.atlas(miniature, "research-illustrations", cell, Rect2(Vector2.ZERO, miniature.size)))
+	miniature.draw.connect(func() -> void:   # 片段就是骨架上那颗同色的原子，库里和分子上看到的一致
+		Shading.sphere(miniature, miniature.size * 0.5, 17.0, col if fits else Color(col, 0.55)))
 	btn.add_child(miniature)
 	var name_row := HBoxContainer.new()
 	name_row.mouse_filter = Control.MOUSE_FILTER_IGNORE

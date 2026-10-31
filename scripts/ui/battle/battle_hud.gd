@@ -40,11 +40,10 @@ class TurnBadge extends Control:
 		var text := str(turn)
 		var fs := 24
 		var w := bold.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-		draw_string_outline(bold, c + Vector2(-w * 0.5, fs * 0.36), text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 4, Color(0, 0, 0, 0.7))
 		draw_string(bold, c + Vector2(-w * 0.5, fs * 0.36), text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, UIKit.INK)
 		var font := get_theme_default_font()
-		draw_string(font, Vector2(64, size.y * 0.5 - 2), tr("battle.turn_word"), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UIKit.PAPER_LIGHT)
-		draw_string(font, Vector2(64, size.y * 0.5 + 16), "ROUND", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(UIKit.PAPER_LIGHT, 0.7))
+		draw_string(font, Vector2(64, size.y * 0.5 - 2), tr("battle.turn_word"), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UIKit.INK)
+		draw_string(font, Vector2(64, size.y * 0.5 + 16), "ROUND", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UIKit.TEXT_DIM)
 
 
 class AiChip extends PanelContainer:
@@ -68,7 +67,7 @@ class AiChip extends PanelContainer:
 		row.add_child(_icon)
 		_tier_label = UIKit.header("", 17)
 		row.add_child(_tier_label)
-		_power = UIKit.header("", 17, Color.WHITE)
+		_power = UIKit.header("", 17, UIKit.INK)
 		row.add_child(_power)
 		var spacer := Control.new()
 		spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -80,6 +79,7 @@ class AiChip extends PanelContainer:
 		_bar.show_percentage = false
 		col.add_child(_bar)
 		_next = UIKit.label("", UIKit.ACCENT_BLUE, 12)
+		_next.visible = false   # 下一档要多少数据写进悬停提示，纸签保持一行高，不压到敌人的意图
 		col.add_child(_next)
 		for node in find_children("*", "Control", true, false):
 			(node as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -109,7 +109,7 @@ class AiChip extends PanelContainer:
 		_bar.add_theme_stylebox_override("fill", UIKit.filled(bar_color, bar_color, 3))
 		_bar.add_theme_stylebox_override("background", UIKit.filled(UIKit.PAPER, UIKit.PAPER, 3))
 		_next.text = BattleView.ai_next_text(tier)
-		tooltip_text = tr("battle.ai_chip") % [effective, tr("tier." + id), float(tier.get("multiplier", 1.0)), miss]
+		tooltip_text = tr("battle.ai_chip") % [effective, tr("tier." + id), float(tier.get("multiplier", 1.0)), miss] + "\n" + _next.text
 
 
 ## 结束回合：圆形按钮——深绿底 + 亮绿圆环 + 中间沙漏图标与「结束回合」，底部「E」键帽；

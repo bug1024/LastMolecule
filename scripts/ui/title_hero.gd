@@ -25,7 +25,7 @@ func _ready() -> void:
 	_avatar.custom_minimum_size = Vector2(120, 144)
 	_code = UIKit.header("LM-001", 30, UIKit.GOLD)
 	_code.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_code.add_theme_color_override("font_color", UIKit.PAPER_LIGHT)
+	_code.add_theme_color_override("font_color", UIKit.INK)
 	_code.add_theme_constant_override("outline_size", 0)
 	_code.add_theme_color_override("font_outline_color", UIKit.PAPER_LIGHT)
 	add_child(_code)
@@ -69,15 +69,15 @@ func _layout() -> void:
 	var h := size.y
 	if w < 200 or h < 200:
 		return
-	var base_y := h - 70.0
-	var mol := Vector2(minf(w * 0.9, 480), minf(h - 170, 380))
+	var base_y := h - 70.0      # 编号和状态写在底座下方的纸面上
+	var mol := Vector2(minf(w * 0.9, 460), minf(h - 250, 340))
 	_molecule.size = mol
-	_molecule.position = Vector2(w * 0.58 - mol.x * 0.5, base_y - 40 - mol.y)
+	_molecule.position = Vector2(w * 0.58 - mol.x * 0.5, base_y - 70 - mol.y)
 	_avatar.size = _avatar.custom_minimum_size
 	_avatar.position = Vector2(w * 0.12, base_y - _avatar.size.y + 8)
-	_code.position = Vector2(w * 0.58 - 120, base_y - 2)
+	_code.position = Vector2(w * 0.58 - 120, base_y - 14)
 	_code.size = Vector2(240, 36)
-	_status.position = Vector2(w * 0.58 - 180, base_y + 34)
+	_status.position = Vector2(w * 0.58 - 180, base_y + 22)
 	_status.size = Vector2(360, 22)
 	queue_redraw()
 
@@ -96,4 +96,4 @@ func _draw() -> void:
 	draw_line(Vector2(42, 75), Vector2(size.x - 42, 75), Color(UIKit.BRASS, 0.5), 1)
 	var pedestal := UIKit.art("pedestal")
 	if pedestal:
-		draw_texture_rect(pedestal, Rect2(size.x * 0.58 - 180, size.y - 150, 360, 120), false)
+		draw_texture_rect(pedestal, Rect2(size.x * 0.58 - 150, size.y - 182, 300, 100), false)

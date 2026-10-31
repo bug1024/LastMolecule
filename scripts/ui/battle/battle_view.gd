@@ -110,7 +110,7 @@ func _build() -> void:
 	_shake_root.add_child(_player_bar)
 	_player_tag = UIKit.header("", 16, PlayerAvatar.GREEN)
 	_player_tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_player_tag.add_theme_color_override("font_color", UIKit.PAPER_LIGHT)
+	_player_tag.add_theme_color_override("font_color", UIKit.INK)
 	_player_tag.add_theme_constant_override("outline_size", 0)
 	_player_tag.add_theme_color_override("font_outline_color", UIKit.PAPER_LIGHT)
 	_shake_root.add_child(_player_tag)
@@ -123,8 +123,8 @@ func _build() -> void:
 	_shake_root.add_child(_dose_button)
 
 	_title = UIKit.header("", 24)
-	_title.position = Vector2(24, 12)
-	_title.add_theme_color_override("font_color", UIKit.PAPER_LIGHT)
+	_title.position = Vector2(64, 38)
+	_title.add_theme_color_override("font_color", UIKit.INK)
 	add_child(_title)
 	_kind_tag = UIKit.label("", UIKit.GOLD, 14)
 	add_child(_kind_tag)
@@ -134,15 +134,15 @@ func _build() -> void:
 	add_child(_ai_chip)
 	_mechanic = UIKit.rich("", 14)
 	_mechanic.custom_minimum_size = Vector2(560, 0)
-	_mechanic.position = Vector2(24, 67)
+	_mechanic.position = Vector2(64, 74)
 	_mechanic.size = Vector2(560, 60)
 	add_child(_mechanic)
 	_mol = MoleculeView.new()
 	_mol.idle_bob = true
-	_mol.face = false
+	_mol.face = true
 	_mol.tooltip_text = " "
 	_mol.mouse_filter = Control.MOUSE_FILTER_PASS
-	_mol.size = Vector2(430, 260)
+	_mol.size = Vector2(380, 250)
 	_shake_root.add_child(_mol)
 	_mol_tag = UIKit.label("", UIKit.ACCENT_BLUE, 13, true)
 	_mol_tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -247,19 +247,20 @@ func _layout() -> void:
 	_player.size = _player.custom_minimum_size
 	_player.size = Vector2(200, 240)
 	_player.position = Vector2(w * 0.1, 140)
-	_player_tag.position = Vector2(w * 0.1 - 20, 362)
-	_player_tag.size = Vector2(240, 24)
-	_player_bar.position = Vector2(w * 0.1 + 6, 388)
-	_player_bar.size = Vector2(190, 26)
-	_player_status.position = Vector2(w * 0.1 + 14, 418)
+	# 分子站在底座上；名牌、血条写在底座下方的纸面上，不压在底座上
+	_player_tag.position = Vector2(w * 0.1 + 10, 392)
+	_player_tag.size = Vector2(240, 22)
+	_player_bar.position = Vector2(w * 0.1 + 35, 418)
+	_player_bar.size = Vector2(190, 24)
+	_player_status.position = Vector2(w * 0.1 + 260, 418)
 	_dose_button.position = Vector2(w * 0.1 - 6, 102)
-	_mol.position = Vector2(w * 0.08 - 35, 100)
+	_mol.position = Vector2(w * 0.1 - 85, 92)
 	_mol_tag.size = Vector2(_mol.size.x + 40, 44)
 	_mol_tag.position = Vector2(_mol.position.x - 20, 440)
-	_kind_tag.position = Vector2(24 + _title.get_combined_minimum_size().x + 14, 20)
-	_turn_badge.position = Vector2(w * 0.5 - 75, 8)
+	_kind_tag.position = Vector2(64 + _title.get_combined_minimum_size().x + 14, 46)
+	_turn_badge.position = Vector2(w * 0.5 - 75, 34)
 	_turn_badge.size = _turn_badge.custom_minimum_size
-	_ai_chip.position = Vector2(w - _ai_chip.custom_minimum_size.x - 20, 12)
+	_ai_chip.position = Vector2(w - _ai_chip.custom_minimum_size.x - 64, 38)
 	_energy_orb.position = Vector2(34, h - 250)
 	_rule_label.position = Vector2(w * 0.5 - 400, h - 278)
 	_draw_button.position = Vector2(24, h - 70)
@@ -271,7 +272,7 @@ func _layout() -> void:
 	for i in n:
 		var ew := _enemy_widgets[i]
 		var x := w * 0.42 + span * (i + 0.5) / n - EnemyWidget.SIZE.x * 0.5
-		ew.position = Vector2(x, 96 + (16 if n > 1 and i % 2 == 1 else 0))
+		ew.position = Vector2(x, 88 + (10 if n > 1 and i % 2 == 1 else 0))
 	_layout_hand(true)
 	_floor.queue_redraw()
 
@@ -281,13 +282,11 @@ func _draw_floor() -> void:
 	var background := UIKit.art("battle-desk")
 	if background:
 		_floor.draw_texture_rect(background, Rect2(Vector2.ZERO, _floor.size), false)
-	_floor.draw_rect(Rect2(0, 0, w, 58), Color(0.045, 0.10, 0.09, 0.98))
-	_floor.draw_line(Vector2(0, 58), Vector2(w, 58), UIKit.BRASS, 1)
 	if _rule_label and _rule_label.visible:
 		_floor.draw_style_box(UIKit.panel_style(), Rect2(_rule_label.position - Vector2(8, 0), _rule_label.size + Vector2(16, 0)))
 	var pedestal := UIKit.art("pedestal")
 	if pedestal:
-		_floor.draw_texture_rect(pedestal, Rect2(w * 0.1 - 35, 315, 300, 100), false)
+		_floor.draw_texture_rect(pedestal, Rect2(w * 0.1 - 10, 318, 240, 80), false)
 
 
 func _draw_energy() -> void:

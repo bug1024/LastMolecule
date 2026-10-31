@@ -71,7 +71,7 @@ func _build() -> void:
 	molecule_art = MoleculeArt.new()
 	add_child(molecule_art)
 	mol_view = MoleculeView.new()
-	mol_view.face = false
+	mol_view.face = true
 	mol_view.idle_bob = true
 	mol_view.visible = false
 	add_child(mol_view)
@@ -188,7 +188,9 @@ func _layout() -> void:
 	mol_view.size = Vector2(minf(440, w * 0.38), minf(196, bench_y - 134))
 	mol_view.position = Vector2(w * 0.56 - mol_view.size.x * 0.5, bench_y - 76 - mol_view.size.y)
 	_mol_line.position = Vector2(STATUS_W + 20, 50)
-	_mol_line.size = Vector2(w - STATUS_W - CARDS_W - 40, 42)
+	_mol_line.size = Vector2(w - STATUS_W - CARDS_W - 40, 22)
+	_mol_line.autowrap_mode = TextServer.AUTOWRAP_OFF
+	_mol_line.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS   # 一行写不下就省略，不压到分子
 	_exam_line.size = Vector2(460, 22)
 	_exam_line.position = Vector2(w * 0.56 - 230, bench_y - 62)   # 写在分子下方的投影台上
 	_bench_panel.position = Vector2(0, bench_y + 14)
@@ -313,15 +315,9 @@ func _draw() -> void:
 	var rect := Rect2(Vector2.ZERO, size)
 	UIKit.folio(self, rect)
 	var bench_y := size.y - BENCH_FROM_BOTTOM
-	var center := Vector2(size.x * 0.48, bench_y - 54)
 	var pedestal := UIKit.art("pedestal")
 	if pedestal:
-		draw_texture_rect(pedestal, Rect2(size.x * 0.48 - 160, bench_y - 100, 320, 106), false)
-	# Specimen plate: fine brass ellipses, not a glowing science-fiction pedestal.
-	for i in 3:
-		draw_set_transform(center, 0, Vector2(1, 0.25))
-		draw_arc(Vector2.ZERO, 115 + i * 9, 0, TAU, 64, Color(UIKit.BRASS, 0.3), 1.0, true)
-	draw_set_transform(Vector2.ZERO)
+		draw_texture_rect(pedestal, Rect2(size.x * 0.56 - 130, bench_y - 96, 260, 86), false)   # 和分子同一条中线
 	draw_line(Vector2(24, bench_y), Vector2(size.x - 24, bench_y), Color(UIKit.BRASS, 0.5), 1.0)
 	for y in range(int(bench_y + 34), int(size.y - 18), 26):
 		draw_line(Vector2(24, y), Vector2(size.x - 24, y), Color(UIKit.BRASS, 0.08), 1.0)

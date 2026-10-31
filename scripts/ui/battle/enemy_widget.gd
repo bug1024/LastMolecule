@@ -5,7 +5,7 @@ extends Control
 signal pressed(index: int)
 signal hovered(index: int, on: bool)
 
-const SIZE := Vector2(250, 330)
+const SIZE := Vector2(250, 350)
 const INTENT_COLOR := {
 	"attack": UIKit.DANGER,
 	"defend": UIKit.ACCENT_BLUE,
@@ -52,24 +52,24 @@ func setup(enemy: Enemy, enemy_index: int) -> void:
 	creature.custom_minimum_size = Vector2(creature.radius * 2.8, creature.radius * 2.6)
 	var cs := creature.custom_minimum_size
 	creature.size = cs
-	creature.position = Vector2((SIZE.x - cs.x) * 0.5, 250 - cs.y)
+	creature.position = Vector2((SIZE.x - cs.x) * 0.5, 246 - cs.y)
 	add_child(creature)
 	move_child(_intent_box, -1)
 	_name = UIKit.label(tr(enemy.name_key), UIKit.INK if enemy.is_boss else UIKit.INK, 15)
 	_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_name.add_theme_color_override("font_color", UIKit.PAPER_LIGHT)
-	_name.position = Vector2(0, 252)
+	_name.add_theme_color_override("font_color", UIKit.INK)
+	_name.position = Vector2(0, 274)
 	_name.size = Vector2(SIZE.x, 22)
 	_name.add_theme_constant_override("outline_size", 0)
 	_name.add_theme_color_override("font_outline_color", UIKit.PAPER_LIGHT)
 	add_child(_name)
 	bar = HealthBar.new()
-	bar.position = Vector2(30, 276)
+	bar.position = Vector2(30, 298)
 	bar.size = Vector2(SIZE.x - 60, 22)
 	add_child(bar)
 	bar.set_values(enemy.hp, enemy.max_hp, enemy.block, true)
 	statuses = StatusRow.new()
-	statuses.position = Vector2(34, 300)
+	statuses.position = Vector2(34, 324)
 	statuses.size = Vector2(SIZE.x - 60, 26)
 	add_child(statuses)
 	mouse_entered.connect(func() -> void:
@@ -140,11 +140,13 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
-	if _intent_box and _intent_box.visible:
-		UIKit.folio(self, Rect2(_intent_box.position - Vector2(3, 3), Vector2(SIZE.x + 6, 46)))
+	if _intent_box and _intent_box.visible:   # 意图：一枚小小的纸签，不抢敌人的戏
+		var w := clampf(_intent_box.get_combined_minimum_size().x + 28, 90, 170)
+		var tag := Rect2(Vector2((SIZE.x - w) * 0.5, 2), Vector2(w, 38))
+		draw_style_box(UIKit.panel_style(UIKit.PAPER_LIGHT, UIKit.BRASS, 4), tag)
 	var pedestal := UIKit.art("pedestal")
 	if pedestal:
-		draw_texture_rect(pedestal, Rect2(-10, 206, SIZE.x + 20, 90), false)
+		draw_texture_rect(pedestal, Rect2(25, 214, SIZE.x - 50, 64), false)
 	if targetable and creature and creature.dying <= 0.0:
 		var c := creature.position + creature.size * Vector2(0.5, 0.55)
 		var r := creature.radius * 1.35

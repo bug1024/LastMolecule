@@ -64,6 +64,7 @@ func _draw() -> void:
 	var fill: Color
 	var border: Color
 	var icon_tint: Color
+	var ink_col := color.darkened(0.35)   # 节点类型色在纸上压暗一些，读起来像墨线
 	match state:
 		"reachable":
 			var pulse := 0.5 + 0.5 * sin(_time * 4.0)
@@ -76,10 +77,10 @@ func _draw() -> void:
 			fill = color.lerp(UIKit.PAPER, 0.62)
 			border = color.lerp(Color.WHITE, 0.2) if state == "current" else Color(color, 0.7)
 			icon_tint = UIKit.INK
-		_:
-			fill = color.lerp(UIKit.PAPER, 0.85)
-			border = Color(color, 0.35)
-			icon_tint = Color(color.lightened(0.2), 0.55)
+		_:   # 还走不到：纸色底 + 墨色细线，清楚但不抢眼
+			fill = UIKit.PAPER_LIGHT
+			border = Color(ink_col, 0.75)
+			icon_tint = Color(ink_col, 0.8)
 	draw_colored_polygon(pts, fill)
 	draw_polyline(pts, border, 3.0 if state == "reachable" or state == "current" else 1.5, true)
 	if _icon:

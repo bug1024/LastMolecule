@@ -60,11 +60,27 @@ func _draw() -> void:
 	_ellipse(c + Vector2(0, r * 1.05), Vector2(r * 0.9, r * 0.18), Color(0, 0, 0, 0.35 * alpha))
 	for i in 4:
 		draw_circle(c, r * (1.5 - i * 0.12), Color(color, 0.03 * alpha))
-	var cells := {"blob": 1, "cell": 1, "crystal": 2, "cloud": 3, "spiky": 4, "molecule": 5}
+	# 标本图集只有 6 种形态：每个敌人再按自己的颜色上色、按 id 左右翻转 / 微转，并在身后衬一圈本色光晕，
+	# 这样同一形态的不同敌人也一眼分得开（两只天然配体之间也略有差别）
+	var cells := {"blob": 0, "cell": 1, "crystal": 2, "cloud": 3, "spiky": 4, "molecule": 5}
 	var cell: int = cells.get(shape, 0)
-	var rect := Rect2(c - Vector2(r * 1.45, r * 1.28), Vector2(r * 2.9, r * 2.56))
-	if not UIKit.atlas(self, "specimens", cell, rect, Color(1, 1 - flash * 0.15, 1 - flash * 0.25, alpha)):
+	Shading.glow(self, c, r * 1.55, Color(color, (0.42 if menace > 0 else 0.3) * alpha))
+	var flip := 1.0 if int(_seed * 10.0) % 2 == 0 else -1.0
+	var tint := color.lerp(Color.WHITE, 0.5).lerp(Color.WHITE, flash * 0.8)
+	tint.a = alpha
+	draw_set_transform(c, sin(_time * 0.6 + _seed) * 0.04 + (_seed - 5.0) * 0.02, Vector2(flip, 1.0))
+	var rect := Rect2(-Vector2(r * 1.45, r * 1.28), Vector2(r * 2.9, r * 2.56))
+	var ok := UIKit.atlas(self, "specimens", cell, rect, tint)
+	draw_set_transform(Vector2.ZERO)
+	if not ok:
 		_draw_cell(c, r, body, alpha)
+	if menace > 0:   # 精英 / Boss：一圈黄铜刻度环，标出它的分量
+		var ring := r * 1.42
+		for i in 36:
+			var a0 := i * TAU / 36.0 + _time * 0.05
+			var long := i % 3 == 0
+			draw_line(c + Vector2.from_angle(a0) * ring, c + Vector2.from_angle(a0) * (ring + (9.0 if long else 4.0)),
+				Color(UIKit.BRASS if menace == 1 else UIKit.DANGER, 0.7 * alpha), 1.5, true)
 
 
 
