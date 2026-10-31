@@ -53,7 +53,7 @@ var _kind_tag: Label
 var _turn_badge: BattleHud.TurnBadge
 var _ai_chip: BattleHud.AiChip
 var _mechanic: RichTextLabel
-var _mol: MoleculeView          # 设计了分子的项目：玩家的分子小图，属性效果生效时对应片段闪一下
+var _mol: MoleculeView          # 设计了分子的项目：分子就是战场上的主角（代替烧瓶）；属性生效、被敌人针对时对应片段会闪
 var _mol_tag: Label
 var _fx: Control
 var _arrow: Control
@@ -135,10 +135,10 @@ func _build() -> void:
 	_mechanic.size = Vector2(560, 60)
 	add_child(_mechanic)
 	_mol = MoleculeView.new()
-	_mol.compact = true
+	_mol.idle_bob = true
 	_mol.tooltip_text = " "
 	_mol.mouse_filter = Control.MOUSE_FILTER_PASS
-	_mol.size = Vector2(190, 104)
+	_mol.size = Vector2(360, 230)
 	_shake_root.add_child(_mol)
 	_mol_tag = UIKit.label("", Color(0.78, 0.68, 1.0), 13, true)
 	_mol_tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -248,10 +248,9 @@ func _layout() -> void:
 	_player_bar.size = Vector2(190, 26)
 	_player_status.position = Vector2(w * 0.1 + 14, 418)
 	_dose_button.position = Vector2(w * 0.1 - 6, 102)
-	_mol.position = Vector2(w * 0.1 + 196, 214)
-	_mol_tag.position = Vector2(_mol.position.x, _mol.position.y + _mol.size.y)
-	_mol_tag.size = Vector2(_mol.size.x + 40, 70)
-	_mol_tag.position.x -= 20
+	_mol.position = Vector2(w * 0.1 - 80, 126)
+	_mol_tag.size = Vector2(_mol.size.x + 40, 44)
+	_mol_tag.position = Vector2(_mol.position.x - 20, 440)
 	_kind_tag.position = Vector2(24 + _title.get_combined_minimum_size().x + 14, 20)
 	_turn_badge.position = Vector2(w * 0.5 - 75, 8)
 	_turn_badge.size = _turn_badge.custom_minimum_size
@@ -352,7 +351,9 @@ func _on_battle_started(encounter: Dictionary) -> void:
 	var molecule: Molecule = _game.molecule
 	_mol.visible = molecule != null
 	_mol_tag.visible = molecule != null
+	_player.visible = molecule == null   # 有分子时，站在战场上的是分子本身
 	if molecule != null:
+		_player_tag.text = tr("player.tag_mol") % _game.get_player_level()
 		_mol.set_molecule(molecule)
 		var props := molecule.properties()
 		_mol_tag.text = " ".join(Molecule.PROPS.map(func(p: String) -> String: return "%s%d" % [tr("prop." + p).left(1), int(props[p])])) \
@@ -519,6 +520,12 @@ func _play(ev: Dictionary) -> void:
 		"mechanic":
 			_float_text(_fmt(ev), Vector2(size.x * 0.5, 150), Color(1.0, 0.82, 0.45), 20)
 			await _wait(0.55)
+		"exploit":
+			# 敌人专攻分子结构弱点：被针对的片段闪红
+			_mol.flash_sites(ev.sites)
+			GameAudio.sfx("deviation")
+			_float_text(tr("battle.fx.exploit." + String(ev.tag)), _mol.position + Vector2(_mol.size.x * 0.5, -6), Color(1.0, 0.45, 0.4), 20)
+			await _wait(0.35)
 		"mol":
 			_mol.flash(String(ev.prop))
 			if not bool(ev.get("start", false)):   # 开场时所有生效的片段一起亮，不逐个飘字
@@ -548,6 +555,7 @@ func _play_damage(ev: Dictionary) -> void:
 		_burst(p, Color(1.0, 0.4, 0.35) if side == "player" else _enemy_color(index), 12 + mini(amount, 20))
 		if side == "player":
 			_player.hit()
+			_mol.hit()
 			GameAudio.sfx("hurt")
 			_screen_flash(0.18 + minf(amount, 30) * 0.01)
 		else:
@@ -979,6 +987,7 @@ func _show_end() -> void:
 		GameAudio.sting("win")
 		_player.set_mood("")
 		_player.react("happy", 3.0)
+		_mol.cheer()
 		await _show_banner(tr("battle.banner.victory"), tr("battle.banner.victory_sub"), Color(0.5, 1.0, 0.7), 0.0, true)
 		if _pending_level > 0:
 			await _wait(0.6)
@@ -1005,7 +1014,7 @@ func _play_level_up(level: int) -> void:
 	tween.tween_callback(func() -> void: _player.form = level)
 	tween.tween_property(_player, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	_player.pivot_offset = _player.size * Vector2(0.5, 0.9)
-	_player_tag.text = tr("player.tag") % [level, tr("player.level.%d" % level)]
+	_player_tag.text = tr("player.tag_mol") % level if _mol.visible else tr("player.tag") % [level, tr("player.level.%d" % level)]
 	await _show_banner(tr("player.level_up") % [level, tr("player.level.%d" % level)], PlayerHud.bonus_text(_game.get_player_bonus()),
 		Color(1.0, 0.85, 0.4), 1.2, true)
 
@@ -1135,6 +1144,8 @@ func _side_point(side: String, index: int) -> Vector2:
 
 
 func _player_point() -> Vector2:
+	if _mol.visible:
+		return _mol.position + _mol.size * Vector2(0.5, 0.52)
 	return _player.position + _player.size * Vector2(0.5, 0.6)
 
 

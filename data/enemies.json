@@ -120,7 +120,11 @@
      },
      "block": 6
     }
-   ]
+   ],
+   "exploit": {
+    "tag": "lipophilic",
+    "damage": 2
+   }
   },
   {
    "id": "activity_cliff",
@@ -191,7 +195,11 @@
      "damage": 9,
      "weight": 2
     }
-   ]
+   ],
+   "exploit": {
+    "tag": "soft_spot",
+    "damage": 3
+   }
   },
   {
    "id": "animal_bias",
@@ -291,7 +299,11 @@
       "strength": 2
      }
     }
-   ]
+   ],
+   "exploit": {
+    "tag": "alert",
+    "damage": 4
+   }
   },
   {
    "id": "tox_storm",
@@ -328,7 +340,11 @@
      "intent": "attack",
      "damage": 20
     }
-   ]
+   ],
+   "exploit": {
+    "tag": "alert",
+    "damage": 2
+   }
   },
   {
    "id": "infusion_reaction",
@@ -618,7 +634,11 @@
      },
      "weight": 2
     }
-   ]
+   ],
+   "exploit": {
+    "tag": "soft_spot",
+    "damage": 2
+   }
   },
   {
    "id": "protocol_dev",
@@ -831,5 +851,6 @@
     }
    ]
   }
- ]
+ ],
+ "_exploit": "exploit：敌人专攻玩家分子的结构弱点（只在有分子的项目生效）。tag 为 soft_spot（没被卤素挡住的代谢软点）/ lipophilic（亲脂片段）/ alert（未排除的毒性警示片段）；攻击每段伤害 + damage × 暴露片段数。"
 }

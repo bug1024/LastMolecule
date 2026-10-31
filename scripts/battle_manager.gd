@@ -11,7 +11,7 @@ extends Node
 ##   block {side, index, amount, block} / status {side, index, id, amount}
 ##   data {amount} / draw {count, hand（手牌快照）} / energy {energy} / add_card {id, count}
 ##   enemy_turn / enemy_move {index, move} / turn {turn} / death {side, index}
-##   mechanic {key, args} / mol {prop, start}（分子某项属性的效果生效；start 为开场时的一次性提示）/ end {victory}
+##   mechanic {key, args} / exploit {index, tag, sites}（敌人专攻分子结构弱点）/ mol {prop, start}（分子某项属性的效果生效；start 为开场时的一次性提示）/ end {victory}
 ## AI 卡：威力取决于有效数据所在档位（倍率 + 偏差概率），偏差时改为结算卡牌的 deviation 效果。
 ## 项目规则 rules（由项目类型决定，见 data/projects.json battle_rules）：
 ##   offtarget_limit / offtarget_damage：一回合超过 limit 张攻击牌，每多 1 张掉 damage 血（选择性项目）；
@@ -61,6 +61,7 @@ var stats := {"attacks": 0, "precise": 0, "backfires": 0}
 var vulnerable_bonus := 0
 var poison_bonus := 0
 var first_energy := 0
+var exposure := {}     # 分子暴露的结构弱点 {tag: {sites, names}}；没有分子时为空（敌人的 exploit 不生效）
 var extra_lines: Array = []   # 本场统计：攻击牌数 / 打破绽目标的攻击 / 反噬次数
 var last_deviation := false
 
@@ -112,6 +113,7 @@ func start_battle(enc: Dictionary, deck: Array, abilities: Array, ctx: Dictionar
 	_start_block = int(ctx.get("start_block", 0))
 	_first_draw = int(ctx.get("first_draw", 0))
 	first_energy = int(ctx.get("first_energy", 0))
+	exposure = ctx.get("exposure", {})
 	enemies.clear()
 	var is_boss := String(enc.get("kind", "fight")) == "boss"
 	for enemy_id in enc.get("enemies", []):
@@ -293,6 +295,17 @@ func get_mechanic_lines() -> Array:
 	lines.append_array(extra_lines)
 	var seen := {}
 	for e in enemies:
+		var info := exploit_info(e)
+		if info.is_empty() or seen.has("exploit:" + e.id):
+			continue
+		seen["exploit:" + e.id] = true
+		var n: int = info.sites.size()
+		if n > 0:
+			lines.append({"key": "mechanic.exploit." + String(info.tag),
+				"args": ["enemy." + e.id, n, String(exposure.get(info.tag, {}).get("names", "")), int(info.per)]})
+		else:
+			lines.append({"key": "mechanic.exploit.safe_" + String(info.tag), "args": ["enemy." + e.id]})
+	for e in enemies:
 		if e.mechanic.is_empty() or seen.has(e.mechanic):
 			continue
 		seen[e.mechanic] = true
@@ -312,7 +325,17 @@ func get_mechanic_lines() -> Array:
 func intent_damage(enemy: Enemy) -> int:
 	if enemy.intent_damage() <= 0:
 		return 0
-	return _calc_damage(enemy, player, enemy.intent_damage(), true)
+	return _calc_damage(enemy, player, enemy.intent_damage() + int(exploit_info(enemy).get("bonus", 0)), true)
+
+
+## 敌人对分子结构弱点的利用：{tag, sites, per, bonus（每段额外伤害）}；不利用或没有分子时为空
+func exploit_info(enemy: Enemy) -> Dictionary:
+	var ex: Dictionary = enemy.data.get("exploit", {})
+	if ex.is_empty() or exposure.is_empty():
+		return {}
+	var tag := String(ex.get("tag", ""))
+	var sites: Array = exposure.get(tag, {}).get("sites", [])
+	return {"tag": tag, "sites": sites, "per": int(ex.get("damage", 0)), "bonus": int(ex.get("damage", 0)) * sites.size()}
 
 
 ## 玩家对某个敌人造成的实际伤害（卡面数值预览）
@@ -424,10 +447,14 @@ func _execute(e: Enemy, index: int) -> void:
 	var move := e.intent
 	_emit({"t": "enemy_move", "index": index, "move": move})
 	if int(move.get("damage", 0)) > 0:
+		var exploit := exploit_info(e)
+		var bonus := int(exploit.get("bonus", 0))
+		if bonus > 0:   # 专攻分子结构弱点：界面让被攻击的片段闪红
+			_emit({"t": "exploit", "index": index, "tag": exploit.tag, "sites": exploit.sites})
 		for h in e.intent_hits():
 			if not player.is_alive():
 				break
-			_attack(e, "enemy", index, player, "player", 0, int(move.damage), true)
+			_attack(e, "enemy", index, player, "player", 0, int(move.damage) + bonus, true)
 	if int(move.get("block", 0)) > 0:
 		_gain_block(e, "enemy", index, int(move.block))
 	for status_id in move.get("status", {}):

@@ -3,7 +3,8 @@ extends Control
 ## 分子结构图：中间是六元环核心，周围是 7 个带类型的位点（data/molecule.json 的 sites 坐标），
 ## 片段画成带颜色的原子徽章并写上名字；带毒性警示的片段旁有警示标记。
 ## interactive 时可以点位点（site_clicked），选中的位点发光；编辑器和研发总览共用。
-## compact 用于战斗界面的小图：位点缩小、不写名字；flash(prop) 让给这项属性加分的片段闪一下。
+## compact 用于小图：位点缩小、不写名字。flash(prop) 让给这项属性加分的片段闪一下；flash_sites 让指定位点闪一下；
+## hit / cheer 是战斗里分子作为主角的受击与胜利反馈。
 
 signal site_clicked(site_id: String)
 
@@ -15,6 +16,10 @@ var _time := 0.0
 var _hover := ""
 var compact := false
 var _flash := {}        # 属性 → 剩余闪光强度（1 → 0）
+var _site_flash := {}   # 位点 → [剩余强度, 颜色]（被敌人攻击的片段闪红）
+var _hit := 0.0         # 受击：抖动 + 泛红
+var _cheer := 0.0       # 胜利：跳一跳、发光
+var idle_bob := false   # 战斗中：轻轻浮动，像活着
 
 const SITE_R := 28.0
 const TYPE_MARK := {"linker": "连", "ring": "环", "terminal": "端"}
@@ -32,6 +37,20 @@ func flash(prop: String) -> void:
 	_flash[prop] = 1.0
 
 
+## 指定位点闪一下（敌人专攻的结构弱点用红色）
+func flash_sites(site_ids: Array, color := Color(1.0, 0.35, 0.3)) -> void:
+	for id in site_ids:
+		_site_flash[String(id)] = [1.0, color]
+
+
+func hit() -> void:
+	_hit = 1.0
+
+
+func cheer() -> void:
+	_cheer = 1.0
+
+
 func set_molecule(m: Molecule) -> void:
 	molecule = m
 	queue_redraw()
@@ -44,11 +63,18 @@ func _process(delta: float) -> void:
 			_flash[prop] = float(_flash[prop]) - delta * 0.9
 			if float(_flash[prop]) <= 0.0:
 				_flash.erase(prop)
+		for id in _site_flash.keys():
+			_site_flash[id][0] = float(_site_flash[id][0]) - delta * 0.8
+			if float(_site_flash[id][0]) <= 0.0:
+				_site_flash.erase(id)
+		_hit = maxf(0.0, _hit - delta * 2.5)
+		_cheer = maxf(0.0, _cheer - delta * 0.35)
+		self_modulate = Color(1, 1 - 0.45 * _hit, 1 - 0.45 * _hit)
 		queue_redraw()
 
 
 func _site_r() -> float:
-	return maxf(7.0, _scale() * 0.36) if compact else SITE_R
+	return maxf(7.0, _scale() * 0.36) if compact else minf(SITE_R, _scale() * 0.62)
 
 
 func _scale() -> float:
@@ -87,6 +113,13 @@ func _draw() -> void:
 	var center := size * Vector2(0.5, 0.52)
 	var k := _scale()
 	var bond := Color(0.7, 0.8, 0.9, 0.55)
+	var offset := Vector2(sin(_time * 70.0) * 6.0 * _hit, 0)
+	if idle_bob:
+		offset.y += sin(_time * 2.0) * 3.0
+	offset.y -= absf(sin(_time * 9.0)) * 10.0 * _cheer
+	draw_set_transform(offset)
+	if _cheer > 0:
+		draw_circle(center, k * 1.9, Color(0.55, 1.0, 0.75, 0.16 * _cheer))
 	# 核心六元环
 	var ring := PackedVector2Array()
 	for i in 7:
@@ -150,12 +183,17 @@ func _draw() -> void:
 				var f := float(_flash[prop])
 				draw_circle(c, r + 4 + (1.0 - f) * 10, Color(col.lightened(0.4), 0.45 * f))
 				draw_arc(c, r + 3, 0, TAU, 32, Color(1, 1, 1, f), 2.5, true)
+		if _site_flash.has(id):
+			var sf: Array = _site_flash[id]
+			var t := float(sf[0])
+			draw_circle(c, r + 5 + (1.0 - t) * 14, Color(sf[1], 0.5 * t))
+			draw_arc(c, r + 3, 0, TAU, 32, Color(sf[1], t), 3.0, true)
 		if compact:
 			if not String(frag.get("alert", "")).is_empty():
 				_draw_alert(c + Vector2(r * 0.9, -r * 0.9), 0.6)
 			continue
 		var frag_name := tr("frag." + frag_id)
-		var fs := 15 if frag_name.length() <= 3 else 12
+		var fs := roundi((15.0 if frag_name.length() <= 3 else 12.0) * r / SITE_R)
 		var nw := font.get_string_size(frag_name, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 		draw_string_outline(font, c + Vector2(-nw * 0.5, fs * 0.36), frag_name, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 3, Color(0, 0, 0, 0.7))
 		draw_string(font, c + Vector2(-nw * 0.5, fs * 0.36), frag_name, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.WHITE)

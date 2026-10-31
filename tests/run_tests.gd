@@ -944,6 +944,28 @@ func _test_molecule() -> void:
 		and m.pool_weight({"kind": "attack", "effects": [{"op": "damage", "value": 6}]}) == 30
 		and m.pool_weight({"kind": "skill", "effects": [{"op": "block", "value": 5}]}) == 10,
 		"Cards that fit a strong property show up more often in rewards")
+	_expect(m.exposed("soft_spot") == ["R3"] and m.exposed("alert") == ["R1"] and m.exposed("lipophilic").size() >= 3,
+		"Exposure lists unshielded soft spots, unresolved alert fragments and lipophilic fragments")
+	m.alerts["genotox"] = "cleared"
+	_expect(m.exposed("alert").is_empty(), "A cleared alert is no longer exposed")
+	m.alerts["genotox"] = "unknown"
+	var shielded := Molecule.from_dict(m.to_dict())
+	var swap: Dictionary = shielded.sites.duplicate()
+	swap["R1"] = "methyl"   # 甲基挨着 R2 的氟原子：被挡住
+	swap["R3"] = "nitro"
+	shielded.apply_layout(swap)
+	_expect(not shielded.exposed("soft_spot").has("R1"), "A soft spot next to fluorine is shielded")
+	var bm := BattleManager.new()
+	root.add_child(bm)
+	var enzyme := Enemy.from_dict({"id": "cyp", "hp": [30, 30], "exploit": {"tag": "soft_spot", "damage": 3},
+		"moves": [{"id": "hit", "intent": "attack", "damage": 6}]}, bm.rng)
+	enzyme.roll_intent(bm.rng)
+	bm.player = Combatant.new()
+	bm.exposure = {"soft_spot": {"sites": ["R3", "T2"], "names": ""}}
+	_expect(bm.intent_damage(enzyme) == 12 and int(bm.exploit_info(enzyme).bonus) == 6, "Enemies that exploit a weakness hit harder per exposed fragment")
+	bm.exposure = {}
+	_expect(bm.intent_damage(enzyme) == 6, "Without a molecule, exploits do nothing")
+	bm.free()
 	var copy := Molecule.from_dict(m.to_dict())
 	_expect(copy.sites == m.sites and copy.inventory == m.inventory and copy.alerts == m.alerts, "A molecule survives save/load")
 	var local: Dictionary = m.sites.duplicate()

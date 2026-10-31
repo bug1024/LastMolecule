@@ -707,7 +707,20 @@ func _start_battle(kind: String) -> void:
 		"boss_exam_strength": int(exam_ctx.get("strength", 0)),
 		"boss_exam_vulnerable": int(exam_ctx.get("vulnerable", 0)),
 		"extra_lines": lines,
+		"exposure": _molecule_exposure(),
 	})
+
+
+## 分子暴露给敌人的结构弱点（敌人的 exploit 用）：{tag: {sites, names}}
+func _molecule_exposure() -> Dictionary:
+	if molecule == null:
+		return {}
+	var out := {}
+	for tag in ["soft_spot", "lipophilic", "alert"]:
+		var sites := molecule.exposed(tag)
+		var names: Array = sites.map(func(site_id: String) -> String: return tr("frag." + String(molecule.sites[site_id])))
+		out[tag] = {"sites": sites, "names": "、".join(names)}
+	return out
 
 
 ## Boss 战的阶段考验：通过则 Boss 开局带破绽，没通过则 Boss 更强；说明行追加到 lines

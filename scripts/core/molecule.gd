@@ -238,6 +238,39 @@ static func exam_label(exam: Dictionary) -> String:
 	return TranslationServer.translate("mol.exam.props_fmt") % ["+".join(names), int(exam.value), int(exam.min)]
 
 
+## 暴露给敌人的结构弱点：位点 id 列表（敌人的 exploit 按它加伤害）
+##   soft_spot 没被相邻卤素挡住的代谢软点；alert 还没排除的毒性警示片段；其它标签（如 lipophilic）按标签数
+func exposed(tag: String) -> Array:
+	var out: Array = []
+	for site_id in sites:
+		var frag := fragment(String(sites[site_id]))
+		var tags: Array = frag.get("tags", [])
+		match tag:
+			"soft_spot":
+				if tags.has("soft_spot") and not _shielded(String(site_id)):
+					out.append(site_id)
+			"alert":
+				var a := String(frag.get("alert", ""))
+				if not a.is_empty() and String(alerts.get(a, "unknown")) != "cleared":
+					out.append(site_id)
+			_:
+				if tags.has(tag):
+					out.append(site_id)
+	out.sort()
+	return out
+
+
+## 这个位点是否被相邻的卤素（氟原子）挡住
+func _shielded(site_id: String) -> bool:
+	for pair in config().get("adjacent", []):
+		if not (pair as Array).has(site_id):
+			continue
+		var other := String(pair[1] if String(pair[0]) == site_id else pair[0])
+		if (fragment(String(sites.get(other, ""))).get("tags", []) as Array).has("halogen"):
+			return true
+	return false
+
+
 ## 当前组合带来的分子特性卡 id（同一组合触发多次也只给一张）
 func signature_cards() -> Array:
 	var ids: Array = []
