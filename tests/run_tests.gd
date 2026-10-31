@@ -71,6 +71,7 @@ func _run() -> void:
 	_test_card_roles()
 	_test_competition()
 	_test_milestone_terminate()
+	_test_molecule_specimen()
 	_test_molecule()
 	_test_molecule_in_run()
 	_test_disease_campaign()
@@ -1396,3 +1397,34 @@ func _test_title_screen() -> void:
 	await process_frame
 	_expect(title._archive.visible, "Archive opens from the title screen")
 	title.free()
+
+
+## The visual refactor must preserve picking and every legal fragment at all display sizes.
+func _test_molecule_specimen() -> void:
+	var texture := UIKit.art("molecular-fragments")
+	_expect(texture != null, "Molecular specimen atlas is packaged with the project")
+	if texture == null:
+		return
+	var img := texture.get_image()
+	_expect(img.get_pixel(0, 0).a < 0.01, "Specimen atlas has transparent background")
+	var issues: Array[String] = []
+	var view := MoleculeView.new()
+	view.molecule = Molecule.new()
+	for dimensions in [Vector2(124, 70), Vector2(460, 280), Vector2(650, 262)]:
+		view.size = dimensions
+		for fragment in Molecule.config().fragments:
+			var id := String(fragment.id)
+			if not MoleculeSpecimen.CELLS.has(id) or not MoleculeSpecimen.region(id).has_area():
+				issues.append("missing " + id)
+			for site in Molecule.config().sites:
+				if not site.type in fragment.sites:
+					continue
+				view.molecule.sites = {String(site.id): id}
+				var center := view.site_center(site)
+				var bounds := MoleculeSpecimen.bounds(id, center, view._scale())
+				if not Rect2(Vector2.ZERO, dimensions).encloses(bounds):
+					issues.append("out of bounds " + id)
+				if view._site_at(center) != String(site.id):
+					issues.append("unselectable " + String(site.id))
+	_expect(issues.is_empty(), "Every legal fragment stays visible and selectable: " + ", ".join(issues))
+	view.free()

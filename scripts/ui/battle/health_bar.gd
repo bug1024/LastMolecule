@@ -45,16 +45,16 @@ func _draw() -> void:
 	var trail_w := rect.size.x * clampf(_trail / max_value, 0.0, 1.0)
 	draw_rect(Rect2(rect.position, Vector2(trail_w, rect.size.y)), Color(1, 0.95, 0.8, 0.8))
 	var fill_w := rect.size.x * clampf(_shown / max_value, 0.0, 1.0)
-	var fill := Color(0.28, 0.82, 0.45) if is_player else Color(0.86, 0.26, 0.3)
+	var fill := Color(0.22, 0.64, 0.48) if is_player else Color(0.86, 0.26, 0.3)
 	draw_rect(Rect2(rect.position, Vector2(fill_w, rect.size.y)), fill)
 	draw_rect(Rect2(rect.position, Vector2(fill_w, rect.size.y * 0.4)), Color(1, 1, 1, 0.15))
-	draw_rect(rect, Color(0, 0, 0, 0.8), false, 2.0)
+	draw_rect(rect, Color("536574"), false, 1.0)
 	var font := get_theme_default_font()
 	var text := "%d/%d" % [value, max_value]
 	var fs := 15
 	var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 	var pos := Vector2(rect.get_center().x - w * 0.5, rect.get_center().y + fs * 0.35)
-	draw_string_outline(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 4, Color(0, 0, 0, 0.9))
+	draw_string_outline(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 2, Color(0, 0, 0, 0.9))
 	draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.WHITE)
 	if is_player:
 		var heart := UIKit.icon("ui_heart")

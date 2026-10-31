@@ -4,7 +4,7 @@ extends Control
 ## 逻辑由 BattleManager 即时结算；本界面按事件列表依次播放动画（出牌飞行、受击闪白、
 ## 伤害数字、震屏、粒子、敌人前冲），播放期间锁定输入。
 ## 单体攻击在有多个敌人时需要再点击目标；右键或 Esc 取消。快捷键：E 结束回合，1–9 选牌。
-## 氛围：生命低于 30% 时屏幕边缘泛红闪烁并有心跳声；Boss 战常驻暗红压迫边框，Boss 重击时闪红、踏地震屏。
+## 氛围：生命低于 30% 时屏幕边缘泛红闪烁并有心跳声；Boss 战仅在敌人周围保留威胁刻度，Boss 重击时闪红、踏地震屏。
 ## 每局第一场战斗显示一张图示小提示；战斗胜利后若团队升级，烧瓶会当场进化。
 
 signal continue_pressed()
@@ -63,7 +63,6 @@ var _banner: Control
 var _continue: Button
 var _player_tag: Label
 var _vignette_low: TextureRect
-var _vignette_boss: TextureRect
 var _flash_rect: ColorRect
 var _tip: PanelContainer
 var _is_boss := false
@@ -91,7 +90,7 @@ func _ready() -> void:
 
 func _build() -> void:
 	_bg = MoleculeBackground.new()
-	_bg.molecule_count = 14
+	_bg.molecule_count = 8
 	_bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(_bg)
 	_floor = Control.new()
@@ -109,14 +108,15 @@ func _build() -> void:
 	_player_bar = HealthBar.new()
 	_player_bar.is_player = true
 	_shake_root.add_child(_player_bar)
-	_player_tag = UIKit.header("", 16, PlayerAvatar.GREEN)
+	_player_tag = UIKit.header("", 16, Color(0.68, 0.86, 0.82))
 	_player_tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_player_tag.add_theme_constant_override("outline_size", 6)
+	_player_tag.add_theme_constant_override("outline_size", 2)
 	_player_tag.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
 	_shake_root.add_child(_player_tag)
 	_player_status = StatusRow.new()
 	_shake_root.add_child(_player_status)
-	_dose_button = UIKit.button("", "status_strength", "danger", Vector2(200, 44))
+	_dose_button = UIKit.button("", "status_strength", "danger", Vector2(166, 44))
+	_dose_button.add_theme_font_size_override("font_size", 13)
 	_dose_button.pressed.connect(func() -> void:
 		if not _busy:
 			_manager.do_action("dose"))
@@ -141,7 +141,7 @@ func _build() -> void:
 	_mol.face = true
 	_mol.tooltip_text = " "
 	_mol.mouse_filter = Control.MOUSE_FILTER_PASS
-	_mol.size = Vector2(360, 230)
+	_mol.size = Vector2(460, 280)
 	_shake_root.add_child(_mol)
 	_mol_tag = UIKit.label("", Color(0.78, 0.68, 1.0), 13, true)
 	_mol_tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -158,13 +158,14 @@ func _build() -> void:
 	_energy_label = UIKit.header("", 28)
 	_energy_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_energy_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_energy_label.size = Vector2(90, 90)
+	_energy_label.size = Vector2(90, 64)
+	_energy_label.position.y = 22
 	_energy_label.add_theme_constant_override("outline_size", 6)
 	_energy_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
 	_energy_orb.add_child(_energy_label)
 	_rule_label = UIKit.label("", UIKit.GOLD, 14, true)
-	_rule_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_rule_label.size = Vector2(150, 62)
+	_rule_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_rule_label.size = Vector2(560, 42)
 	_rule_label.tooltip_text = tr("battle.rule_tip")
 	_rule_label.mouse_filter = Control.MOUSE_FILTER_PASS
 	add_child(_rule_label)
@@ -174,6 +175,9 @@ func _build() -> void:
 	_discard_button = UIKit.button("", "ui_discard_pile", "normal", Vector2(110, 44))
 	_discard_button.pressed.connect(func() -> void: pile_requested.emit(_manager.discard_pile.duplicate(), "battle.pile.discard"))
 	add_child(_discard_button)
+	for button in [_draw_button, _discard_button]:
+		button.add_theme_stylebox_override("normal", UIKit.panel_style(Color("111d29"), Color("536574"), 6))
+		button.add_theme_stylebox_override("hover", UIKit.panel_style(Color("182c35"), UIKit.ACCENT, 6))
 	_end_button = BattleHud.EndTurnButton.new()
 	_end_button.pressed.connect(_on_end_turn)
 	add_child(_end_button)
@@ -187,11 +191,9 @@ func _build() -> void:
 	_arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_arrow.draw.connect(_draw_arrow)
 	add_child(_arrow)
-	_vignette_boss = _make_vignette(Color(0.35, 0.0, 0.02))
 	_vignette_low = _make_vignette(Color(0.95, 0.05, 0.05))
 	# 边缘遮罩只压在战场上，不盖住手牌和按钮
-	move_child(_vignette_boss, _shake_root.get_index() + 1)
-	move_child(_vignette_low, _shake_root.get_index() + 2)
+	move_child(_vignette_low, _shake_root.get_index() + 1)
 	_flash_rect = ColorRect.new()
 	_flash_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_flash_rect.color = Color(1, 0.1, 0.05, 0.0)
@@ -245,23 +247,23 @@ func _layout() -> void:
 	_player.size = _player.custom_minimum_size
 	_player.size = Vector2(200, 240)
 	_player.position = Vector2(w * 0.1, 140)
-	_player_tag.position = Vector2(w * 0.1 - 20, 362)
+	_player_tag.position = Vector2(w * 0.1 - 20, 348)
 	_player_tag.size = Vector2(240, 24)
-	_player_bar.position = Vector2(w * 0.1 + 6, 388)
+	_player_bar.position = Vector2(w * 0.1 + 6, 372)
 	_player_bar.size = Vector2(190, 26)
-	_player_status.position = Vector2(w * 0.1 + 14, 418)
-	_dose_button.position = Vector2(w * 0.1 - 6, 102)
-	_mol.position = Vector2(w * 0.1 - 80, 126)
+	_player_status.position = Vector2(w * 0.1 + 14, 400)
+	_dose_button.position = Vector2(20, h - 174)
+	_mol.position = Vector2(w * 0.1 - 130, 96)
 	_mol_tag.size = Vector2(_mol.size.x + 40, 44)
 	_mol_tag.position = Vector2(_mol.position.x - 20, 440)
 	_kind_tag.position = Vector2(24 + _title.get_combined_minimum_size().x + 14, 20)
 	_turn_badge.position = Vector2(w * 0.5 - 75, 8)
 	_turn_badge.size = _turn_badge.custom_minimum_size
 	_ai_chip.position = Vector2(w - _ai_chip.custom_minimum_size.x - 20, 12)
-	_energy_orb.position = Vector2(34, h - 250)
-	_rule_label.position = Vector2(4, h - 156)
+	_energy_orb.position = Vector2(34, h - 284)
+	_rule_label.position = Vector2(24, maxf(82.0, _mechanic.position.y + _mechanic.get_content_height() + 8.0))
 	_draw_button.position = Vector2(24, h - 70)
-	_discard_button.position = Vector2(w - 134, h - 70)
+	_discard_button.position = Vector2(w - maxf(110.0, _discard_button.get_combined_minimum_size().x) - 24, h - 70)
 	_end_button.position = Vector2(w - 168, h - 290)
 	_continue.position = Vector2(w * 0.5 - 120, h * 0.5 + 70)
 	var n := _enemy_widgets.size()
@@ -269,7 +271,7 @@ func _layout() -> void:
 	for i in n:
 		var ew := _enemy_widgets[i]
 		var x := w * 0.42 + span * (i + 0.5) / n - EnemyWidget.SIZE.x * 0.5
-		ew.position = Vector2(x, 96 + (16 if n > 1 and i % 2 == 1 else 0))
+		ew.position = Vector2(x, 96)
 	_layout_hand(true)
 	_floor.queue_redraw()
 
@@ -289,15 +291,11 @@ func _draw_floor() -> void:
 
 
 func _draw_energy() -> void:
-	var c := _energy_orb.size * 0.5
 	var full := _manager != null and _manager.energy > 0
-	var color := Color(0.98, 0.72, 0.3) if full else Color(0.4, 0.4, 0.45)
-	for i in 6:
-		_energy_orb.draw_circle(c, 44 - i * 2, Color(color, 0.05))
-	_energy_orb.draw_circle(c, 34, color.darkened(0.55))
-	_energy_orb.draw_circle(c, 30, color.darkened(0.15))
-	_energy_orb.draw_circle(c + Vector2(-9, -10), 10, Color(1, 1, 1, 0.25))
-	_energy_orb.draw_arc(c, 34, 0, TAU, 48, color.lightened(0.3), 3.0, true)
+	var accent := UIKit.GOLD if full else UIKit.TEXT_DIM
+	_energy_orb.draw_style_box(UIKit.panel_style(Color("111d29"), Color("536574"), 6), Rect2(Vector2.ZERO, _energy_orb.size))
+	_energy_orb.draw_line(Vector2(12, 3), Vector2(78, 3), accent, 2.0)
+	_energy_orb.draw_string(get_theme_default_font(), Vector2(16, 20), tr("battle.energy_title"), HORIZONTAL_ALIGNMENT_LEFT, 70, 12, accent)
 
 
 # ---------- 战斗开始 ----------
@@ -1127,7 +1125,9 @@ func _layout_hand(instant := false) -> void:
 	var card_w := CardFace.BASE.x * CARD_SCALE
 	var spacing := minf(card_w * 0.95, 820.0 / n)
 	var center_x := size.x * 0.5
-	var base_y := size.y - CardFace.BASE.y * CARD_SCALE - 14   # 留出余量，扇形两端的牌底部关键词也不出屏
+	var edge := (n - 1) * 0.5
+	var fan_margin := maxf(40.0, edge * edge * 2.0 + absf(sin(deg_to_rad(edge * 3.0))) * card_w * 0.5 + 16.0)
+	var base_y := size.y - CardFace.BASE.y * CARD_SCALE - fan_margin
 	var hover_i := cards.find(_hover_card if _selected == null else _selected)
 	for i in n:
 		var face: CardFace = _faces[cards[i]]
@@ -1139,7 +1139,7 @@ func _layout_hand(instant := false) -> void:
 		if hover_i >= 0 and i != hover_i:
 			x += 30.0 * signf(i - hover_i) / maxf(1.0, absf(i - hover_i))
 		if i == hover_i:
-			y = size.y - CardFace.BASE.y * CARD_SCALE * HOVER_SCALE - 12
+			y = size.y - CardFace.BASE.y * CARD_SCALE * HOVER_SCALE - 40
 			rot = 0.0
 			s = Vector2(HOVER_SCALE, HOVER_SCALE)
 			face.z_index = 20
@@ -1264,8 +1264,6 @@ func _process(delta: float) -> void:
 	var low := float(_shown_player_hp) / max_hp <= 0.3 and not (_ended and not _victory)
 	var target_low := (0.35 + 0.25 * sin(_time * 5.0)) if low else 0.0
 	_vignette_low.modulate.a = move_toward(_vignette_low.modulate.a, target_low, delta * 3.0)
-	var target_boss := (0.55 + 0.12 * sin(_time * 1.6)) if _is_boss and not _ended else 0.0
-	_vignette_boss.modulate.a = move_toward(_vignette_boss.modulate.a, target_boss, delta * 1.5)
 	if low and not _ended:
 		_heart_timer -= delta
 		if _heart_timer <= 0.0:
@@ -1390,8 +1388,9 @@ func _should_prompt_end() -> bool:
 func _refresh_top() -> void:
 	_turn_badge.set_turn(maxi(1, _manager.turn))
 	_ai_chip.refresh(_manager.get_ai_tier(), _manager.deviation_chance())
-	_draw_button.text = str(_manager.draw_pile.size())
-	_discard_button.text = str(_manager.discard_pile.size())
+	_draw_button.text = tr("battle.draw_short") % _manager.draw_pile.size()
+	_discard_button.text = tr("battle.discard_short") % _manager.discard_pile.size()
+	_discard_button.position.x = size.x - maxf(110.0, _discard_button.get_combined_minimum_size().x) - 24
 	_player.ratio = float(_manager.player.hp) / _manager.player.max_hp
 	_mol.ratio = _player.ratio
 	_player.shield = _manager.player.block
@@ -1609,7 +1608,7 @@ func _side_point(side: String, index: int) -> Vector2:
 
 func _player_point() -> Vector2:
 	if _mol.visible:
-		return _mol.position + _mol.size * Vector2(0.5, 0.52)
+		return _mol.position + _mol.size * Vector2(0.5, 0.48)
 	return _player.position + _player.size * Vector2(0.5, 0.6)
 
 

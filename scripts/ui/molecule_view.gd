@@ -1,12 +1,8 @@
 class_name MoleculeView
 extends Control
-## 分子结构图：中间是六元环核心，周围是 7 个带类型的位点（data/molecule.json 的 sites 坐标），
-## 片段画成带颜色的原子徽章并写上名字；带毒性警示的片段旁有警示标记。
-## interactive 时可以点位点（site_clicked），选中的位点发光；编辑器和研发总览共用。
-## compact 用于小图：位点缩小、不写名字。flash(prop) 让给这项属性加分的片段闪一下；flash_sites 让指定位点闪一下；
-## 原子用 Shading 画成有明暗的立体小球；名字和口袋提示只在编辑器（interactive）里写。
-## hit / cheer / attack 是战斗里分子作为主角的反馈；face 打开时核心里亮着两点会随情绪变化的「眼光」，
-## form（1–5，随研发团队等级）让分子长出光晕、电子轨道与星光——分子在「进化」。
+## Live scaffold with pre-rendered chemical fragments: shared by battle, hub and editor.
+## Site identity, picking, pocket hints and property flashes remain tied to the actual molecule.
+## Reactions use local charge light and bond motion; the core has no face or instrument disk.
 
 signal site_clicked(site_id: String)
 
@@ -22,14 +18,12 @@ var _site_flash := {}   # 位点 → [剩余强度, 颜色]（被敌人攻击的
 var _hit := 0.0         # 受击：抖动 + 泛红
 var _cheer := 0.0       # 胜利：跳一跳、发光
 var idle_bob := false   # 战斗中：轻轻浮动，像活着
-var face := false       # 核心环上画脸（战斗、研发总览）；编辑器里写「核心」
+var face := false       # Enable ambient evolution/reaction light in battle and hub.
 var form := 1           # 进化形态 1–5
-var mood := ""          # 持续表情：focus / sad；空为按 ratio 自动（idle / worried）
+var mood := ""          # 持续反应：focus / sad；空为按 ratio 自动（idle / worried）
 var ratio := 1.0        # 生命比例（低了会担心）
 var _react := ""        # 短暂反应：hurt / happy / fierce
 var _react_t := 0.0
-var _blink := 0.0
-var _next_blink := 2.5
 var _glow_burst := 0.0  # 进化时的闪光
 var _jolt := {}         # 位点 → [偏移, 速度]：受击时片段被震开再弹回
 var _offset := Vector2.ZERO   # 本帧整体位移（抖动 / 浮动 / 跳跃）
@@ -39,6 +33,7 @@ const TYPE_MARK := {"linker": "连", "ring": "环", "terminal": "端"}
 
 
 func _ready() -> void:
+	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	if interactive:
 		mouse_filter = Control.MOUSE_FILTER_STOP
 	elif tooltip_text.is_empty():
@@ -56,7 +51,7 @@ func flash_sites(site_ids: Array, color := Color(1.0, 0.35, 0.3)) -> void:
 		_site_flash[String(id)] = [1.0, color]
 
 
-## 受击：抖动泛红、片段被震开再弹回、表情吃痛；strength 随伤害大小
+## 受击：抖动泛红、片段被震开再弹回；strength 随伤害大小
 func hit(strength := 1.0) -> void:
 	_hit = 1.0
 	react("hurt", 0.7)
@@ -70,7 +65,7 @@ func cheer() -> void:
 	react("happy", 3.0)
 
 
-## 出招：一瞬间的凶狠表情
+## 出招：一瞬间的局部电荷辉光
 func attack() -> void:
 	react("fierce", 0.45)
 
@@ -89,7 +84,7 @@ func level_up() -> void:
 	react("happy", 2.0)
 
 
-## 当前表情：短暂反应优先，其次持续表情，最后看生命
+## 当前反应：短暂反馈优先，其次持续状态，最后看生命
 func expression() -> String:
 	if _react_t > 0:
 		return _react
@@ -118,11 +113,6 @@ func _process(delta: float) -> void:
 		_cheer = maxf(0.0, _cheer - delta * 0.35)
 		_glow_burst = maxf(0.0, _glow_burst - delta * 0.6)
 		_react_t = maxf(0.0, _react_t - delta)
-		_next_blink -= delta
-		if _next_blink <= 0:
-			_blink = 0.14
-			_next_blink = randf_range(2.0, 4.5)
-		_blink = maxf(0.0, _blink - delta)
 		for id in _jolt.keys():   # 阻尼弹簧：片段被震开后弹回原位
 			var j: Array = _jolt[id]
 			var v: Vector2 = j[1] + (-j[0] * 260.0 - j[1] * 14.0) * delta
@@ -141,12 +131,13 @@ func _site_r() -> float:
 
 
 func _scale() -> float:
-	return unit if unit > 0 else minf(size.x / 7.2, size.y / 3.9)
+	return unit if unit > 0 else minf(size.x / 8.0, size.y / 4.9)
 
 
 func site_center(site: Dictionary) -> Vector2:
 	var p: Array = site.get("pos", [0, 0])
-	return size * Vector2(0.5, 0.52) + Vector2(float(p[0]), float(p[1])) * _scale()
+	var projected := Vector2(float(p[0]) + float(p[1]) * 0.12, float(p[1]) * 0.88)
+	return size * Vector2(0.5, 0.48) + projected * _scale()
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -171,15 +162,24 @@ func _pos(site: Dictionary) -> Vector2:
 
 
 func _site_at(pos: Vector2) -> String:
+	var nearest := ""
+	var distance := INF
 	for site in Molecule.config().get("sites", []):
-		if site_center(site).distance_to(pos) <= _site_r() + 4:
-			return String(site.id)
-	return ""
+		var center := site_center(site)
+		var id := String(site.id)
+		var frag_id := String(molecule.sites.get(id, "")) if molecule != null else ""
+		var inside := center.distance_to(pos) <= _site_r() + 4
+		if not frag_id.is_empty():
+			inside = inside or MoleculeSpecimen.bounds(frag_id, center, _scale()).grow(4).has_point(pos)
+		if inside and center.distance_squared_to(pos) < distance:
+			nearest = id
+			distance = center.distance_squared_to(pos)
+	return nearest
 
 
 func _draw() -> void:
 	var cfg := Molecule.config()
-	var center := size * Vector2(0.5, 0.52)
+	var center := size * Vector2(0.5, 0.48)
 	var k := _scale()
 	var offset := Vector2(sin(_time * 70.0) * 6.0 * _hit, 0)
 	if idle_bob:
@@ -192,15 +192,8 @@ func _draw() -> void:
 	if face and not compact:
 		_draw_form(center, k)
 	var font := get_theme_default_font()
-	var bw := maxf(2.0, k * (0.1 if compact else 0.12))      # 键的粗细
-	var bond_col := Color(0.62, 0.7, 0.8)
-	# 核心：6 个碳原子组成的芳香环
-	var ring_pts: Array[Vector2] = []
-	for i in 6:
-		ring_pts.append(center + Vector2.from_angle(PI / 6 + i * TAU / 6) * k * 0.82)
-	for i in 6:
-		Shading.bond(self, ring_pts[i], ring_pts[(i + 1) % 6], bw, bond_col)
-	draw_arc(center, k * 0.52, 0, TAU, 40, Color(0.7, 0.82, 0.95, 0.3), maxf(1.0, bw * 0.35), true)
+	var bw := maxf(1.2, k * 0.065)
+	var bond_col := Color(0.64, 0.72, 0.78)
 	# 键：环上位点和连接位接在核心环上，末端位接在连接位上
 	var by_id := {}
 	for site in cfg.get("sites", []):
@@ -212,18 +205,11 @@ func _draw() -> void:
 			"terminal":
 				anchor = _pos(by_id["L1" if float(site.pos[0]) < 0 else "L2"])
 			_:
-				anchor = center + (c - center).normalized() * k * 0.82
+				anchor = center + (c - center).normalized() * Vector2(k * 0.64, k * 0.42)
 		var filled := molecule != null and molecule.sites.has(String(site.id))
 		Shading.bond(self, anchor, c, bw * (1.0 if filled else 0.6), Color(bond_col, 1.0 if filled else 0.35))
-	for p in ring_pts:
-		Shading.sphere(self, p, k * (0.13 if compact else 0.15), Color(0.42, 0.47, 0.55))
-	if face and not compact:
-		_draw_core(center, k)
-	elif not compact:
-		var core_text := tr("mol.core")
-		var tw := font.get_string_size(core_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
-		draw_string(font, center + Vector2(-tw * 0.5, 5), core_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.7, 0.8, 0.9, 0.7))
-	# 位点：片段画成立体原子；名字只在编辑器里写
+	MoleculeSpecimen.draw_fragment(self, "core", center, k)
+	# 位点：绘制对应化学片段；名字只在编辑器里写
 	var r := _site_r()
 	for site in cfg.get("sites", []):
 		var id := String(site.id)
@@ -238,7 +224,7 @@ func _draw() -> void:
 			draw_arc(c, r + 5, 0, TAU, 40, Color(1, 1, 1, 0.4), 1.5, true)
 		if frag_id.is_empty():
 			if not interactive:
-				draw_circle(c, r * 0.35, Color(0.4, 0.46, 0.54, 0.5))   # 空位：只留一个小氢原子似的点
+				MoleculeSpecimen.draw_fragment(self, "hydrogen", c, k)   # 空位：只留一个小氢原子似的点
 				continue
 			draw_circle(c, r, Color(0.06, 0.08, 0.11, 0.95))
 			for d in 16:
@@ -259,16 +245,17 @@ func _draw() -> void:
 			var t := float(sf[0])
 			Shading.glow(self, c, r * (1.7 + (1.0 - t) * 0.9), Color(sf[1], 0.8 * t))
 			draw_arc(c, r + 3, 0, TAU, 32, Color(sf[1], t), 2.5, true)
-		Shading.sphere(self, c, r, col)
+		MoleculeSpecimen.draw_fragment(self, frag_id, c, k)
 		if not String(frag.get("alert", "")).is_empty():
 			_draw_alert(c + Vector2(r * 0.85, -r * 0.85), 0.6 if compact else (1.0 if interactive else 0.75))
 		if not interactive:
 			continue
 		var frag_name := tr("frag." + frag_id)
-		var fs := roundi((15.0 if frag_name.length() <= 3 else 12.0) * r / SITE_R)
+		var fs := 12
+		var label_y := -MoleculeSpecimen.bounds(frag_id, c, k).size.y * 0.5 - 7.0
 		var nw := font.get_string_size(frag_name, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-		draw_string_outline(font, c + Vector2(-nw * 0.5, fs * 0.36), frag_name, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 4, Color(0, 0, 0, 0.75))
-		draw_string(font, c + Vector2(-nw * 0.5, fs * 0.36), frag_name, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.WHITE)
+		draw_string_outline(font, c + Vector2(-nw * 0.5, label_y), frag_name, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 4, Color(0, 0, 0, 0.75))
+		draw_string(font, c + Vector2(-nw * 0.5, label_y), frag_name, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.WHITE)
 	if interactive:
 		_draw_pocket(font)
 
@@ -308,96 +295,20 @@ func _draw_pocket(font: Font) -> void:
 			y += 13.0
 
 
-## 进化形态：2 光晕，3 电子轨道，4 第二条轨道 + 金色核心，5 闪烁的星光
+## Local electronic-density light keeps the structure, rather than a face, expressive.
 func _draw_form(center: Vector2, k: float) -> void:
-	var colors := [Color(0.5, 0.95, 0.7), Color(0.5, 0.95, 0.7), Color(0.45, 0.85, 1.0), Color(0.6, 0.75, 1.0), Color(1.0, 0.85, 0.4), Color(1.0, 0.7, 0.95)]
-	var col: Color = colors[clampi(form, 1, 5)]
-	if _glow_burst > 0:
-		draw_circle(center, k * (2.0 + (1.0 - _glow_burst) * 2.5), Color(1.0, 0.9, 0.5, 0.35 * _glow_burst))
-	if form >= 2:
-		var pulse := 0.5 + 0.5 * sin(_time * 2.2)
-		for i in 4:
-			draw_circle(center, k * (1.3 + i * 0.35 + pulse * 0.1), Color(col, 0.05))
-	if form >= 3:
-		_draw_orbit(center, Vector2(k * 3.3, k * 1.25), 0.25, 3, col, 1.0)
-	if form >= 4:
-		_draw_orbit(center, Vector2(k * 2.9, k * 1.5), -0.45, 2, Color(1.0, 0.85, 0.4), -1.3)
-		draw_arc(center, k * 0.95, 0, TAU, 48, Color(1.0, 0.85, 0.4, 0.55), 2.0, true)
-	if form >= 5:
-		for i in 7:
-			var a := i * TAU / 7.0 + _time * 0.3
-			var p := center + Vector2(cos(a) * k * 3.6, sin(a) * k * 1.9)
-			var tw := 0.5 + 0.5 * sin(_time * 4.0 + i * 1.7)
-			_draw_star(p, 3.0 + tw * 4.0, Color(1.0, 0.95, 0.7, 0.4 + 0.6 * tw))
-
-
-func _draw_orbit(center: Vector2, radii: Vector2, tilt: float, electrons: int, col: Color, speed: float) -> void:
-	var pts := PackedVector2Array()
-	for i in 49:
-		var a := i * TAU / 48.0
-		pts.append(center + Vector2(cos(a) * radii.x, sin(a) * radii.y).rotated(tilt))
-	draw_polyline(pts, Color(col, 0.22), 1.5, true)
-	for e in electrons:
-		var a := _time * speed + e * TAU / electrons
-		var p := center + Vector2(cos(a) * radii.x, sin(a) * radii.y).rotated(tilt)
-		draw_circle(p, 6.0, Color(col, 0.25))
-		draw_circle(p, 3.2, col.lightened(0.3))
-
-
-func _draw_star(p: Vector2, r: float, col: Color) -> void:
-	var pts := PackedVector2Array()
-	for i in 8:
-		var a := i * TAU / 8.0 - PI / 2
-		pts.append(p + Vector2.from_angle(a) * (r if i % 2 == 0 else r * 0.35))
-	draw_colored_polygon(pts, col)
-
-
-## 核心：一颗深色玻璃质感的球，里面亮着两点「眼光」——形状和颜色随情绪变（没有嘴巴，不走卡通路线）
-const CORE_COLOR := {"idle": Color(0.45, 0.9, 1.0), "worried": Color(1.0, 0.8, 0.4), "hurt": Color(1.0, 0.4, 0.38),
-	"happy": Color(0.5, 1.0, 0.72), "fierce": Color(1.0, 0.58, 0.32), "focus": Color(0.8, 0.95, 1.0), "sad": Color(0.45, 0.6, 0.95)}
-
-
-func _draw_core(center: Vector2, k: float) -> void:
-	var kind := expression()
-	var col: Color = CORE_COLOR.get(kind, CORE_COLOR.idle)
-	var pulse := 0.5 + 0.5 * sin(_time * 2.4)
-	Shading.glow(self, center, k * (0.95 + 0.08 * pulse), Color(col, 0.35))
-	Shading.sphere(self, center, k * 0.44, Color(0.16, 0.22, 0.32))
-	draw_arc(center, k * 0.44, 0, TAU, 40, Color(col, 0.55), 1.5, true)
-	var e := k * 0.15
-	var y := center.y - k * 0.02
-	var lw := maxf(2.0, k * 0.055)
-	for side in [-1, 1]:
-		var c := Vector2(center.x + side * e, y)
-		Shading.glow(self, c, k * 0.14, Color(col, 0.55))
-		match kind:
-			"happy":
-				draw_arc(c + Vector2(0, k * 0.03), k * 0.06, PI * 1.15, PI * 1.85, 10, col.lightened(0.4), lw, true)
-			"hurt":
-				draw_line(c + Vector2(-k * 0.05 * side, -k * 0.05), c + Vector2(k * 0.05 * side, 0), col.lightened(0.4), lw, true)
-				draw_line(c + Vector2(k * 0.05 * side, 0), c + Vector2(-k * 0.05 * side, k * 0.05), col.lightened(0.4), lw, true)
-			"fierce":
-				draw_line(c + Vector2(-k * 0.055, -k * 0.03 * side), c + Vector2(k * 0.055, k * 0.03 * side), col.lightened(0.4), lw * 1.2, true)
-			"sad":
-				draw_arc(c + Vector2(0, -k * 0.02), k * 0.055, PI * 0.15, PI * 0.85, 10, Color(col.lightened(0.3), 0.8), lw, true)
-			"focus":
-				draw_line(c - Vector2(k * 0.055, 0), c + Vector2(k * 0.055, 0), col.lightened(0.4), lw, true)
-			_:
-				if _blink > 0:
-					draw_line(c - Vector2(k * 0.045, 0), c + Vector2(k * 0.045, 0), col.lightened(0.4), lw, true)
-				else:
-					var tilt: float = 0.25 * side if kind == "worried" else 0.0
-					draw_set_transform(c + _offset, tilt)
-					_ellipse(Vector2.ZERO, Vector2(k * 0.035, k * 0.075), col.lightened(0.45))
-					draw_set_transform(_offset)
-
-
-func _ellipse(c: Vector2, radii: Vector2, col: Color) -> void:
-	var pts := PackedVector2Array()
-	for i in 20:
-		var a := i * TAU / 20.0
-		pts.append(c + Vector2(cos(a) * radii.x, sin(a) * radii.y))
-	draw_colored_polygon(pts, col)
+	var col := Color(0.25, 0.66, 0.75)
+	if ratio < 0.35:
+		col = Color(0.8, 0.38, 0.25)
+	var reaction := maxf(_glow_burst, _react_t * 0.3)
+	if _react == "hurt" and _react_t > 0:
+		col = Color(0.9, 0.25, 0.22)
+	var strength := 0.035 * mini(form, 5) + reaction * 0.12
+	Shading.glow(self, center, k * 2.3, Color(col, strength))
+	if reaction > 0.02:
+		for site in Molecule.config().get("sites", []):
+			if molecule != null and molecule.sites.has(String(site.id)):
+				Shading.glow(self, _pos(site), k * 0.5, Color(col, reaction * 0.2))
 
 
 func _draw_alert(p: Vector2, k := 1.0) -> void:

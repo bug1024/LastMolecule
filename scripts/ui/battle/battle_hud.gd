@@ -3,7 +3,7 @@ extends RefCounted
 ## 战斗界面顶部与右下角的 HUD 小部件：
 ##   TurnBadge  回合徽章——六边形里的大号回合数 + 「回合」字样，换回合时弹一下；
 ##   AiChip     AI 状态卡——档位名 + 威力倍率 + 失误率，下方一条到下一档的进度条；
-##   EndTurnButton  圆形结束回合按钮——沙漏图标 + 「E」键帽，悬停放大、按下回弹带专属音效，没牌可打时外圈光环提示。
+##   EndTurnButton  仪器面板式结束回合按钮——沙漏图标 + 「E」键帽，悬停放大、按下回弹带专属音效，没牌可打时外圈光环提示。
 
 
 class TurnBadge extends Control:
@@ -112,8 +112,8 @@ class AiChip extends PanelContainer:
 		tooltip_text = tr("battle.ai_chip") % [effective, tr("tier." + id), float(tier.get("multiplier", 1.0)), miss]
 
 
-## 结束回合：圆形按钮——深绿底 + 亮绿圆环 + 中间沙漏图标与「结束回合」，底部「E」键帽；
-## 悬停变亮放大、按下回弹并播放专属音效 end_turn；没牌可打时（prompt）外圈有扩散的光环提示。
+## 结束回合：深色仪器面板、金属边框、绿色提示线，底部保留「E」键帽；
+## 悬停变亮放大、按下回弹并播放专属音效 end_turn；没牌可打时（prompt）顶部提示线呼吸发亮。
 class EndTurnButton extends Button:
 	const D := 112.0
 	var prompt := false
@@ -148,20 +148,13 @@ class EndTurnButton extends Button:
 
 	func _draw() -> void:
 		var c := size * 0.5
-		var r := D * 0.5 - 6
 		var on := not disabled
 		var accent: Color = UIKit.ACCENT if on else Color(0.4, 0.45, 0.5)
 		var hover := on and is_hovered()
-		if on and prompt:
-			# 提示：两圈向外扩散的光环
-			for k in 2:
-				var t := fmod(_time * 0.8 + k * 0.5, 1.0)
-				draw_arc(c, r + 4 + t * 14, 0, TAU, 48, Color(accent, 0.5 * (1.0 - t)), 3.0, true)
-		draw_circle(c, r + 4, Color(accent, 0.12 if not hover else 0.22))
-		draw_circle(c, r, accent.darkened(0.62 if not hover else 0.5))
-		draw_circle(c + Vector2(0, -r * 0.25), r * 0.7, Color(accent, 0.08))   # 上半部高光
-		draw_arc(c, r, 0, TAU, 64, accent.lightened(0.3 if hover else 0.1), 3.0, true)
-		draw_arc(c, r - 7, 0, TAU, 64, Color(accent, 0.25), 1.0, true)
+		var panel := Rect2(Vector2(0, 6), Vector2(size.x, size.y - 12))
+		draw_style_box(UIKit.panel_style(Color("182c35") if hover else Color("111d29"), Color("536574"), 6), panel)
+		var alpha := 0.7 + 0.3 * sin(_time * 3.0) if on and prompt else 0.7
+		draw_line(Vector2(12, 9), Vector2(size.x - 12, 9), Color(accent, alpha), 2.0)
 		var ink := Color(0.95, 1.0, 0.97) if on else Color(0.62, 0.66, 0.7)
 		if _icon_tex:
 			draw_texture_rect(_icon_tex, Rect2(c + Vector2(-13, -34), Vector2(26, 26)), false, ink)

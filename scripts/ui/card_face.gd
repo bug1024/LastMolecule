@@ -433,9 +433,20 @@ func _draw_art(art: Rect2) -> void:
 		_art_layer.draw_set_transform(Vector2(art.position.x * 2 + art.size.x, 0), 0, Vector2(-1, 1))
 	_art_layer.draw_texture_rect_region(tex, geometry.destination, geometry.source)
 	_art_layer.draw_set_transform(Vector2.ZERO)
+	if card.id == "exp_counter":
+		var a := art.position + art.size * Vector2(0.28, 0.68)
+		var b := art.position + art.size * Vector2(0.78, 0.28)
+		_art_layer.draw_line(a, b, Color(0.04, 0.08, 0.12, 0.9), 7.0, true)
+		_art_layer.draw_line(a, b, UIKit.DANGER.lightened(0.3), 3.0, true)
+		_art_layer.draw_colored_polygon(PackedVector2Array([b + Vector2(5, -2), b + Vector2(-9, -2), b + Vector2(-2, 9)]), UIKit.DANGER.lightened(0.3))
 
 
 func _art_cell() -> int:
+	# Mechanism first: assay apparatus, structural polarity, and shield-driven counterattack.
+	match card.id:
+		"exp_assay": return 3
+		"sig_balance": return 2
+		"exp_counter": return 1
 	var ops: Array = card.effects.map(func(e: Dictionary) -> String: return String(e.get("op", "")))
 	if card.type == "ai":
 		return 5

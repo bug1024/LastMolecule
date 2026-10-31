@@ -16,7 +16,8 @@ func run() -> void:
 	Company.default_save_path = ""
 	RunSave.save_path = ""
 	GameSettings.save_path = ""
-	root.size = Vector2i(1280,720)
+	root.size = Vector2i(1280, 800 if OS.get_cmdline_user_args().has("--tall") else 720)
+	root.gui_disable_input = true # Captures must not react to incidental mouse clicks.
 	if OS.get_cmdline_user_args().has("--english"):
 		GameSettings.locale = "en"
 		TranslationServer.set_locale("en")
@@ -38,6 +39,7 @@ func run() -> void:
 	main = load("res://main.tscn").instantiate()
 	root.add_child(main)
 	await process_frame
+	main._battle_view.set_process_unhandled_input(false)
 	var game = main.get_node("GameLogic")
 	if String(game._current_event.get("id", "")) == "disease":
 		game.resolve_event_choice("disease", 0)
@@ -58,6 +60,46 @@ func run() -> void:
 		main._battle_view._tip.get_parent().get_parent().queue_free()
 		main._battle_view._tip = null
 	await shot("battle")
+	# Regression composition: boss pressure, three different mechanisms and low-HP warning.
+	game.battles_fought = 1
+	game._start_battle("boss")
+	await create_timer(5).timeout
+	while main._battle_view._busy:
+		await process_frame
+	var battle = main._battle_view
+	var manager = battle._manager
+	manager.hand.clear()
+	for id in ["exp_assay", "exp_counter", "sig_balance"]:
+		manager.hand.append(ResearchCard.from_dict(game.get_card_by_id(id)))
+	manager.energy = 1
+	manager.player.hp = 77
+	battle._shown_player_hp = 77
+	battle._refresh_all(true)
+	await shot("battle-boss")
+	var displayed_molecule = battle._mol.molecule
+	for preset in ["potent", "selective"]:
+		var candidate := Molecule.create()
+		candidate.apply_preset(preset)
+		battle._mol.set_molecule(candidate)
+		await shot("molecule-" + preset)
+	battle._mol.set_molecule(displayed_molecule)
+	battle._mol.flash_sites(["L1"], Color(0.9, 0.3, 0.25))
+	battle._mol.hit(0.5)
+	await shot("molecule-hit")
+	manager.player.hp = 20
+	battle._shown_player_hp = 20
+	battle._refresh_all(true)
+	await shot("battle-low-hp")
+	manager.player.hp = 77
+	battle._shown_player_hp = 77
+	battle._refresh_all(true)
+	for stage in ["三期临床试验", "一期临床试验"]:
+		game.state.stage = stage
+		game._start_battle("boss")
+		await create_timer(5).timeout
+		while battle._busy:
+			await process_frame
+		await shot("battle-multi" if stage == "三期临床试验" else "battle-dose")
 	main._settings.open()
 	await shot("settings")
 	main._settings.visible = false

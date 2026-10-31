@@ -22,7 +22,6 @@ var danger := false           # 本回合伤害很高：意图数字放大并闪
 const DANGER_DAMAGE := 15
 var _intent_box: HBoxContainer
 var _intent_icons: HBoxContainer
-var _intent_label: Label
 var _name: Label
 var _time := 0.0
 var _hover := false
@@ -35,20 +34,17 @@ func setup(enemy: Enemy, enemy_index: int) -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	_intent_box = HBoxContainer.new()
 	_intent_box.alignment = BoxContainer.ALIGNMENT_CENTER
-	_intent_box.position = Vector2(0, 0)
-	_intent_box.size = Vector2(SIZE.x, 40)
+	_intent_box.position = Vector2(25, 4)
+	_intent_box.size = Vector2(200, 40)
 	_intent_box.mouse_filter = Control.MOUSE_FILTER_STOP
 	_intent_icons = HBoxContainer.new()
 	_intent_icons.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_intent_box.add_child(_intent_icons)
-	_intent_label = UIKit.label("", Color.WHITE, 22)
-	_intent_label.add_theme_constant_override("outline_size", 6)
-	_intent_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
-	_intent_box.add_child(_intent_label)
+	_intent_icons.add_theme_constant_override("separation", 12)
 	add_child(_intent_box)
 	creature = CreatureView.new()
 	creature.setup(enemy.data, enemy.is_boss, enemy.is_elite)
-	creature.radius = clampf(creature.radius * 1.2, 70, 100)
+	creature.radius = clampf(creature.radius * 1.2, 70, 92)
 	creature.custom_minimum_size = Vector2(creature.radius * 2.8, creature.radius * 2.6)
 	var cs := creature.custom_minimum_size
 	creature.size = cs
@@ -57,8 +53,10 @@ func setup(enemy: Enemy, enemy_index: int) -> void:
 	move_child(_intent_box, -1)
 	_name = UIKit.label(tr(enemy.name_key), Color(1, 0.9, 0.85) if enemy.is_boss else Color.WHITE, 15)
 	_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_name.position = Vector2(0, 252)
-	_name.size = Vector2(SIZE.x, 22)
+	_name.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_name.tooltip_text = tr(enemy.name_key)
+	_name.position = Vector2(25, 252)
+	_name.size = Vector2(200, 22)
 	_name.add_theme_constant_override("outline_size", 5)
 	_name.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
 	add_child(_name)
@@ -84,22 +82,44 @@ func setup(enemy: Enemy, enemy_index: int) -> void:
 
 func show_intent(enemy: Enemy, damage: int) -> void:
 	for child in _intent_icons.get_children():
+		_intent_icons.remove_child(child)
 		child.queue_free()
 	if not enemy.is_alive() or enemy.intent.is_empty():
 		_intent_box.visible = false
 		return
 	_intent_box.visible = true
-	var kind := String(enemy.intent.get("intent", "attack"))
-	var parts := kind.split("_")
-	for part in parts:
-		var color: Color = INTENT_COLOR.get(part, Color.WHITE)
-		_intent_icons.add_child(UIKit.icon_rect("intent_" + part, 32, color))
+	var move := enemy.intent
+	var kind := String(move.get("intent", "attack"))
 	var hits := enemy.intent_hits()
-	_intent_label.text = "" if damage <= 0 else (str(damage) if hits == 1 else "%d×%d" % [damage, hits])
 	danger = damage * hits >= DANGER_DAMAGE
-	_intent_label.add_theme_font_size_override("font_size", 30 if danger else 24)
-	_intent_label.add_theme_color_override("font_color", Color(1.0, 0.25, 0.2) if danger else (INTENT_COLOR.attack.lightened(0.3) if damage > 0 else Color.WHITE))
+	if kind.split("_").has("attack"):
+		_add_intent("intent_attack", str(damage) if hits == 1 else "%d×%d" % [damage, hits], INTENT_COLOR.attack)
+	for field in ["block", "ally_block"]:
+		if int(move.get(field, 0)) > 0:
+			_add_intent("intent_defend", str(int(move[field])), INTENT_COLOR.defend)
+	for field in ["status", "self_status", "ally_status"]:
+		for id in move.get(field, {}):
+			var debuff: bool = field == "status"
+			_add_intent("status_" + String(id) if debuff else "intent_buff", str(int(move[field][id])), INTENT_COLOR.debuff if debuff else INTENT_COLOR.buff)
+	if move.has("add_card"):
+		_add_intent("intent_debuff", str(int(move.add_card.get("value", 1))), INTENT_COLOR.debuff)
+	if _intent_icons.get_child_count() == 0:
+		_add_intent("intent_" + kind, "", INTENT_COLOR.get(kind, Color.WHITE))
 	_intent_box.tooltip_text = _intent_tooltip(enemy, damage)
+
+
+func _add_intent(icon_name: String, amount: String, color: Color) -> void:
+	var item := HBoxContainer.new()
+	item.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	item.add_theme_constant_override("separation", 3)
+	item.add_child(UIKit.icon_rect(icon_name, 26, color))
+	if not amount.is_empty():
+		var number := UIKit.label(amount, color.lightened(0.25), 22)
+		number.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		number.add_theme_constant_override("outline_size", 3)
+		number.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+		item.add_child(number)
+	_intent_icons.add_child(item)
 
 
 func _intent_tooltip(enemy: Enemy, damage: int) -> String:
@@ -131,8 +151,8 @@ func refresh(enemy: Enemy) -> void:
 func _process(delta: float) -> void:
 	_time += delta
 	if _intent_box and _intent_box.visible:
-		_intent_box.position.y = 4.0 * sin(_time * 2.5)
-		var s := 1.0 + (0.12 * absf(sin(_time * 6.0)) if danger else 0.0)
+		_intent_box.position.y = 4.0
+		var s := 1.0 + (0.025 * absf(sin(_time * 6.0)) if danger else 0.0)
 		_intent_box.pivot_offset = _intent_box.size * 0.5
 		_intent_box.scale = Vector2(s, s)
 	queue_redraw()
