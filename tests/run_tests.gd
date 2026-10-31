@@ -56,6 +56,7 @@ func _run() -> void:
 	_test_player_levels()
 	_test_ai_next_tier()
 	_test_card_face_readable()
+	_test_card_art_bounds()
 	_test_project_types()
 	_test_backfire_preview()
 	_test_program_decisions()
@@ -690,6 +691,28 @@ func _test_card_face_readable() -> void:
 			face.free()
 	TranslationServer.set_locale("zh_CN")
 	_expect(small.is_empty(), "Card face text stays >= 12px at hand scale: %s" % ", ".join(small))
+
+
+## Atlas crops must stay in their source cell and positive destination, including mirrored AI cards.
+func _test_card_art_bounds() -> void:
+	var issues: Array[String] = []
+	var flips := 0
+	for data in JsonData.load_dict("res://data/cards.json").cards:
+		var card := ResearchCard.from_dict(data)
+		for k in [0.9, 1.15, 1.6]:
+			var face := CardFace.create(card, k)
+			var area := Rect2(Vector2.ZERO, CardFace.ART_RECT.size * k)
+			var cell := face._art_cell()
+			var g := CardFace.art_region(card.id, cell, area, Vector2(1536, 1024))
+			var source: Rect2 = g.source
+			var destination: Rect2 = g.destination
+			var tile := Rect2(Vector2(cell % 3, cell / 3) * 512, Vector2(512, 512))
+			if not tile.encloses(source) or destination != area or not face._art_layer.clip_contents:
+				issues.append("%s/%s" % [card.id, k])
+			flips += 1 if bool(g.mirrored) else 0
+			face.free()
+	_expect(issues.is_empty(), "Card crops remain inside their atlas cell and clipping viewport at hand, pick and detail scales: " + ", ".join(issues))
+	_expect(flips > 0, "Art bounds regression includes mirrored card illustrations")
 
 
 func _test_ai_next_tier() -> void:

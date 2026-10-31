@@ -18,7 +18,6 @@ var _pending_upgrade: ResearchCard = null
 
 
 func _ready() -> void:
-	UIKit.decorate_panel($Center/Margin)
 	_skip_button.pressed.connect(_on_skip_pressed)
 
 
@@ -86,7 +85,7 @@ func _upgrade_option(card: ResearchCard, card_scale: float, ai_info: Dictionary)
 		face.set_state(false, false, true)
 	box.add_child(face)
 	var diff := ResearchCard.upgrade_diff(card, card.upgrade_preview)
-	var lines := UIKit.label("\n".join(diff) if not diff.is_empty() else tr("ui.upgrade.same"), UIKit.ACCENT_BLUE, 14, true)
+	var lines := UIKit.label("\n".join(diff) if not diff.is_empty() else tr("ui.upgrade.same"), Color(0.55, 1.0, 0.65), 14, true)
 	lines.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lines.custom_minimum_size = Vector2(CardFace.BASE.x * card_scale, 0)
 	box.add_child(lines)
@@ -123,11 +122,11 @@ func _show_upgrade_result(card: ResearchCard) -> void:
 	var old_face := CardFace.create(card, 0.9)
 	old_face.set_state(false, false, true)
 	row.add_child(old_face)
-	row.add_child(UIKit.header("➜", 48, UIKit.ACCENT_BLUE))
+	row.add_child(UIKit.header("➜", 48, Color(0.55, 1.0, 0.65)))
 	var new_face := CardFace.create(card.upgrade_preview, 1.25, {"compare_to": card})
 	new_face.set_state(true, false)
 	row.add_child(new_face)
-	var diff := UIKit.label("\n".join(ResearchCard.upgrade_diff(card, card.upgrade_preview)), UIKit.ACCENT_BLUE, 20, true)
+	var diff := UIKit.label("\n".join(ResearchCard.upgrade_diff(card, card.upgrade_preview)), Color(0.55, 1.0, 0.65), 20, true)
 	diff.custom_minimum_size = Vector2(240, 0)
 	row.add_child(diff)
 	_card_row.add_child(row)

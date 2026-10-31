@@ -6,9 +6,9 @@ extends Control
 signal restart_requested()
 
 const OUTCOME_COLOR := {
-	"approved": UIKit.ACCENT,
-	"terminated": UIKit.GOLD,
-	"failed": UIKit.DANGER,
+	"approved": Color(0.35, 0.85, 0.6),
+	"terminated": Color(0.95, 0.8, 0.4),
+	"failed": Color(0.93, 0.42, 0.42),
 }
 
 var _panel: PanelContainer
@@ -22,7 +22,7 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	visible = false
 	var dim := ColorRect.new()
-	dim.color = Color(0.12, 0.09, 0.06, 0.82)
+	dim.color = Color(0.01, 0.02, 0.04, 0.82)
 	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(dim)
 	var center := CenterContainer.new()
@@ -31,7 +31,6 @@ func _ready() -> void:
 	_panel = PanelContainer.new()
 	_panel.custom_minimum_size = Vector2(640, 0)
 	center.add_child(_panel)
-	UIKit.decorate_panel(_panel)
 	_box = VBoxContainer.new()
 	_box.add_theme_constant_override("separation", 12)
 	_box.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -43,7 +42,7 @@ func show_ending(outcome: String, reason_key: String, summary: Dictionary, state
 	for child in _box.get_children():
 		child.queue_free()
 	var color: Color = OUTCOME_COLOR.get(outcome, OUTCOME_COLOR.failed)
-	var style := UIKit.panel_style(Color(UIKit.PAPER, 0.98), color, 18)
+	var style := UIKit.panel_style(Color(0.07, 0.09, 0.12, 0.98), color, 18)
 	style.set_content_margin_all(28)
 	style.shadow_color = Color(color, 0.25)
 	style.shadow_size = 24
@@ -111,7 +110,7 @@ func show_ending(outcome: String, reason_key: String, summary: Dictionary, state
 			lines.append(tr("ending.conquered") % disease_name)
 		elif not String(summary.get("next_variant", "")).is_empty():
 			lines.append(tr("ending.resistance") % tr("variant." + String(summary.next_variant)))
-		var mission := UIKit.label("\n".join(lines), UIKit.ACCENT_BLUE, 15, true)
+		var mission := UIKit.label("\n".join(lines), Color(0.82, 0.72, 1.0), 15, true)
 		mission.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		mission.custom_minimum_size = Vector2(560, 0)
 		_mid.add_child(mission)

@@ -12,7 +12,7 @@ var _atoms: Array[Vector3] = []   # x, y, 颜色索引
 var _bonds: Array[Vector2i] = []
 var _time := 0.0
 
-const ATOM_COLORS := [Color(0.20, 0.18, 0.15), Color(0.18, 0.42, 0.42), Color(0.70, 0.61, 0.42), Color(0.72, 0.43, 0.12), Color(0.56, 0.24, 0.16)]
+const ATOM_COLORS := [Color(0.95, 0.97, 1.0), Color(0.45, 0.75, 1.0), Color(0.6, 0.48, 0.95), Color(0.95, 0.72, 0.35), Color(0.93, 0.45, 0.45)]
 
 
 func _ready() -> void:
@@ -68,7 +68,7 @@ func _draw() -> void:
 	var extent := 0.0
 	for a in _atoms:
 		extent = maxf(extent, Vector2(a.x, a.y).length())
-	var scale_px := minf(size.x, size.y) * 0.49 / maxf(extent, 1.0)
+	var scale_px := minf(size.x, size.y) * 0.42 / maxf(extent, 1.0)
 	var tone := Color(0.93, 0.42, 0.42).lerp(Color(0.31, 0.85, 0.6), clampf(health, 0.0, 1.0))
 	var pulse := 0.5 + 0.5 * sin(_time * 1.6)
 	for i in 8:
@@ -84,11 +84,10 @@ func _draw() -> void:
 		var p := (Vector2(a.x, a.y) - centroid).rotated(rot)
 		points.append(center + Vector2(p.x, p.y * squash) * scale_px)
 	for b in _bonds:
-		var normal := (points[b.y] - points[b.x]).normalized().orthogonal() * 2
-		Shading.bond(self, points[b.x] + normal, points[b.y] + normal, 5, Color(0.60, 0.46, 0.24))
-		Shading.bond(self, points[b.x] - normal, points[b.y] - normal, 3, Color(0.44, 0.36, 0.26))
+		draw_line(points[b.x], points[b.y], Color(tone, 0.25), 9.0, true)
+		draw_line(points[b.x], points[b.y], Color(tone.lightened(0.3), 0.9), 3.0, true)
 	for i in _atoms.size():
 		var c: Color = ATOM_COLORS[int(_atoms[i].z)]
-		var r := 8.0 if int(_atoms[i].z) == 0 else 11.0
-		Shading.sphere(self, points[i] + Vector2(2, 4), r + 1, Color(0.1, 0.08, 0.05, 0.2), 0)
-		Shading.sphere(self, points[i], r, c, 1.4)
+		var r := 7.0 if int(_atoms[i].z) == 0 else 10.0
+		draw_circle(points[i], r + 5, Color(c, 0.15 + 0.1 * pulse))
+		draw_circle(points[i], r, c)

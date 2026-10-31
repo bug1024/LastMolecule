@@ -347,7 +347,7 @@ title.help,玩法说明,How to Play
 title.settings,设置,Settings
 title.credits,制作名单,Credits
 title.quit,退出游戏,Quit
-title.version,v0.4 · 研究档案,v0.4 · Research Archive
+title.version,v0.4 · Godot 4.7 · 美术与音乐均为程序生成,v0.4 · Godot 4.7 · procedural art and music
 title.company,公司概况,Company
 title.company_new,刚成立的新公司，还没有做过项目。第一次玩建议先看看「玩法说明」。,A brand-new company with no projects yet. First time? Check “How to Play”.
 title.company_line,已完成 %d 个项目，获批 %d 个\n流程等级 Lv%d · 公司数据 %d,"%d projects finished, %d approved\nProcess Lv%d · company data %d"

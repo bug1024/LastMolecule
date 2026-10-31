@@ -32,7 +32,7 @@ class TurnBadge extends Control:
 		for k in 7:
 			var a := PI / 6 + k * TAU / 6
 			pts.append(c + Vector2(cos(a), sin(a)) * r)
-		draw_colored_polygon(pts, Color(UIKit.PAPER, 0.92))
+		draw_colored_polygon(pts, Color(0.05, 0.08, 0.1, 0.92))
 		draw_polyline(pts, Color(UIKit.ACCENT, 0.9), 2.0, true)
 		if _pop > 0.0:
 			draw_circle(c, r + 10 * _pop, Color(UIKit.ACCENT, 0.18 * _pop))
@@ -40,10 +40,11 @@ class TurnBadge extends Control:
 		var text := str(turn)
 		var fs := 24
 		var w := bold.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-		draw_string(bold, c + Vector2(-w * 0.5, fs * 0.36), text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, UIKit.INK)
+		draw_string_outline(bold, c + Vector2(-w * 0.5, fs * 0.36), text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 4, Color(0, 0, 0, 0.7))
+		draw_string(bold, c + Vector2(-w * 0.5, fs * 0.36), text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.WHITE)
 		var font := get_theme_default_font()
-		draw_string(font, Vector2(64, size.y * 0.5 - 2), tr("battle.turn_word"), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UIKit.INK)
-		draw_string(font, Vector2(64, size.y * 0.5 + 16), "ROUND", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UIKit.TEXT_DIM)
+		draw_string(font, Vector2(64, size.y * 0.5 - 2), tr("battle.turn_word"), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UIKit.TEXT_DIM)
+		draw_string(font, Vector2(64, size.y * 0.5 + 16), "ROUND", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(UIKit.ACCENT, 0.7))
 
 
 class AiChip extends PanelContainer:
@@ -67,7 +68,7 @@ class AiChip extends PanelContainer:
 		row.add_child(_icon)
 		_tier_label = UIKit.header("", 17)
 		row.add_child(_tier_label)
-		_power = UIKit.header("", 17, UIKit.INK)
+		_power = UIKit.header("", 17, Color.WHITE)
 		row.add_child(_power)
 		var spacer := Control.new()
 		spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -78,8 +79,7 @@ class AiChip extends PanelContainer:
 		_bar.custom_minimum_size = Vector2(0, 6)
 		_bar.show_percentage = false
 		col.add_child(_bar)
-		_next = UIKit.label("", UIKit.ACCENT_BLUE, 12)
-		_next.visible = false   # 下一档要多少数据写进悬停提示，纸签保持一行高，不压到敌人的意图
+		_next = UIKit.label("", Color(0.7, 0.82, 0.95), 12)
 		col.add_child(_next)
 		for node in find_children("*", "Control", true, false):
 			(node as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -90,7 +90,7 @@ class AiChip extends PanelContainer:
 		# 档位只改文字颜色（低档灰蓝、中档蓝、高档金）；进度条统一用代表「数据」的蓝色，不用红色，以免和敌人混淆
 		var color: Color = {"low": Color(0.62, 0.7, 0.8), "mid": UIKit.ACCENT_BLUE, "high": UIKit.GOLD}.get(id, UIKit.ACCENT_BLUE)
 		var bar_color: Color = UIKit.ACCENT_BLUE
-		var sb := UIKit.panel_style(Color(UIKit.PAPER, 0.72), Color(0.3, 0.4, 0.5, 0.45), 12)
+		var sb := UIKit.panel_style(Color(0.04, 0.06, 0.09, 0.72), Color(0.3, 0.4, 0.5, 0.45), 12)
 		sb.content_margin_left = 12
 		sb.content_margin_right = 12
 		sb.content_margin_top = 8
@@ -98,7 +98,7 @@ class AiChip extends PanelContainer:
 		add_theme_stylebox_override("panel", sb)
 		_icon.self_modulate = UIKit.ACCENT_BLUE
 		_tier_label.text = "AI · " + tr("tier." + id)
-		_tier_label.add_theme_color_override("font_color", UIKit.ink(color))
+		_tier_label.add_theme_color_override("font_color", color.lightened(0.2))
 		_power.text = "×" + String.num(float(tier.get("multiplier", 1.0)), 2)
 		_miss.text = tr("battle.ai_miss") % miss
 		var effective := int(tier.get("effective", 0))
@@ -107,9 +107,9 @@ class AiChip extends PanelContainer:
 		_bar.step = 0.001
 		_bar.value = 1.0 if need < 0 else clampf(float(effective) / maxf(1.0, float(tier.get("max", effective + need))), 0.0, 1.0)
 		_bar.add_theme_stylebox_override("fill", UIKit.filled(bar_color, bar_color, 3))
-		_bar.add_theme_stylebox_override("background", UIKit.filled(UIKit.PAPER, UIKit.PAPER, 3))
+		_bar.add_theme_stylebox_override("background", UIKit.filled(Color(0.12, 0.15, 0.2), Color(0.12, 0.15, 0.2), 3))
 		_next.text = BattleView.ai_next_text(tier)
-		tooltip_text = tr("battle.ai_chip") % [effective, tr("tier." + id), float(tier.get("multiplier", 1.0)), miss] + "\n" + _next.text
+		tooltip_text = tr("battle.ai_chip") % [effective, tr("tier." + id), float(tier.get("multiplier", 1.0)), miss]
 
 
 ## 结束回合：圆形按钮——深绿底 + 亮绿圆环 + 中间沙漏图标与「结束回合」，底部「E」键帽；
@@ -147,15 +147,30 @@ class EndTurnButton extends Button:
 		queue_redraw()
 
 	func _draw() -> void:
-		var rect := Rect2(Vector2(0, 22), Vector2(size.x, 62))
-		var color := UIKit.TEAL if not disabled else UIKit.TEXT_DIM
-		if is_hovered() and not disabled:
-			color = color.lightened(0.1)
-		draw_style_box(UIKit.action_style(color.darkened(0.3)), rect)
-		draw_rect(rect.grow(-4), Color(UIKit.BRASS, 0.8), false, 1)
+		var c := size * 0.5
+		var r := D * 0.5 - 6
+		var on := not disabled
+		var accent: Color = UIKit.ACCENT if on else Color(0.4, 0.45, 0.5)
+		var hover := on and is_hovered()
+		if on and prompt:
+			# 提示：两圈向外扩散的光环
+			for k in 2:
+				var t := fmod(_time * 0.8 + k * 0.5, 1.0)
+				draw_arc(c, r + 4 + t * 14, 0, TAU, 48, Color(accent, 0.5 * (1.0 - t)), 3.0, true)
+		draw_circle(c, r + 4, Color(accent, 0.12 if not hover else 0.22))
+		draw_circle(c, r, accent.darkened(0.62 if not hover else 0.5))
+		draw_circle(c + Vector2(0, -r * 0.25), r * 0.7, Color(accent, 0.08))   # 上半部高光
+		draw_arc(c, r, 0, TAU, 64, accent.lightened(0.3 if hover else 0.1), 3.0, true)
+		draw_arc(c, r - 7, 0, TAU, 64, Color(accent, 0.25), 1.0, true)
+		var ink := Color(0.95, 1.0, 0.97) if on else Color(0.62, 0.66, 0.7)
+		if _icon_tex:
+			draw_texture_rect(_icon_tex, Rect2(c + Vector2(-13, -34), Vector2(26, 26)), false, ink)
 		var font := get_theme_default_font()
 		var label := TranslationServer.translate("ui.end_turn")
-		var fs := 17
+		var fs := 16
 		var w := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-		draw_string(font, Vector2((size.x-w)*0.5, 60), label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, UIKit.PAPER_LIGHT)
-		draw_string(font, Vector2(size.x * 0.5 - 3, 78), "E", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(UIKit.PAPER, 0.6))
+		draw_string(font, c + Vector2(-w * 0.5, 14), label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, ink)
+		var cap := Rect2(c + Vector2(-10, 22), Vector2(20, 18))
+		draw_rect(cap, Color(0, 0, 0, 0.3))
+		draw_rect(cap, Color(ink, 0.5), false, 1.0)
+		draw_string(font, cap.position + Vector2(6, 14), "E", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(ink, 0.85))

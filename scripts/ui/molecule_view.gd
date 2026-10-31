@@ -193,7 +193,7 @@ func _draw() -> void:
 		_draw_form(center, k)
 	var font := get_theme_default_font()
 	var bw := maxf(2.0, k * (0.1 if compact else 0.12))      # 键的粗细
-	var bond_col := Color(0.49, 0.39, 0.24)
+	var bond_col := Color(0.62, 0.7, 0.8)
 	# 核心：6 个碳原子组成的芳香环
 	var ring_pts: Array[Vector2] = []
 	for i in 6:
@@ -216,13 +216,13 @@ func _draw() -> void:
 		var filled := molecule != null and molecule.sites.has(String(site.id))
 		Shading.bond(self, anchor, c, bw * (1.0 if filled else 0.6), Color(bond_col, 1.0 if filled else 0.35))
 	for p in ring_pts:
-		Shading.sphere(self, p, k * (0.13 if compact else 0.15), Color(0.26, 0.24, 0.20))
+		Shading.sphere(self, p, k * (0.13 if compact else 0.15), Color(0.42, 0.47, 0.55))
 	if face and not compact:
 		_draw_core(center, k)
 	elif not compact:
 		var core_text := tr("mol.core")
 		var tw := font.get_string_size(core_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
-		draw_string(font, center + Vector2(-tw * 0.5, 5), core_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UIKit.TEXT_DIM)
+		draw_string(font, center + Vector2(-tw * 0.5, 5), core_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.7, 0.8, 0.9, 0.7))
 	# 位点：片段画成立体原子；名字只在编辑器里写
 	var r := _site_r()
 	for site in cfg.get("sites", []):
@@ -240,13 +240,13 @@ func _draw() -> void:
 			if not interactive:
 				draw_circle(c, r * 0.35, Color(0.4, 0.46, 0.54, 0.5))   # 空位：只留一个小氢原子似的点
 				continue
-			draw_circle(c, r, UIKit.PAPER_DARK)
+			draw_circle(c, r, Color(0.06, 0.08, 0.11, 0.95))
 			for d in 16:
 				var a0 := d * TAU / 16.0
-				draw_arc(c, r, a0, a0 + TAU / 32.0, 4, Color(UIKit.BRASS, 0.6), 1.5, true)
+				draw_arc(c, r, a0, a0 + TAU / 32.0, 4, Color(0.6, 0.68, 0.76, 0.6), 1.5, true)
 			var mark := String(TYPE_MARK.get(String(site.type), "?"))
 			var mw := font.get_string_size(mark, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
-			draw_string(font, c + Vector2(-mw * 0.5, 6), mark, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, UIKit.TEXT_DIM)
+			draw_string(font, c + Vector2(-mw * 0.5, 6), mark, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.6, 0.68, 0.76, 0.8))
 			continue
 		var frag := Molecule.fragment(frag_id)
 		var col := Color.from_string(String(frag.get("color", "#9fb4c8")), Color(0.6, 0.7, 0.8))
@@ -259,7 +259,6 @@ func _draw() -> void:
 			var t := float(sf[0])
 			Shading.glow(self, c, r * (1.7 + (1.0 - t) * 0.9), Color(sf[1], 0.8 * t))
 			draw_arc(c, r + 3, 0, TAU, 32, Color(sf[1], t), 2.5, true)
-		Shading.glow(self, c + Vector2(r * 0.15, r * 0.35), r * 1.4, Color(0.18, 0.1, 0.04, 0.25))   # 落在纸面上的柔影
 		Shading.sphere(self, c, r, col)
 		if not String(frag.get("alert", "")).is_empty():
 			_draw_alert(c + Vector2(r * 0.85, -r * 0.85), 0.6 if compact else (1.0 if interactive else 0.75))
@@ -268,9 +267,8 @@ func _draw() -> void:
 		var frag_name := tr("frag." + frag_id)
 		var fs := roundi((15.0 if frag_name.length() <= 3 else 12.0) * r / SITE_R)
 		var nw := font.get_string_size(frag_name, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-		# 名字写在原子球里（深色球 + 浅色字），不再挂在球下面和别的原子、口袋提示打架
-		draw_string_outline(font, c + Vector2(-nw * 0.5, fs * 0.36), frag_name, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 4, Color(0.1, 0.08, 0.05, 0.7))
-		draw_string(font, c + Vector2(-nw * 0.5, fs * 0.36), frag_name, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, UIKit.PAPER_LIGHT)
+		draw_string_outline(font, c + Vector2(-nw * 0.5, fs * 0.36), frag_name, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 4, Color(0, 0, 0, 0.75))
+		draw_string(font, c + Vector2(-nw * 0.5, fs * 0.36), frag_name, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.WHITE)
 	if interactive:
 		_draw_pocket(font)
 
@@ -290,11 +288,11 @@ func _draw_pocket(font: Font) -> void:
 		if fits.is_empty():
 			continue
 		var c := _pos(site)
-		var y := -r - 18.0
+		var y := r + 13.0
 		for fit in fits:
 			var want: bool = fit.has("want")
 			var hit: bool = bool(fit.hit)
-			var col := (UIKit.TEAL if want else UIKit.DANGER)
+			var col := (Color(0.45, 0.95, 0.6) if want else Color(1.0, 0.45, 0.4))
 			var rr := r + (7.0 if want else 11.0)
 			if hit:
 				draw_arc(c, rr, 0, TAU, 40, Color(col, 0.95), 2.5, true)
@@ -305,14 +303,14 @@ func _draw_pocket(font: Font) -> void:
 			var label := tr("pocket.%s.%s" % ["want" if want else "avoid", String(fit.get("want", fit.get("avoid", "")))])
 			var fs := 11
 			var w := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-			draw_string_outline(font, c + Vector2(-w * 0.5, y), label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 0, UIKit.PAPER_LIGHT)
+			draw_string_outline(font, c + Vector2(-w * 0.5, y), label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 3, Color(0, 0, 0, 0.85))
 			draw_string(font, c + Vector2(-w * 0.5, y), label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, col if (hit == want) else Color(col, 0.75))
 			y += 13.0
 
 
 ## 进化形态：2 光晕，3 电子轨道，4 第二条轨道 + 金色核心，5 闪烁的星光
 func _draw_form(center: Vector2, k: float) -> void:
-	var colors := [UIKit.TEAL, UIKit.TEAL, Color(0.2, 0.5, 0.52), UIKit.ACCENT_BLUE, UIKit.BRASS, Color(0.72, 0.5, 0.2)]
+	var colors := [Color(0.5, 0.95, 0.7), Color(0.5, 0.95, 0.7), Color(0.45, 0.85, 1.0), Color(0.6, 0.75, 1.0), Color(1.0, 0.85, 0.4), Color(1.0, 0.7, 0.95)]
 	var col: Color = colors[clampi(form, 1, 5)]
 	if _glow_burst > 0:
 		draw_circle(center, k * (2.0 + (1.0 - _glow_burst) * 2.5), Color(1.0, 0.9, 0.5, 0.35 * _glow_burst))
@@ -323,14 +321,14 @@ func _draw_form(center: Vector2, k: float) -> void:
 	if form >= 3:
 		_draw_orbit(center, Vector2(k * 3.3, k * 1.25), 0.25, 3, col, 1.0)
 	if form >= 4:
-		_draw_orbit(center, Vector2(k * 2.9, k * 1.5), -0.45, 2, UIKit.BRASS, -1.3)
-		draw_arc(center, k * 0.95, 0, TAU, 48, Color(UIKit.BRASS, 0.7), 2.0, true)
+		_draw_orbit(center, Vector2(k * 2.9, k * 1.5), -0.45, 2, Color(1.0, 0.85, 0.4), -1.3)
+		draw_arc(center, k * 0.95, 0, TAU, 48, Color(1.0, 0.85, 0.4, 0.55), 2.0, true)
 	if form >= 5:
 		for i in 7:
 			var a := i * TAU / 7.0 + _time * 0.3
 			var p := center + Vector2(cos(a) * k * 3.6, sin(a) * k * 1.9)
 			var tw := 0.5 + 0.5 * sin(_time * 4.0 + i * 1.7)
-			_draw_star(p, 3.0 + tw * 4.0, Color(UIKit.BRASS.lightened(0.2), 0.4 + 0.6 * tw))
+			_draw_star(p, 3.0 + tw * 4.0, Color(1.0, 0.95, 0.7, 0.4 + 0.6 * tw))
 
 
 func _draw_orbit(center: Vector2, radii: Vector2, tilt: float, electrons: int, col: Color, speed: float) -> void:
@@ -355,7 +353,7 @@ func _draw_star(p: Vector2, r: float, col: Color) -> void:
 
 
 ## 核心：一颗深色玻璃质感的球，里面亮着两点「眼光」——形状和颜色随情绪变（没有嘴巴，不走卡通路线）
-const CORE_COLOR := {"idle": Color(0.4, 0.85, 0.78), "worried": Color(1.0, 0.8, 0.4), "hurt": Color(1.0, 0.4, 0.38),
+const CORE_COLOR := {"idle": Color(0.45, 0.9, 1.0), "worried": Color(1.0, 0.8, 0.4), "hurt": Color(1.0, 0.4, 0.38),
 	"happy": Color(0.5, 1.0, 0.72), "fierce": Color(1.0, 0.58, 0.32), "focus": Color(0.8, 0.95, 1.0), "sad": Color(0.45, 0.6, 0.95)}
 
 
@@ -364,7 +362,7 @@ func _draw_core(center: Vector2, k: float) -> void:
 	var col: Color = CORE_COLOR.get(kind, CORE_COLOR.idle)
 	var pulse := 0.5 + 0.5 * sin(_time * 2.4)
 	Shading.glow(self, center, k * (0.95 + 0.08 * pulse), Color(col, 0.35))
-	Shading.sphere(self, center, k * 0.44, Color(0.13, 0.2, 0.19))
+	Shading.sphere(self, center, k * 0.44, Color(0.16, 0.22, 0.32))
 	draw_arc(center, k * 0.44, 0, TAU, 40, Color(col, 0.55), 1.5, true)
 	var e := k * 0.15
 	var y := center.y - k * 0.02

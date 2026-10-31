@@ -1,6 +1,6 @@
 class_name CardFace
 extends Control
-## 实验记录卡：纸面、墨色效果、铜绿费用印章。阅读顺序：
+## 深色实验记录卡：保留标本插画、费用印章与角色配色，匹配实验室主题。阅读顺序：
 ##   ① 左上费用宝石 + 名称条（按角色上色：攻击红 / 防护蓝 / 技能绿 / 能力金 / 状态灰；名称过长自动缩字或换行）
 ##   ② 效果区：「图标 + 大号数字 + 两三个字」一行一条，实时数值变高显示绿色、变低显示红色
 ##   ③ 关键词与限制（消耗 / 无法打出 / AI 失误率）紧跟效果
@@ -12,7 +12,7 @@ const BASE := Vector2(180, 250)
 
 const TYPE_COLOR := {
 	"ai": UIKit.ACCENT_BLUE,
-	"molecular": Color(0.40, 0.34, 0.27),
+	"molecular": Color(0.6, 0.45, 0.98),
 	"experiment": UIKit.GOLD,
 	"clinical": UIKit.DANGER,
 	"process": UIKit.ACCENT,
@@ -44,6 +44,7 @@ var hovered := false
 var selected := false
 var dimmed := false
 var detail_enabled := true   # 右键 / 长按打开大图说明
+var _art_layer: Control
 var _name_label: Label
 var _rows: VBoxContainer
 var _type_text := ""
@@ -55,13 +56,13 @@ var _mods := {}
 var _ai_info := {}
 var _press_time := -1.0
 
-const PICK_GREEN := UIKit.TEAL
+const PICK_GREEN := UIKit.ACCENT
 const MIN_FONT := 14   # 基准字号下限：0.9 倍时约 12.6px
 const LONG_PRESS := 0.5
 # 牌面布局（基准坐标）
 const NAME_RECT := Rect2(6, 6, 168, 34)
-const ART_RECT := Rect2(14, 44, 152, 100)   # 和 record.png 卡框里的插画窗口对齐
-const BODY_RECT := Rect2(10, 146, 160, 96)
+const ART_RECT := Rect2(14, 44, 152, 76)   # 和 record.png 卡框里的插画窗口对齐
+const BODY_RECT := Rect2(10, 126, 160, 116)
 
 
 static func create(model: ResearchCard, scale_factor := 1.0, mods := {}, ai_info := {}) -> CardFace:
@@ -79,6 +80,16 @@ func _build() -> void:
 	size = custom_minimum_size
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	pivot_offset = Vector2(size.x * 0.5, size.y)
+	_art_layer = Control.new()
+	_art_layer.position = ART_RECT.position * face_scale
+	_art_layer.size = ART_RECT.size * face_scale
+	_art_layer.clip_contents = true
+	_art_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_art_layer.draw.connect(func() -> void:
+		var area := Rect2(Vector2.ZERO, _art_layer.size)
+		_draw_art(area)
+		_draw_art_tags(area, _role_color()))
+	add_child(_art_layer)
 	_name_label = _label(18, HORIZONTAL_ALIGNMENT_CENTER)
 	_name_label.position = Vector2(NAME_RECT.position.x + 38, NAME_RECT.position.y) * face_scale
 	_name_label.size = Vector2(NAME_RECT.size.x - 42, NAME_RECT.size.y) * face_scale
@@ -101,7 +112,7 @@ func _label(font_size: int, align: HorizontalAlignment) -> Label:
 	l.horizontal_alignment = align
 	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	l.add_theme_font_size_override("font_size", _px(font_size))
-	l.add_theme_color_override("font_outline_color", UIKit.PAPER_LIGHT)
+	l.add_theme_color_override("font_outline_color", UIKit.TEXT)
 	l.add_theme_constant_override("outline_size", 0)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(l)
@@ -135,7 +146,7 @@ func refresh(mods := {}, ai_info := {}) -> void:
 	_mods = mods
 	_ai_info = ai_info
 	_set_name(tr(card.name) + ("+" if card.upgraded else ""))
-	_name_label.add_theme_color_override("font_color", UIKit.ACCENT_BLUE if card.upgraded else UIKit.INK)
+	_name_label.add_theme_color_override("font_color", UIKit.ACCENT_BLUE if card.upgraded else UIKit.TEXT)
 	_type_text = tr(card.type_name if not card.type_name.is_empty() else "card.type." + card.type)
 	for child in _rows.get_children():
 		child.queue_free()
@@ -147,6 +158,7 @@ func refresh(mods := {}, ai_info := {}) -> void:
 	_ai_multiplier = float(ai_info.get("multiplier", 1.0)) if card.can_deviate() and not ai_info.is_empty() else -1.0
 	tooltip_text = ""
 	queue_redraw()
+	_art_layer.queue_redraw()
 
 
 ## 名称：一行放得下就缩字，放不下就两行
@@ -186,7 +198,7 @@ func _make_row(row: Dictionary) -> HBoxContainer:
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_theme_constant_override("separation", int(5 * face_scale))
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_child(UIKit.icon_rect(String(row.icon), 26 * face_scale, UIKit.ink(row.color)))
+	box.add_child(UIKit.icon_rect(String(row.icon), 26 * face_scale, row.color))
 	var number_text := String(row.number)
 	var text := Label.new()
 	text.text = String(row.text)
@@ -209,9 +221,9 @@ func _make_row(row: Dictionary) -> HBoxContainer:
 		number.theme_type_variation = &"HeaderLabel"
 		number.add_theme_font_size_override("font_size", _px(number_size))
 		var change := int(row.get("change", 0))
-		var color: Color = UIKit.ACCENT if change > 0 else (UIKit.DANGER if change < 0 else UIKit.INK)
+		var color: Color = UIKit.ACCENT if change > 0 else (UIKit.DANGER if change < 0 else UIKit.TEXT)
 		number.add_theme_color_override("font_color", color)
-		number.add_theme_color_override("font_outline_color", UIKit.PAPER_LIGHT)
+		number.add_theme_color_override("font_outline_color", UIKit.TEXT)
 		number.add_theme_constant_override("outline_size", 0)
 		number.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		box.add_child(number)
@@ -220,8 +232,8 @@ func _make_row(row: Dictionary) -> HBoxContainer:
 		text.autowrap_mode = TextServer.AUTOWRAP_WORD   # 只在词间换行，不把单词拆开
 		text.custom_minimum_size.x = avail
 		text.add_theme_constant_override("line_spacing", int(-3 * face_scale))
-	text.add_theme_color_override("font_color", UIKit.INK)
-	text.add_theme_color_override("font_outline_color", UIKit.PAPER_LIGHT)
+	text.add_theme_color_override("font_color", UIKit.TEXT)
+	text.add_theme_color_override("font_outline_color", UIKit.TEXT)
 	text.add_theme_constant_override("outline_size", 0)
 	text.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(text)
@@ -240,8 +252,8 @@ func _make_note(notes: Array) -> Control:
 		l.custom_minimum_size.x = (BODY_RECT.size.x - 4) * face_scale
 		l.add_theme_font_size_override("font_size", _px(MIN_FONT))
 		l.add_theme_constant_override("line_spacing", int(-3 * face_scale))
-		l.add_theme_color_override("font_color", UIKit.ink(note.color))
-		l.add_theme_color_override("font_outline_color", UIKit.PAPER_LIGHT)
+		l.add_theme_color_override("font_color", note.color)
+		l.add_theme_color_override("font_outline_color", UIKit.TEXT)
 		l.add_theme_constant_override("outline_size", 0)
 		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		box.add_child(l)
@@ -288,14 +300,14 @@ func _draw_pick_mark() -> void:
 	_pick_mark.draw_style_box(_box(Color(PICK_GREEN, 0.08), PICK_GREEN, 12, 5), rect)
 	var c := Vector2(BASE.x * 0.5, BASE.y - 4) * k
 	var pill := Rect2(c - Vector2(46, 17) * k, Vector2(92, 34) * k)
-	_pick_mark.draw_style_box(_box(UIKit.PAPER, UIKit.PAPER, 17, 0), pill.grow(3 * k))
+	_pick_mark.draw_style_box(_box(Color(0.055, 0.075, 0.11), Color(0.055, 0.075, 0.11), 17, 0), pill.grow(3 * k))
 	_pick_mark.draw_style_box(_box(PICK_GREEN.darkened(0.15 * pulse), PICK_GREEN.lightened(0.4), 17, 2), pill)
 	var tick := PackedVector2Array([c + Vector2(-34, 0) * k, c + Vector2(-27, 7) * k, c + Vector2(-15, -7) * k])
-	_pick_mark.draw_polyline(tick, UIKit.PAPER, 4.0 * k, true)
+	_pick_mark.draw_polyline(tick, Color(0.055, 0.075, 0.11), 4.0 * k, true)
 	var font := get_theme_default_font()
 	var fs := int(17 * k)
 	var text := tr("ui.picked")
-	_pick_mark.draw_string(font, c + Vector2(-10 * k, fs * 0.36), text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, UIKit.PAPER)
+	_pick_mark.draw_string(font, c + Vector2(-10 * k, fs * 0.36), text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(0.055, 0.075, 0.11))
 
 
 func _role_color() -> Color:
@@ -335,37 +347,51 @@ func _draw() -> void:
 	if plate:
 		draw_texture_rect(plate, rect.grow(5 * k), false)
 	else:
-		UIKit.folio(self, rect)
-	var art := Rect2(ART_RECT.position * k, ART_RECT.size * k)
-	_draw_art(art, _type_color())
-	_draw_art_tags(art, role_color)
+		draw_style_box(_box(Color(0.07, 0.09, 0.13), role_color, 8, 2), rect)
+	# Role is visible across the whole title strip; the type badge has its own independent color.
+	draw_style_box(_box(role_color.darkened(0.55), role_color.lightened(0.2), 5, 1), Rect2(NAME_RECT.position * k, NAME_RECT.size * k))
+	draw_style_box(_box(Color(0, 0, 0, 0), Color(role_color, 0.9), 7, 2), rect.grow(-2 * k))
+	# Mask the old frame's taller illustration window so its baked divider cannot cross the live effects.
+	var body := Rect2(BODY_RECT.position * k, BODY_RECT.size * k)
+	draw_style_box(_box(role_color.lerp(Color(0.055, 0.075, 0.11), 0.94), Color(role_color, 0.2), 4, 1), body)
+	var code := card.id.to_upper().left(16)
+	draw_string(get_theme_default_font(), Vector2(12, BASE.y - 5) * k, code, HORIZONTAL_ALIGNMENT_LEFT, -1, _px(8), Color(UIKit.TEXT_DIM, 0.65))
 	# 左上角费用宝石
 	if not card.unplayable:
 		var font: Font = get_theme_font("font", &"HeaderLabel")
 		var orb := Vector2(24, 23) * k
-		draw_circle(orb, 20 * k, UIKit.PAPER)
-		draw_circle(orb, 17 * k, UIKit.BRASS)
-		draw_circle(orb, 13 * k, UIKit.TEAL)
-		draw_circle(orb + Vector2(-5, -5) * k, 6 * k, Color(UIKit.INK, 0.3))
+		draw_circle(orb, 20 * k, Color(0.055, 0.075, 0.11))
+		draw_circle(orb, 17 * k, UIKit.ACCENT_BLUE)
+		draw_circle(orb, 13 * k, UIKit.ACCENT)
+		draw_circle(orb + Vector2(-5, -5) * k, 6 * k, Color(UIKit.TEXT, 0.3))
 		var fs := _px(26)
 		var text := str(card.cost)
 		var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 		var pos := orb + Vector2(-w * 0.5, fs * 0.36)
-		draw_string_outline(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, maxi(2, int(6 * k)), UIKit.PAPER)
-		draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, UIKit.PAPER_LIGHT)
+		draw_string_outline(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 2, Color(0.055, 0.075, 0.11))
+		draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, UIKit.TEXT)
 
 
 ## 插画上的小标记：左下类型、右上角色图标、左上稀有度宝石、右下 AI 倍率
 func _draw_art_tags(art: Rect2, role_color: Color) -> void:
+	var k := face_scale
 	var font := get_theme_default_font()
-	var fs := _px(10)
-	# 类型标签：贴在插画左下角的小纸签，压在图上也读得清
+	var fs := _px(MIN_FONT)
+	var type_color := _type_color()
 	var tw := font.get_string_size(_type_text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-	var tag := Rect2(art.position + Vector2(3, art.size.y - fs - 9 * face_scale), Vector2(tw + 10 * face_scale, fs + 6 * face_scale))
-	draw_style_box(_box(Color(UIKit.PAPER_LIGHT, 0.92), Color(UIKit.BRASS, 0.7), 3, 1), tag)
-	draw_string(font, tag.position + Vector2(5 * face_scale, fs + 1 * face_scale), _type_text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, UIKit.INK)
-	var code := card.id.to_upper().left(16)
-	draw_string(font, Vector2(12, BASE.y - 5) * face_scale, code, HORIZONTAL_ALIGNMENT_LEFT, -1, _px(8), Color(UIKit.TEXT_DIM, 0.75))
+	var tag := Rect2(Vector2(3 * k, art.size.y - fs - 8 * k), Vector2(minf(tw + 10 * k, art.size.x - 6 * k), fs + 5 * k))
+	_art_layer.draw_style_box(_box(type_color.darkened(0.7), type_color, 3, 1), tag)
+	_art_layer.draw_string(font, tag.position + Vector2(5 * k, fs), _type_text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, type_color.lightened(0.35))
+	var badge := Vector2(art.size.x - 14 * k, 14 * k)
+	_art_layer.draw_circle(badge, 12 * k, role_color.darkened(0.65))
+	_art_layer.draw_arc(badge, 12 * k, 0, TAU, 32, role_color, k, true)
+	var role_icon := UIKit.icon(String(ROLE_ICON.get(card.role(), "role_skill")))
+	if role_icon:
+		_art_layer.draw_texture_rect(role_icon, Rect2(badge - Vector2(8, 8) * k, Vector2(16, 16) * k), false, Color.WHITE)
+	if card.rarity != "common":
+		var c := Vector2(10, 10) * k
+		var gem := PackedVector2Array([c + Vector2(0, -5) * k, c + Vector2(5, 0) * k, c + Vector2(0, 5) * k, c + Vector2(-5, 0) * k])
+		_art_layer.draw_colored_polygon(gem, RARITY_COLOR.get(card.rarity, Color.WHITE))
 	if _ai_multiplier >= 0.0:
 		_draw_ai_chip(art)
 
@@ -379,31 +405,34 @@ func _draw_ai_chip(art: Rect2) -> void:
 	var fs := _px(MIN_FONT)
 	var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 12 * k
 	var h := fs + 6 * k
-	var pill := Rect2(art.end - Vector2(w + 3 * k, h + 3 * k), Vector2(w, h))
-	draw_style_box(_box(Color(UIKit.PAPER, 0.92), col, 8, 2), pill)
-	draw_string(font, pill.position + Vector2(6 * k, h * 0.5 + fs * 0.36), text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, col.lightened(0.25))
+	var pill := Rect2(art.end - Vector2(w + 3 * k, h + 25 * k), Vector2(w, h))
+	_art_layer.draw_style_box(_box(Color(Color(0.055, 0.075, 0.11), 0.92), col, 8, 2), pill)
+	_art_layer.draw_string(font, pill.position + Vector2(6 * k, h * 0.5 + fs * 0.36), text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, col.lightened(0.25))
 
 
 ## 插画：先按卡牌的作用挑图（攻击＝结合、护盾＝防护、AI＝推理……），再按卡牌 id 取不同的局部取景、
 ## 左右翻转，让同类型的牌也各长各样，手牌里不会排一排一模一样的图
-func _draw_art(art: Rect2, accent: Color) -> void:
+## Positive destination sizes are required. Mirror the canvas transform, not the destination rectangle.
+static func art_region(card_id: String, cell: int, area: Rect2, texture_size: Vector2) -> Dictionary:
+	var cell_size := texture_size / Vector2(3, 2)
+	var h := absi(hash(card_id))
+	var zoom := 0.62 + float(h % 23) / 100.0
+	var aspect := area.size.x / maxf(area.size.y, 1.0)
+	var region_size := Vector2(cell_size.x * zoom, minf(cell_size.x * zoom / aspect, cell_size.y))
+	var slack := cell_size - region_size
+	var offset := Vector2(float((h / 23) % 100) / 100.0, float((h / 2300) % 100) / 100.0) * slack
+	return {"source": Rect2(Vector2(cell % 3, cell / 3) * cell_size + offset, region_size), "destination": area.abs(), "mirrored": (h / 7) % 2 == 1}
+
+
+func _draw_art(art: Rect2) -> void:
 	var tex := UIKit.art("research-illustrations")
 	if tex == null:
 		return
-	var cell := _art_cell()
-	var cell_size := tex.get_size() / Vector2(3, 2)
-	var h := absi(hash(card.id))
-	var zoom := 0.62 + float(h % 23) / 100.0                  # 取景 62%–84%
-	var aspect := art.size.x / art.size.y
-	var region_size := Vector2(cell_size.x * zoom, cell_size.x * zoom / aspect)
-	region_size.y = minf(region_size.y, cell_size.y)
-	var slack := cell_size - region_size
-	var offset := Vector2(float((h / 23) % 100) / 100.0, float((h / 2300) % 100) / 100.0) * slack
-	var region := Rect2(Vector2(cell % 3, cell / 3) * cell_size + offset, region_size)
-	if (h / 7) % 2 == 1:   # 翻转：用负宽度的目标矩形
-		draw_texture_rect_region(tex, Rect2(art.position + Vector2(art.size.x, 0), Vector2(-art.size.x, art.size.y)), region)
-	else:
-		draw_texture_rect_region(tex, art, region)
+	var geometry := art_region(card.id, _art_cell(), art, tex.get_size())
+	if geometry.mirrored:
+		_art_layer.draw_set_transform(Vector2(art.position.x * 2 + art.size.x, 0), 0, Vector2(-1, 1))
+	_art_layer.draw_texture_rect_region(tex, geometry.destination, geometry.source)
+	_art_layer.draw_set_transform(Vector2.ZERO)
 
 
 func _art_cell() -> int:

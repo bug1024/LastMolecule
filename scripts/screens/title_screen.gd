@@ -18,6 +18,7 @@ var _primary: Button
 func _ready() -> void:
 	GameSettings.apply()
 	var bg := MoleculeBackground.new()
+	bg.molecule_count = 10   # 少量漂浮分子做氛围，太密会像数据关系图
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 	_build()
@@ -31,7 +32,7 @@ func _build() -> void:
 	# 主视觉占满右侧大半屏，左侧只放标题与菜单，公司信息缩成右下角一行
 	_hero = TitleHero.new()
 	_hero.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_hero.offset_left = 510
+	_hero.offset_left = 470
 	_hero.offset_top = 40
 	_hero.offset_right = -40
 	_hero.offset_bottom = -56
@@ -45,7 +46,6 @@ func _build() -> void:
 	brand.add_theme_constant_override("separation", 18)
 	_logo = TextureRect.new()
 	_logo.texture = UIKit.icon("logo")
-	_logo.self_modulate = UIKit.TEAL
 	_logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_logo.custom_minimum_size = Vector2(92, 92)
@@ -53,9 +53,9 @@ func _build() -> void:
 	var names := VBoxContainer.new()
 	names.alignment = BoxContainer.ALIGNMENT_CENTER
 	names.add_theme_constant_override("separation", 0)
-	var title := UIKit.header(tr("ui.title"), 48, Color(0.93, 0.98, 0.96))
-	title.add_theme_constant_override("outline_size", 0)
-	title.add_theme_color_override("font_outline_color", UIKit.PAPER)
+	var title := UIKit.header(tr("ui.title"), 64, Color(0.93, 0.98, 0.96))
+	title.add_theme_constant_override("outline_size", 14)
+	title.add_theme_color_override("font_outline_color", Color(0.1, 0.4, 0.3, 0.55))
 	names.add_child(title)
 	names.add_child(UIKit.label(tr("title.english"), UIKit.ACCENT, 18))
 	brand.add_child(names)
@@ -90,14 +90,14 @@ func _build() -> void:
 	version.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	version.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	version.offset_left = 96
-	version.offset_bottom = -42
+	version.offset_bottom = -24
 	add_child(version)
 	_company_box = VBoxContainer.new()
 	_company_box.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
 	_company_box.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	_company_box.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	_company_box.offset_right = -48
-	_company_box.offset_bottom = -42
+	_company_box.offset_bottom = -24
 	_company_box.alignment = BoxContainer.ALIGNMENT_END
 	add_child(_company_box)
 	_fill_company()
@@ -130,14 +130,14 @@ func _menu_button(key: String, icon_name: String, action: Callable, primary := f
 	btn.add_theme_constant_override("h_separation", 12)
 	btn.custom_minimum_size = Vector2(300, 48)
 	btn.add_theme_font_size_override("font_size", 20 if primary else 19)
-	var accent: Color = UIKit.ACCENT if primary else UIKit.BRASS
-	var text_color := UIKit.PAPER_LIGHT if primary else UIKit.INK
+	var accent: Color = UIKit.ACCENT if primary else Color(0.55, 0.78, 0.9)
+	var text_color := Color(0.92, 1.0, 0.95) if primary else Color(0.78, 0.84, 0.9)
 	for state_name in ["font_color", "font_focus_color"]:
 		btn.add_theme_color_override(state_name, text_color)
-	btn.add_theme_color_override("font_hover_color", UIKit.PAPER_LIGHT if primary else UIKit.TEAL)
-	btn.add_theme_color_override("font_pressed_color", UIKit.PAPER_LIGHT if primary else UIKit.TEAL)
-	btn.add_theme_color_override("icon_normal_color", UIKit.PAPER_LIGHT if primary else UIKit.TEXT_DIM)
-	btn.add_theme_color_override("icon_hover_color", UIKit.PAPER_LIGHT if primary else UIKit.TEAL)
+	btn.add_theme_color_override("font_hover_color", Color.WHITE)
+	btn.add_theme_color_override("font_pressed_color", Color.WHITE)
+	btn.add_theme_color_override("icon_normal_color", accent.lightened(0.1))
+	btn.add_theme_color_override("icon_hover_color", Color.WHITE)
 	btn.add_theme_color_override("icon_focus_color", accent.lightened(0.1))
 	btn.add_theme_stylebox_override("normal", _menu_style(accent, primary, false))
 	btn.add_theme_stylebox_override("focus", _menu_style(accent, primary, false))
@@ -155,10 +155,10 @@ func _menu_button(key: String, icon_name: String, action: Callable, primary := f
 
 func _menu_style(accent: Color, primary: bool, hover: bool) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = (UIKit.TEAL.lightened(0.08) if hover else UIKit.TEAL) if primary else (UIKit.PAPER_LIGHT if hover else Color(UIKit.PAPER, 0.9))
+	sb.bg_color = Color(accent, 0.2 if hover else (0.14 if primary else 0.0)).blend(Color(0.05, 0.08, 0.11, 0.6))
 	sb.border_color = Color(accent, 0.95 if hover else (0.75 if primary else 0.28))
 	sb.set_border_width_all(2 if hover or primary else 1)
-	sb.set_corner_radius_all(3)
+	sb.set_corner_radius_all(12)
 	sb.content_margin_left = 18
 	sb.content_margin_right = 18
 	sb.anti_aliasing = true

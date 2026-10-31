@@ -57,7 +57,7 @@ func rebuild() -> void:
 func _construct() -> void:
 	_built = true
 	var dim := ColorRect.new()
-	dim.color = Color(0.12, 0.09, 0.06, 0.72)
+	dim.color = Color(0.01, 0.02, 0.04, 0.72)
 	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(dim)
 	var center := CenterContainer.new()
@@ -65,7 +65,7 @@ func _construct() -> void:
 	add_child(center)
 	_panel = PanelContainer.new()
 	_panel.custom_minimum_size = Vector2(panel_width, 0)
-	_panel.add_theme_stylebox_override("panel", UIKit.panel_style(Color(UIKit.PAPER, 0.98), Color(accent, 0.45), 18))
+	_panel.add_theme_stylebox_override("panel", UIKit.panel_style(Color(0.06, 0.08, 0.11, 0.98), Color(accent, 0.45), 18))
 	center.add_child(_panel)
 	var decor := Control.new()
 	decor.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -127,14 +127,19 @@ func _construct() -> void:
 
 ## 面板背景装饰：右上角强调色光晕 + 淡淡的六边形纹理
 func _draw_decor(decor: Control) -> void:
-	UIKit.paper(decor, Rect2(Vector2(2, 2), decor.size - Vector2(4, 4)), 0.65)
-	var rect := Rect2(Vector2(7, 7), decor.size - Vector2(14, 14))
-	decor.draw_rect(rect, Color(UIKit.BRASS, 0.3), false, 1.0)
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 1024
-	for i in 700:
-		var pos := Vector2(rng.randf() * decor.size.x, rng.randf() * decor.size.y)
-		decor.draw_circle(pos, rng.randf_range(0.3, 0.8), Color(UIKit.INK, 0.045))
+	var w := decor.size.x
+	var corner := Vector2(w - 60, 40)
+	for i in 8:
+		decor.draw_circle(corner, 170.0 - i * 18.0, Color(accent, 0.02))
+	var r := 18.0
+	for row in 5:
+		for col in 7:
+			var center := Vector2(w - 30 - col * r * 1.732 - (r * 0.866 if row % 2 else 0.0), 20 + row * r * 1.5)
+			var pts := PackedVector2Array()
+			for k in 7:
+				var a := PI / 6 + k * TAU / 6
+				pts.append(center + Vector2(cos(a), sin(a)) * r)
+			decor.draw_polyline(pts, Color(accent, 0.08 * (1.0 - (col + row) / 10.0)), 1.0, true)
 
 
 ## 子类实现：构建内容

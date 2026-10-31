@@ -54,7 +54,7 @@ func _draw() -> void:
 	var breathe := 1.0 + 0.03 * sin(_time * 2.0 + _seed)
 	var r := radius * breathe * (1.0 - dying * 0.4)
 	var alpha := 1.0 - dying
-	var body := color.lerp(Color(0.44, 0.47, 0.39), 0.45).lerp(Color.WHITE, flash * 0.85)
+	var body := color.lerp(Color.WHITE, flash * 0.85)
 	body.a = alpha
 	draw_set_transform(Vector2.ZERO)
 	_ellipse(c + Vector2(0, r * 1.05), Vector2(r * 0.9, r * 0.18), Color(0, 0, 0, 0.35 * alpha))
@@ -74,13 +74,13 @@ func _draw() -> void:
 	draw_set_transform(Vector2.ZERO)
 	if not ok:
 		_draw_cell(c, r, body, alpha)
-	if menace > 0:   # 精英 / Boss：一圈黄铜刻度环，标出它的分量
+	if menace > 0:   # 精英 / Boss：一圈实验仪器刻度环，标出它的分量
 		var ring := r * 1.42
 		for i in 36:
 			var a0 := i * TAU / 36.0 + _time * 0.05
 			var long := i % 3 == 0
 			draw_line(c + Vector2.from_angle(a0) * ring, c + Vector2.from_angle(a0) * (ring + (9.0 if long else 4.0)),
-				Color(UIKit.BRASS if menace == 1 else UIKit.DANGER, 0.7 * alpha), 1.5, true)
+				Color(UIKit.GOLD if menace == 1 else UIKit.DANGER, 0.7 * alpha), 1.5, true)
 
 
 

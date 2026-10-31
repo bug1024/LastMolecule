@@ -2,8 +2,8 @@ class_name StatusRow
 extends HBoxContainer
 ## 状态图标行：图标 + 层数，悬停显示名称与说明。新增状态时图标弹跳一下。
 
-const BUFF_COLOR := UIKit.TEAL
-const DEBUFF_COLOR := UIKit.DANGER
+const BUFF_COLOR := Color(0.45, 0.9, 0.6)
+const DEBUFF_COLOR := Color(0.95, 0.45, 0.45)
 
 var _shown := {}
 
@@ -30,8 +30,8 @@ func set_statuses(statuses: Dictionary) -> void:
 		var icon := UIKit.icon_rect("status_" + String(id), 22, color)
 		box.add_child(icon)
 		var count := UIKit.label(str(amount), Color.WHITE, 13)
-		count.add_theme_constant_override("outline_size", 0)
-		count.add_theme_color_override("font_outline_color", UIKit.PAPER_LIGHT)
+		count.add_theme_constant_override("outline_size", 4)
+		count.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
 		count.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		box.add_child(count)
 		add_child(box)

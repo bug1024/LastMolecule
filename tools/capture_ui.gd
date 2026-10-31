@@ -1,7 +1,7 @@
 extends SceneTree
 ## Desktop visual smoke capture. All persistence is disabled before scenes are created.
 var main: Control
-var output := "res://.godot/art-review"
+var output := "res://.godot/lab-review"
 func _initialize() -> void:
 	call_deferred("run")
 func shot(name: String) -> void:
@@ -69,7 +69,16 @@ func run() -> void:
 	main._pause_menu.close()
 	main._card_popup.show_cards(game.build_deck(), "view", 0, 0, game.get_ai_info())
 	await shot("deck")
+	# Reproduce the previously overflowing mirrored AI artwork at pick and detail scale.
+	var pick_cards: Array = []
+	for id in ["ai_intel", "clin_endpoint", "ai_tox_predict"]:
+		pick_cards.append(ResearchCard.from_dict(game.get_card_by_id(id)))
+	main._card_popup.show_cards(pick_cards, "add", 0, 40, game.get_ai_info())
+	await shot("card-pick-fixed")
 	main._card_popup.visible = false
+	CardDetail.open(main, pick_cards[2], {}, game.get_ai_info())
+	await shot("card-detail-fixed")
+	CardDetail.close_current()
 	main._battle_view.visible = false
 	main._event_popup.show_event({"id": "research", "title_key": "node.research", "desc_key": "node.research.desc", "choices": [
 		{"label_key": "milestone.continue", "effects": {"funding": -3, "data": 5}},

@@ -34,7 +34,7 @@ func _build(box: VBoxContainer) -> void:
 	row.add_child(_nav)
 	var page := PanelContainer.new()
 	page.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var sb := UIKit.panel_style(Color(UIKit.PAPER, 0.92), Color(accent, 0.25), 14)
+	var sb := UIKit.panel_style(Color(0.05, 0.075, 0.1, 0.92), Color(accent, 0.25), 14)
 	sb.border_width_left = 4
 	sb.border_color = Color(accent, 0.25)
 	sb.set_content_margin_all(20)
@@ -51,7 +51,7 @@ func _build(box: VBoxContainer) -> void:
 	_page_icon.custom_minimum_size = Vector2(30, 30)
 	_page_icon.modulate = accent.lightened(0.2)
 	head.add_child(_page_icon)
-	_page_title = UIKit.header("", 24, UIKit.INK)
+	_page_title = UIKit.header("", 24, Color(0.93, 0.97, 0.98))
 	head.add_child(_page_title)
 	col.add_child(head)
 	_scroll = ScrollContainer.new()

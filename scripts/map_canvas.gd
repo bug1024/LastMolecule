@@ -107,12 +107,12 @@ func _draw() -> void:
 				elif open:
 					_curve(from, to, UIKit.GOLD, 3.0, true)
 				else:
-					_curve(from, to, Color(UIKit.TEXT_DIM, 0.45), 1.5, false)
+					_curve(from, to, Color(0.55, 0.62, 0.72, 0.28), 2.0, false)
 	# 当前位置：头顶的小烧瓶
 	if not _path.is_empty():
 		var current: MapNode = _nodes[_path.size() - 1][int(_path.back())]
 		var top := current.hex_center() - Vector2(0, current.radius() + 18 + 3 * sin(_time * 3.0))
-		draw_circle(top, 15, Color(UIKit.PAPER, 0.95))
+		draw_circle(top, 15, Color(0.04, 0.06, 0.09, 0.95))
 		draw_arc(top, 15, 0, TAU, 32, PlayerAvatar.GREEN, 2.0, true)
 		var flask := UIKit.icon("type_experiment")
 		if flask:
@@ -138,9 +138,23 @@ func _curve(from: Vector2, to: Vector2, color: Color, width: float, dashed: bool
 
 ## 背景：淡淡的六边形网格，按阶段着色
 func _draw_grid() -> void:
-	for y in range(20, int(size.y), 28):
-		draw_line(Vector2(0, y), Vector2(size.x, y), Color(UIKit.BRASS, 0.12), 1)
-	draw_line(Vector2(24, 0), Vector2(24, size.y), Color(UIKit.DANGER, 0.15), 1)
+	var r := 22.0
+	var dx := r * sqrt(3.0)
+	var dy := r * 1.5
+	var color := Color(tint.lightened(0.3), 0.07)
+	var row := 0
+	var y := 0.0
+	while y < size.y + r:
+		var x := (dx * 0.5 if row % 2 == 1 else 0.0)
+		while x < size.x + r:
+			var pts := PackedVector2Array()
+			for i in 7:
+				var a := PI / 6 + i * TAU / 6
+				pts.append(Vector2(x, y) + Vector2(cos(a), sin(a)) * r)
+			draw_polyline(pts, color, 1.0)
+			x += dx
+		y += dy
+		row += 1
 
 
 func _notification(what: int) -> void:

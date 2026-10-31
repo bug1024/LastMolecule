@@ -62,10 +62,10 @@ func _ready() -> void:
 
 
 func _build() -> void:
-	stage_label = UIKit.header("", 28, UIKit.ACCENT_BLUE)
+	stage_label = UIKit.header("", 28, Color(0.75, 0.95, 1.0))
 	stage_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	stage_label.add_theme_constant_override("outline_size", 0)
-	stage_label.add_theme_color_override("font_outline_color", UIKit.PAPER_LIGHT)
+	stage_label.add_theme_constant_override("outline_size", 8)
+	stage_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
 	add_child(stage_label)
 
 	molecule_art = MoleculeArt.new()
@@ -75,15 +75,15 @@ func _build() -> void:
 	mol_view.idle_bob = true
 	mol_view.visible = false
 	add_child(mol_view)
-	_mol_line = UIKit.label("", UIKit.ACCENT_BLUE, 14, true)
+	_mol_line = UIKit.label("", Color(0.82, 0.75, 1.0), 14)
 	_mol_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_mol_line.add_theme_constant_override("outline_size", 0)
-	_mol_line.add_theme_color_override("font_outline_color", UIKit.PAPER_LIGHT)
+	_mol_line.add_theme_constant_override("outline_size", 5)
+	_mol_line.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
 	add_child(_mol_line)
 	_exam_line = UIKit.label("", UIKit.ACCENT, 14)
 	_exam_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_exam_line.add_theme_constant_override("outline_size", 0)
-	_exam_line.add_theme_color_override("font_outline_color", UIKit.PAPER_LIGHT)
+	_exam_line.add_theme_constant_override("outline_size", 5)
+	_exam_line.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
 	add_child(_exam_line)
 	avatar = PlayerAvatar.new()
 	add_child(avatar)
@@ -126,7 +126,7 @@ func _build() -> void:
 	goal_card.pin()
 	_cards.add_child(goal_card)
 	ai_card = InfoCard.new("type_ai", "ui.hub_ai", UIKit.ACCENT_BLUE)
-	abilities_card = InfoCard.new("role_power", "ui.hub_abilities", UIKit.GOLD)
+	abilities_card = InfoCard.new("role_power", "ui.hub_abilities", Color(0.75, 0.55, 1.0))
 	competition_card = InfoCard.new("node_event", "ui.competition_title", UIKit.GOLD)
 	for card in [ai_card, abilities_card, competition_card]:
 		_cards.add_child(card)
@@ -147,7 +147,7 @@ func _build() -> void:
 	_bonus_label.custom_minimum_size = Vector2(220, 0)
 	plate.add_child(_bonus_label)
 	# 消息条：放进 CenterContainer，由容器按最小尺寸居中排版（自动换行的 Label 自己定尺寸不可靠）
-	var msg := MarginContainer.new()
+	var msg := CenterContainer.new()
 	msg.name = "Message"
 	msg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_bench_panel.add_child(msg)
@@ -189,8 +189,6 @@ func _layout() -> void:
 	mol_view.position = Vector2(w * 0.56 - mol_view.size.x * 0.5, bench_y - 76 - mol_view.size.y)
 	_mol_line.position = Vector2(STATUS_W + 20, 50)
 	_mol_line.size = Vector2(w - STATUS_W - CARDS_W - 40, 22)
-	_mol_line.autowrap_mode = TextServer.AUTOWRAP_OFF
-	_mol_line.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS   # 一行写不下就省略，不压到分子
 	_exam_line.size = Vector2(460, 22)
 	_exam_line.position = Vector2(w * 0.56 - 230, bench_y - 62)   # 写在分子下方的投影台上
 	_bench_panel.position = Vector2(0, bench_y + 14)
@@ -204,7 +202,6 @@ func _layout() -> void:
 	msg.position = Vector2(w * 0.3 + 130, 4)
 	# 文字最小高度要等定宽后下一帧才更新；立即设尺寸会被旧的（零宽度时的）最小高度撑大
 	msg.set_deferred("size", Vector2(msg_w, 64))
-	event_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var buttons: Control = _bench_panel.get_node("Buttons")
 	buttons.size = Vector2(w, 52)
 	buttons.position = Vector2(0, _bench_panel.size.y - 64)
@@ -220,7 +217,7 @@ static func fill_goal_card(card: InfoCard, items: Array) -> void:
 		var ok := bool(item.ok)
 		met += 1 if ok else 0
 		var need := ("< %d" % int(item.need)) if item.id == "safety" else str(int(item.need))
-		var mark := "[color=#245951]✓[/color]" if ok else "[color=#a34235]%s[/color]" % (t.translate("goal.gap") % int(item.gap))
+		var mark := "[color=#5ad99a]✓[/color]" if ok else "[color=#ff8a80]%s[/color]" % (t.translate("goal.gap") % int(item.gap))
 		lines.append("%s　[b]%d[/b] / %s　%s" % [t.translate("goal." + String(item.id)), int(item.current), need, mark])
 	card.set_title_suffix(t.translate("goal.summary") % [met, items.size()])
 	card.set_content("", "\n".join(lines))
@@ -312,20 +309,65 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
+	var w := size.x
+	var h := size.y
+	var bench_y := h - BENCH_FROM_BOTTOM
 	var rect := Rect2(Vector2.ZERO, size)
-	UIKit.folio(self, rect)
-	var bench_y := size.y - BENCH_FROM_BOTTOM
-	var pedestal := UIKit.art("pedestal")
-	if pedestal:
-		draw_texture_rect(pedestal, Rect2(size.x * 0.56 - 130, bench_y - 96, 260, 86), false)   # 和分子同一条中线
-	draw_line(Vector2(24, bench_y), Vector2(size.x - 24, bench_y), Color(UIKit.BRASS, 0.5), 1.0)
-	for y in range(int(bench_y + 34), int(size.y - 18), 26):
-		draw_line(Vector2(24, y), Vector2(size.x - 24, y), Color(UIKit.BRASS, 0.08), 1.0)
+	# 后墙：深色渐变 + 阶段色灯光
+	draw_style_box(UIKit.filled(Color(0.05, 0.08, 0.11, 0.96), Color(0.2, 0.28, 0.34), 14), rect)
+	var pulse := 0.5 + 0.5 * sin(_time * 1.2)
+	var light := Vector2(w * 0.56, bench_y - 150)
+	for i in 10:
+		draw_circle(light, (330.0 - i * 28.0), Color(_tint.lightened(0.2), 0.022 + 0.006 * pulse))
+	# 货架与瓶罐
+	for shelf in 2:
+		var y := bench_y - 200.0 + shelf * 92.0
+		if y < 70:
+			continue
+		draw_rect(Rect2(w * 0.03, y, w * 0.94, 4), Color(0.25, 0.32, 0.38, 0.55))
+		for prop in _props:
+			if int(prop[1]) != shelf:
+				continue
+			var px: float = float(prop[0]) * w
+			if px > w * 0.42 and px < w * 0.7:
+				continue   # 分子周围留空
+			var pw: float = float(prop[2]) * w
+			var ph: float = prop[3]
+			var c: Color = prop[4]
+			draw_rect(Rect2(px, y - ph, pw, ph), Color(c, 0.16))
+			draw_rect(Rect2(px, y - ph * 0.45, pw, ph * 0.45), Color(c, 0.22))
+			draw_rect(Rect2(px + pw * 0.3, y - ph - 6, pw * 0.4, 6), Color(c, 0.18))
+	# 分析仪：分子下方的底座与向上的光柱
+	var base := Vector2(w * 0.56, bench_y)
+	var beam := PackedVector2Array([base + Vector2(-70, -40), base + Vector2(70, -40), base + Vector2(150, -300), base + Vector2(-150, -300)])
+	draw_colored_polygon(beam, Color(_tint.lightened(0.4), 0.05 + 0.03 * pulse))
+	draw_style_box(UIKit.filled(Color(0.12, 0.16, 0.2), Color(_tint.lightened(0.3), 0.8), 10), Rect2(base + Vector2(-90, -44), Vector2(180, 44)))
+	draw_rect(Rect2(base + Vector2(-60, -30), Vector2(120, 6)), Color(_tint.lightened(0.5), 0.6 + 0.3 * pulse))
+	# 实验台：台面高光 + 正面
+	draw_rect(Rect2(0, bench_y, w, 14), Color(0.32, 0.4, 0.46))
+	draw_rect(Rect2(0, bench_y + 14, w, h - bench_y - 14), Color(0.09, 0.12, 0.15))
+	draw_line(Vector2(0, bench_y), Vector2(w, bench_y), Color(0.6, 0.72, 0.8, 0.6), 2.0)
+	for x in range(1, 6):
+		draw_line(Vector2(w * x / 6.0, bench_y + 14), Vector2(w * x / 6.0, h), Color(0, 0, 0, 0.25), 2.0)
+	# 台面小道具：右侧试管架与烧杯
+	var rack := Vector2(w * 0.8, bench_y)
+	if w > 900:
+		for i in 4:
+			var tube := Rect2(rack + Vector2(i * 16 - 32, -46), Vector2(9, 40))
+			draw_rect(tube, Color(0.7, 0.85, 0.95, 0.25))
+			draw_rect(Rect2(tube.position + Vector2(0, 22), Vector2(9, 18)), Color([UIKit.ACCENT, UIKit.ACCENT_BLUE, UIKit.GOLD, UIKit.DANGER][i], 0.55))
+		draw_rect(Rect2(rack + Vector2(-40, -18), Vector2(78, 6)), Color(0.4, 0.48, 0.55))
+	# 阴影：烧瓶脚下（烧瓶不出场时不画）
+	if avatar != null and avatar.visible:
+		var feet := Vector2(w * 0.3, bench_y + 4)
+		draw_set_transform(feet, 0.0, Vector2(1.0, 0.22))
+		draw_circle(Vector2.ZERO, 70, Color(0, 0, 0, 0.35))
+		draw_set_transform(Vector2.ZERO)
 
 
 func _glass_panel() -> PanelContainer:
 	var panel := PanelContainer.new()
-	var sb := UIKit.panel_style(Color(UIKit.PAPER, 0.78), Color(0.3, 0.4, 0.46, 0.6), 12)
+	var sb := UIKit.panel_style(Color(0.04, 0.06, 0.09, 0.78), Color(0.3, 0.4, 0.46, 0.6), 12)
 	sb.set_content_margin_all(12)
 	panel.add_theme_stylebox_override("panel", sb)
 	return panel
@@ -342,7 +384,7 @@ func _bar(width: float, height: float) -> ProgressBar:
 
 func _style_bar(b: ProgressBar, color: Color) -> void:
 	b.add_theme_stylebox_override("fill", UIKit.filled(color, color, 4))
-	b.add_theme_stylebox_override("background", UIKit.filled(UIKit.PAPER, Color(0.25, 0.3, 0.36), 4))
+	b.add_theme_stylebox_override("background", UIKit.filled(Color(0.1, 0.12, 0.16), Color(0.25, 0.3, 0.36), 4))
 
 
 func _chip(grid: GridContainer, icon_name: String, color: Color, text: String) -> Label:
