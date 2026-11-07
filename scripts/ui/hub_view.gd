@@ -313,7 +313,7 @@ func _process(delta: float) -> void:
 		_time += delta
 		_growth = move_toward(_growth, _target_growth, delta * 0.45)
 		_scan = maxf(0.0, _scan - delta * 0.7)
-		var base_unit := minf(mol_view.size.x / 8.0, mol_view.size.y / 5.4)
+		var base_unit := minf(mol_view.size.x / 8.85, mol_view.size.y / 6.25)
 		mol_view.unit = base_unit * lerpf(0.78, 1.04, _growth)
 		queue_redraw()
 

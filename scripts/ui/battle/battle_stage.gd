@@ -12,31 +12,33 @@ var threat_x := 0.0
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 
 
 func _draw() -> void:
 	var w := size.x
 	draw_polygon(PackedVector2Array([Vector2.ZERO,Vector2(w,0),Vector2(w,48),Vector2(0,48)]),PackedColorArray([Color(0.04,0.06,0.11,0.75),Color(0.04,0.06,0.11,0.75),Color(0.04,0.06,0.11,0.2),Color(0.04,0.06,0.11,0.2)]))
-	# A low-frequency ribbon plane replaces busy terrain at the combatants' feet.
-	var ridge := PackedVector2Array([Vector2(0, ground - 27), Vector2(w * 0.18, ground - 17),
-		Vector2(w * 0.43, ground - 29), Vector2(w * 0.70, ground - 19), Vector2(w, ground - 31),
-		Vector2(w, ground + 69), Vector2(w * 0.60, ground + 77), Vector2(0, ground + 63)])
-	draw_polygon(ridge,PackedColorArray([Color(0.25,0.27,0.34,0.82),Color(0.28,0.29,0.35,0.86),Color(0.30,0.30,0.36,0.85),Color(0.27,0.28,0.35,0.8),Color(0.25,0.27,0.34,0.8),Color(0.18,0.21,0.29,0.24),Color(0.18,0.21,0.29,0.20),Color(0.18,0.21,0.29,0.24)]))
-	draw_polyline(PackedVector2Array([ridge[0],ridge[1],ridge[2],ridge[3],ridge[4]]), Color(0.48,0.45,0.46,0.6), 1.5, true)
+	var terrain := UIKit.art("geometric-ground")
+	if terrain:
+		var depth := clampf(size.y * 0.32, 155.0, 238.0)
+		draw_texture_rect(terrain, Rect2(0, ground - depth * 0.68, w, depth), false, Color(0.89, 0.90, 0.98))
+	else:
+		draw_rect(Rect2(0, ground - 22, w, 80), Color(0.22, 0.24, 0.31, 0.8))
 	if pressure > 0.01:
-		Shading.glow(self, Vector2(threat_x, ground), 330, Color(pressure_color, 0.34 * pressure))
-		draw_polyline(PackedVector2Array([ridge[0],ridge[1],ridge[2],ridge[3],ridge[4]]), Color(pressure_color.lightened(0.15), 0.8 * pressure), 2.0, true)
-	for i in 7:
-		var x := w * (i + 0.4) / 7.0
-		draw_line(Vector2(x, ground + 26), Vector2(x + 30, ground + 23), Color(0.12, 0.15, 0.23, 0.28), 2, true)
+		Shading.glow(self, Vector2(threat_x, ground), 245, Color(pressure_color, 0.22 * pressure))
+
 	for shadow in shadows:
 		var c: Vector2 = shadow.center
-		for j in 5:
+		var opacity := float(shadow.get("opacity", 0.14))
+		var depth := float(shadow.get("depth", 10.0))
+		for j in 4:
 			var points := PackedVector2Array()
-			for k in 40:
-				var a := k * TAU / 40.0
-				points.append(c + Vector2(cos(a) * float(shadow.width) * (0.5 - j * 0.065), sin(a) * (9 - j)))
-			draw_colored_polygon(points, Color(0.04, 0.05, 0.09, 0.11))
+			var offset := Vector2((3 - j) * 4, (3 - j) * 1.4)
+			for k in 28:
+				var a := k * TAU / 28.0
+				points.append(c + offset + Vector2(cos(a) * float(shadow.width) * (0.52 - j * 0.074),
+					sin(a) * depth * (1.0 - j * 0.16)))
+			draw_colored_polygon(points, Color(0.035, 0.045, 0.085, opacity))
 	if impact_light > 0:
 		Shading.glow(self, Vector2(impact.x, ground), 160, Color(UIKit.GOLD, impact_light * 0.45))
 	# Stable quiet UI reading plane, independent of the world illustration.

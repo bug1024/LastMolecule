@@ -9,10 +9,17 @@ const PORTRAIT_SHEETS := {
 	"enemies-b": ["tox_storm", "infusion_reaction", "pk_variance", "cytokine_storm", "dlt", "placebo", "enroll_drag", "resistant_clone"],
 	"enemies-c": ["progression", "endpoint_miss", "protocol_dev", "safety_signal", "center_pd", "center_ae", "center_drop"],
 }
+const GEOMETRIC_SHEET := "geometric-foes"
+# Trim follows the opaque silhouettes; stray low-alpha pixels are outside the staging bounds.
+const GEOMETRIC_REGIONS := {
+	"activity_cliff": Rect2(22, 118, 964, 634),
+	"resistant_clone": Rect2(1042, 171, 708, 578),
+}
 
 var shape := "blob"
 var _portrait := "painted-enemies"
 var _source := Rect2()
+var _geometric := false
 var color := Color(0.6, 0.5, 0.9)
 var radius := 60.0
 var menace := 0        # 0 普通 / 1 精英 / 2 Boss
@@ -32,6 +39,7 @@ var windup := false      # 下一招很痛：身体后缩蓄力，底下透出�
 var _surge := 0.0        # 剂量刚提高：一次猛烈的膨胀
 var _shown_strain := 0.0
 var _windup := 0.0
+var action_load := 0.0
 var _id := ""
 var _fx: Control         # 不受身份色着色的效果层（受击光、裂纹、毒滴）
 
@@ -45,16 +53,21 @@ func setup(def: Dictionary, boss := false, elite := false) -> void:
 	_seed = float(hash(String(def.get("id", ""))) % 1000) / 100.0
 	_id = String(def.get("id", ""))
 	_source = PaintedArt.sprite_source(_portrait, int(LEGACY_CELLS.get(shape, 0)))
-	for sheet in PORTRAIT_SHEETS:
-		var cell: int = PORTRAIT_SHEETS[sheet].find(_id)
-		if cell < 0:
-			continue
-		var source := PaintedArt.sprite_source(sheet, cell, 4, 2)
-		if source.has_area():
-			_portrait = sheet
-			_source = source
-		break
-	if shape != "molecule":
+	if GEOMETRIC_REGIONS.has(_id) and UIKit.art(GEOMETRIC_SHEET) != null:
+		_portrait = GEOMETRIC_SHEET
+		_source = GEOMETRIC_REGIONS[_id]
+		_geometric = true
+	if not _geometric:
+		for sheet in PORTRAIT_SHEETS:
+			var cell: int = PORTRAIT_SHEETS[sheet].find(_id)
+			if cell < 0:
+				continue
+			var source := PaintedArt.sprite_source(sheet, cell, 4, 2)
+			if source.has_area():
+				_portrait = sheet
+				_source = source
+			break
+	if shape != "molecule" and not _geometric:
 		var tint := ShaderMaterial.new()
 		tint.shader = load("res://assets/shaders/enemy_tint.gdshader")
 		tint.set_shader_parameter("target_hue", color.h)
@@ -105,12 +118,43 @@ func _draw() -> void:
 		return
 	var pivot := Vector2(size.x * 0.5, size.y)
 	draw_set_transform_matrix(_body_transform())
-	var tint := Color(0.85, 0.86, 0.93).lerp(Color(1.18, 1.10, 1.0), flash * 0.55)
+	var neutral := Color.WHITE if _geometric else Color(0.85, 0.86, 0.93)
+	var tint := neutral.lerp(Color(1.20, 1.10, 0.97), flash * 0.64)
 	tint.a = 1.0 - dying
 	var body := visible_body_rect()
 	body.position -= pivot
-	draw_texture_rect_region(UIKit.art(_portrait), body, _source, tint)
+	if _geometric and _id == "activity_cliff":
+		_draw_receptor(body, tint)
+	else:
+		draw_texture_rect_region(UIKit.art(_portrait), body, _source, tint)
 	draw_set_transform(Vector2.ZERO)
+
+
+func _draw_receptor(body: Rect2, tint: Color) -> void:
+	var texture := UIKit.art(_portrait)
+	# Pin the planted base. The upper fold lowers into the opening during windup.
+	var rows := [0.0, 0.34, 0.63, 1.0]
+	var jaw := body.size.y * (maxf(_windup, action_load) * 0.13 - flash * 0.06)
+	var shifts := [0.0, jaw, jaw * 0.29, 0.0]
+	for i in range(rows.size() - 1):
+		var a := float(rows[i])
+		var b := float(rows[i + 1])
+		var y0 := body.position.y + body.size.y * a + float(shifts[i])
+		var y1 := body.position.y + body.size.y * b + float(shifts[i + 1])
+		var source := Rect2(_source.position + Vector2(0, a * _source.size.y),
+			Vector2(_source.size.x, (b - a) * _source.size.y))
+		PaintedArt.textured_quad(self, texture, source, PackedVector2Array([
+			Vector2(body.position.x, y0), Vector2(body.end.x, y0),
+			Vector2(body.end.x, y1), Vector2(body.position.x, y1)]), tint)
+
+
+func action_contact() -> Vector2:
+	var body := visible_body_rect()
+	var mark := Vector2(0.28, 0.52)
+	if _geometric:
+		mark = Vector2(0.26, 0.49) if _id == "activity_cliff" else Vector2(0.34, 0.49)
+	var point := body.position + body.size * mark
+	return _body_transform() * (point - Vector2(size.x * 0.5, size.y)) if _geometric else point
 
 
 func _body_transform() -> Transform2D:

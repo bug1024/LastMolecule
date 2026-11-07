@@ -218,8 +218,7 @@ func set_meta_alpha(alpha: float) -> void:
 
 
 func contact_point() -> Vector2:
-	var body := creature.visible_body_rect()
-	return position + creature.position + body.position + body.size * Vector2(0.28, 0.52)
+	return position + creature.position + creature.action_contact()
 
 
 func _has_point(point: Vector2) -> bool:

@@ -188,12 +188,12 @@ func _site_r() -> float:
 func _scale() -> float:
 	if unit > 0:
 		return unit
-	return minf(size.x / 8.0, size.y / (5.4 if character else 4.9))
+	return minf(size.x / (8.85 if character else 8.0), size.y / (6.25 if character else 4.9))
 
 
 func site_center(site: Dictionary) -> Vector2:
 	if character:
-		return size * Vector2(0.5, 0.48) + (MoleculeCharacter.ANCHORS[String(site.id)] as Vector2) * _scale()
+		return size * Vector2(0.5, 0.48) + MoleculeCharacter.anchor(String(site.id), _profile) * _scale()
 	var p: Array = site.get("pos", [0, 0])
 	var projected := Vector2(float(p[0]) + float(p[1]) * 0.12, float(p[1]) * 0.88)
 	return size * Vector2(0.5, 0.48) + projected * _scale()
@@ -340,11 +340,10 @@ func _draw_character(center: Vector2, k: float) -> void:
 	var points := {}
 	for site in Molecule.config().sites:
 		var id := String(site.id)
-		var anchor: Vector2 = MoleculeCharacter.ANCHORS[id]
-		anchor += _pose_shift(anchor, pose)
+		var anchor := MoleculeCharacter.anchor(id, _profile, pose)
 		points[id] = anchor + (_pos(site) - site_center(site)) * 0.62 / k
 	draw_set_transform(center, 0.0, Vector2.ONE * k)
-	MoleculeCharacter.draw(self, points, molecule.sites if molecule != null else {}, form, _profile, pose)
+	MoleculeCharacter.draw(self, points, molecule.sites if molecule != null else {}, form, pose)
 	draw_set_transform(Vector2.ZERO)
 	for site in Molecule.config().sites:
 		var id := String(site.id)
@@ -361,16 +360,20 @@ func _draw_character(center: Vector2, k: float) -> void:
 			Color(MoleculeCharacter.GOLD, _glow_burst), 2.5, true)
 
 
-func _pose_shift(anchor: Vector2, pose: float) -> Vector2:
-	return Vector2(0.30 + maxf(anchor.x, 0.0) * 0.17, -0.15) * pose
-
-
 func attack_tip(pose := 0.0) -> Vector2:
 	if character:
-		var tip := MoleculeCharacter.FRONT
-		return size * Vector2(0.5, 0.48) + (tip + _pose_shift(tip, pose)) * _scale()
+		var tip := MoleculeCharacter.attack_anchor(molecule.sites if molecule != null else {}, _profile, pose)
+		return size * Vector2(0.5, 0.48) + tip * _scale()
 	var bounds := visual_bounds()
 	return Vector2(bounds.end.x, bounds.get_center().y)
+
+
+func support_points() -> PackedVector2Array:
+	var supports := PackedVector2Array()
+	if character:
+		for point in MoleculeCharacter.SUPPORTS:
+			supports.append(size * Vector2(0.5, 0.48) + point * _scale())
+	return supports
 
 
 func _draw_links(by_id: Dictionary) -> void:

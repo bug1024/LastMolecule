@@ -308,8 +308,15 @@ func _layout() -> void:
 		var slot: Dictionary = _space.slots[i]
 		var ew := _enemy_widgets[i]
 		var body: Vector2 = slot.body
-		if _manager != null and _manager.enemies[i].mechanic == "dose":
-			body.y = minf(body.y, (float(_space.ground) - 111.0) / 1.2)
+		if _manager != null:
+			var enemy := _manager.enemies[i]
+			if enemy.mechanic == "dose":
+				body.y = minf(body.y, (float(_space.ground) - 111.0) / 1.2)
+			elif enemy.id == "activity_cliff":
+				# Reserve the intent row above the visible shell at smaller window heights.
+				body.y = minf(body.y, float(_space.ground) - 105.0)
+			elif enemy.id == "resistant_clone":
+				body *= 0.82
 		ew.set_stage_pose(body, minf(240, body.x + 8))
 		ew.position = slot.foot - Vector2(EnemyWidget.SIZE.x * 0.5,0)
 	_floor.ground = _space.ground
@@ -321,11 +328,23 @@ func _update_stage() -> void:
 	if _space.is_empty():
 		return
 	var shadows: Array = []
-	var footprint := _mol.visual_bounds()
-	shadows.append({"center":Vector2(_mol.position.x + footprint.get_center().x,float(_space.ground)),"width":footprint.size.x * 0.75})
+	var ground := float(_space.ground)
+	if _mol.visible:
+		var footprint := _mol.visual_bounds()
+		var projected := _mol.get_transform() * footprint.get_center()
+		shadows.append({"center": Vector2(projected.x + 12, ground), "width": footprint.size.x * 0.72, "opacity": 0.085})
+		for foot in _mol.support_points():
+			var p := _mol.get_transform() * foot
+			var distance := absf(p.y - ground)
+			shadows.append({"center": Vector2(p.x + 4, ground), "width": footprint.size.x * 0.14,
+				"opacity": lerpf(0.21, 0.06, clampf(distance / 80.0, 0.0, 1.0)), "depth": 5.5})
+	else:
+		shadows.append({"center": Vector2(_player.position.x + _player.size.x * 0.5, ground), "width": _player.size.x * 0.57})
 	for ew in _enemy_widgets:
 		if ew.creature.dying < 0.95:
-			shadows.append({"center":Vector2(ew.position.x+ew.creature.position.x+ew.creature.size.x*0.5,float(_space.ground)),"width":ew.creature.visible_body_rect().size.x * 0.72})
+			var body := ew.creature.visible_body_rect()
+			shadows.append({"center": Vector2(ew.position.x + ew.creature.position.x + body.get_center().x, ground),
+				"width": body.size.x * 0.89, "opacity": 0.18 * (1.0 - ew.creature.dying)})
 	_floor.shadows = shadows
 	_floor.queue_redraw()
 
@@ -698,7 +717,7 @@ func _update_pressure(delta: float) -> void:
 	_update_music(delta)
 	_floor.pressure = _pressure * 0.82
 	_pressure_dim.color.a = maxf(0.2 * _pressure, _intro_dark)
-	_vignette_boss.modulate.a = _pressure * 0.28
+	_vignette_boss.modulate.a = _pressure * 0.17
 
 
 # ---------- 事件播放 ----------
@@ -897,6 +916,10 @@ func _play_enemy_move(index: int, move: Dictionary) -> void:
 	var origin := ew.creature.position
 	var tween := create_tween()
 	var enemy: Enemy = _manager.enemies[index]
+	if enemy.id == "activity_cliff":
+		var fold := ew.creature.create_tween()
+		fold.tween_property(ew.creature, "action_load", 1.0, 0.12)
+		fold.tween_property(ew.creature, "action_load", 0.0, 0.28)
 	if enemy.is_boss:
 		var foot := ew.position + Vector2(EnemyWidget.SIZE.x * 0.5, 0)
 		var landing := Vector2(_player_point().x, foot.y) if int(move.get("damage", 0)) > 0 else foot

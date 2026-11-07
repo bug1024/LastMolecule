@@ -2,10 +2,11 @@ class_name MoleculeSpecimen
 extends RefCounted
 ## Shared pre-rendered fragment atlas. Geometry stays live in MoleculeView.
 ## Illustrative medicinal-chemistry motifs, not a valence-valid chemistry simulator.
+const ATLAS := "geometric-fragments"
 const CELLS := {"fluoro": 0, "methyl": 1, "hydroxyl": 2, "phenyl": 3,
 	"morpholine": 4, "nitro": 5, "amide": 6, "sulfonamide": 7,
 	"tbutyl": 8, "pyridine": 9, "cyclopropyl": 10, "acid": 11,
-	"core": 12, "carbon": 13, "hydrogen": 14, "chain": 15}
+	"core": 3, "chain": 12, "carbon": 13, "hydrogen": 13, "membrane": 14, "spur": 15}
 # Extent in scaffold units: a fluorine substituent must not be as large as a ring.
 const EXTENT := {"fluoro": 0.48, "methyl": 0.78, "hydroxyl": 0.65, "phenyl": 1.52,
 	"morpholine": 1.42, "nitro": 0.96, "amide": 1.20, "sulfonamide": 1.28,
@@ -14,17 +15,21 @@ const EXTENT := {"fluoro": 0.48, "methyl": 0.78, "hydroxyl": 0.65, "phenyl": 1.5
 static var _regions: Dictionary = {}
 
 
+static func texture() -> Texture2D:
+	return UIKit.art(ATLAS)
+
+
 static func region(id: String) -> Rect2:
-	var texture := UIKit.art("painted-fragments")
-	if texture == null:
+	var atlas := texture()
+	if atlas == null:
 		return Rect2()
 	if _regions.is_empty():
-		var img := texture.get_image()
+		var img := atlas.get_image()
 		var cell_size := Vector2i(img.get_width() / 4, img.get_height() / 4)
 		for key in CELLS:
 			var index: int = CELLS[key]
 			var row := index / 4
-			var cuts := [0.0, 0.25, 0.5, 0.71875, 1.0]
+			var cuts := [0.0, 0.25, 0.49, 0.73, 1.0]
 			var y := roundi(img.get_height() * float(cuts[row]))
 			var end_y := roundi(img.get_height() * float(cuts[row + 1]))
 			var cell := Rect2i(Vector2i((index % 4) * cell_size.x, y), Vector2i(cell_size.x, end_y - y))
@@ -55,7 +60,7 @@ static func bounds(id: String, center: Vector2, unit: float) -> Rect2:
 
 
 static func draw_fragment(canvas: CanvasItem, id: String, center: Vector2, unit: float, tint := Color.WHITE) -> void:
-	var texture := UIKit.art("painted-fragments")
-	if texture == null:
+	var atlas := texture()
+	if atlas == null:
 		return
-	canvas.draw_texture_rect_region(texture, bounds(id, center, unit), region(id), tint)
+	canvas.draw_texture_rect_region(atlas, bounds(id, center, unit), region(id), tint)

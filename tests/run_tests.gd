@@ -1435,7 +1435,7 @@ func _test_title_screen() -> void:
 
 ## The visual refactor must preserve picking and every legal fragment at all display sizes.
 func _test_molecule_specimen() -> void:
-	var texture := UIKit.art("painted-fragments")
+	var texture := MoleculeSpecimen.texture()
 	_expect(texture != null, "Molecular specimen atlas is packaged with the project")
 	if texture == null:
 		return

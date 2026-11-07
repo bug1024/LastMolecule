@@ -78,6 +78,17 @@ static func cover(ci: CanvasItem, name: String, area: Rect2, tile: Rect2, tint :
 	return true
 
 
+## Map a painted strip to an animated quad while retaining its original values and brush marks.
+static func textured_quad(ci: CanvasItem, texture: Texture2D, source: Rect2,
+		points: PackedVector2Array, tint := Color.WHITE) -> void:
+	var a := source.position
+	var b := source.end
+	var dimensions := texture.get_size()
+	var uv := PackedVector2Array([a / dimensions, Vector2(b.x, a.y) / dimensions,
+		b / dimensions, Vector2(a.x, b.y) / dimensions])
+	ci.draw_polygon(points, PackedColorArray([tint]), uv, texture)
+
+
 static func stage_world(ci: CanvasItem, area: Rect2, stage: int, shade: float) -> void:
 	if not cover(ci, "stage-worlds", area, atlas_region("stage-worlds", clampi(stage, 0, 5), 2, 3).grow(-2)):
 		world(ci, area, shade)

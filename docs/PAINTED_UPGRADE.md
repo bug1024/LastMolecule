@@ -67,3 +67,18 @@ The supplied image is STYLE REFERENCE ONLY. Create production GAME ART matching 
 - **地图**。两列三行全幅全景，前景贴下沿，中央压暗，禁止角色与框线。六格依次为蓝灰膜下裂谷、琥珀毛细根林、暗红脉管深峡、深绿细胞三角洲、三座紫色膜岛、朝阳中的组织穹顶。
 - **事件**。两列两行全幅插画，主体偏右。左上容器破裂与猩红逸出物，右上骨白粒子中对齐的翡翠芳香环，左下交换金封档案，右下在标本玻片高柱间审阅紫色档案。
 - **卡牌**。两张五列五行图集，独立满幅场景，主体居中且缩小后可辨。A 表依次画撞击、对接、类似物、骨架替换、选择性膜、多靶点、前药、三重挂钩、构效关系、共价连接、检测皿、毒性盾、类器官、对照瓶、筛选架、实验档案、生物标志物、反击盾、培养台、保护网、复现实验、注射器、试验方案、中心建筑和心电图。B 表依次画联用、终点旗、多中心网络、计算筛选、毒性预测、结构圆规、治理锁、情报天线、折叠蛋白、结构生成、人群分层、自动探针、优化螺旋、部署流程、SOP、质量方盒、实验归档、机械台、分层制剂、审查放大镜、芳环叠合、极性、分子壳、噪声及受损细胞。
+
+## 2D 几何厚涂首批战斗样例
+
+下列四项使用内置 ImageGen，以 [LM-018 角色设定板](visual-reference/lm-018-geometric-fantasy.png) 为共同画法参考。贴图保留透明边缘，Godot 负责装配、形变、承托阴影、接触点与状态反馈。首批覆盖分子角色、靶点结合口袋和耐药克隆。其他敌人沿用现有图集。
+
+| 项目资产 | 提示词中的制作要求 |
+| --- | --- |
+| `assets/art/geometric-hero.png` | 单体朝右的分子核心，开放六边芳香环，左右两根支撑枝落在同一基线，骨白和玉绿的薄膜从腰后向左延展。环孔完全透明，四周留位装配支链与取代基。 |
+| `assets/art/geometric-fragments.png` | 4 × 4 透明图集，十二个片段按氟、甲基、羟基、苯基、吗啉、硝基、酰胺、磺酰胺、叔丁基、吡啶、环丙基、羧基排列。末行是横向分支杆、骨白节点、膜旗和细晶尖。开环留真实透明孔洞。 |
+| `assets/art/geometric-foes.png` | 两个朝左的透明主体。左格是三块厚紫膜围成的深口袋，唇缘保留少量哑金结合缺口。右格是大小不等的双囊耐药细胞，有偏心裂口、膜片与支撑鳍。保持共同的笔触尺度和光向。 |
+| `assets/art/geometric-ground.png` | 横向独立承托层，上方透明。灰蓝厚膜片从左右连续铺过，两处站位降低地面细节。靠光侧留少量骨白干刷，远缘不成直线，前景向墨蓝收暗。 |
+
+生成使用的共用描述为 “Stylized 2D hand-painted geometric fantasy game sprite, irregular matte gouache broad painted facets, three large organized values, sparse dry brush flecks following the planes, sharp selected edges and soft broken shadow edges, no uniform black outline. Single screen upper-left key with warm bone-white facets and deep cool ink blue shadows. Substance is living crystalline membrane. True clean RGBA with transparent holes.” 排除光滑 3D、写实组织、湿反光、均匀三角面、文字、地面投影和烘焙特效。地面单独以参考板脚下的膜地貌为构图参照，排除任何角色与界面。
+
+分子核心使用连续纹理条随姿态弯曲。七个位点读当前结构，冲刺瞄准当前右侧末端片段的外缘。编辑器与片段卡共用新图集。口袋蓄力时上层折膜向内收，敌人边界按可见主体校准，排除透明底边的残留像素。
