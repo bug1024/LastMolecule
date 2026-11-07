@@ -70,8 +70,8 @@ func _draw() -> void:
 			for k in 3:
 				draw_circle(c, r + 6 + k * 4 + pulse * 3, Color(color, 0.10 - k * 0.025))
 			fill = color.lerp(Color(0.08, 0.1, 0.14), 0.3)
-			border = Color(1, 1, 1, 0.9)
-			icon_tint = Color.WHITE
+			border = UIKit.GOLD
+			icon_tint = UIKit.PAPER
 		"current", "visited":
 			fill = color.lerp(Color(0.08, 0.1, 0.14), 0.62)
 			border = color.lerp(Color.WHITE, 0.2) if state == "current" else Color(color, 0.7)
@@ -81,6 +81,7 @@ func _draw() -> void:
 			border = Color(color, 0.35)
 			icon_tint = Color(color.lightened(0.2), 0.55)
 	draw_colored_polygon(pts, fill)
+	draw_polyline(pts, UIKit.INK, 6.0, true)
 	draw_polyline(pts, border, 3.0 if state == "reachable" or state == "current" else 1.5, true)
 	if _icon:
 		var s := r * 1.0

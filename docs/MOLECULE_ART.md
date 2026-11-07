@@ -1,4 +1,6 @@
-# Molecular specimen assets
+# Molecular specimen assets (legacy implementation)
+
+This document records the existing atlas and its original production prompt. New art follows [ART_DIRECTION.md](ART_DIRECTION.md), and the replacement atlas and UI system are recorded in [PAINTED_UPGRADE.md](PAINTED_UPGRADE.md). This realistic specimen treatment is no longer the active visual target.
 
 Generated with the built-in image_gen tool. Production asset: `assets/art/molecular-fragments.png` (transparent 4 × 4 atlas). The original image is retained in the Codex generated-images directory; the game only loads the repository copy.
 

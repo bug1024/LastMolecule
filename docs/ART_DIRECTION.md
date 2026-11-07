@@ -1,37 +1,169 @@
-# Dark laboratory with scientific specimen art
+# 《最后的分子》视觉风格原则
 
-The page layout, typography, backgrounds, panels, dialogs, map and HUD use commit `0cb89b52` as their baseline. The subsequent warm research-archive page treatment has been removed without rewriting Git history.
+本规范以已选定的战斗概念图为方向基准：**厚涂微观生物奇幻 × 科学结构美学**。主角、敌人和环境都属于由药物研发概念转译而来的微观异世界。
 
-Retained art:
+状态：本轮已接入新的分子片段、六类敌人、膜结构背景、卡牌插画及共用手绘控件皮肤，覆盖战斗、主界面与弹窗。实现、素材及尚未扩展的部分见 [PAINTED_UPGRADE.md](PAINTED_UPGRADE.md)。本文仍是方向与审核标准，不表示每项阶段变体和动作细节均已全部实现。旧深色实验室实现记录见 [ART_DIRECTION_LEGACY.md](ART_DIRECTION_LEGACY.md)，旧分子图集记录见 [MOLECULE_ART.md](MOLECULE_ART.md)。后续新增素材以本规范为准。
 
-- `assets/art/specimens.png`: six scientific specimens in a 3 × 2 transparent atlas; receptor, cell, crystal, folded protein, membrane and molecular sculpture. Reworked in cool glass, silver, teal and blue for the original dark-lab theme. Live hit, death and enemy-specific tint feedback remain.
-- `assets/art/research-illustrations.png`: six experiment illustrations, with cool light engraving suitable for dark cards. Live cards select their illustration by effects and preserve per-card crops.
-- `assets/art/record.png`: the retained record-card silhouette and compartments with a dark navy face, silver border and teal cost seal; text and numbers remain live.
-- `assets/art/molecular-fragments.png`: transparent 4×4 atlas of twelve chemical groups, central scaffold and supporting atoms.
-- `MoleculeView`: live scaffold and placement interactions, shared pre-rendered fragments, local charge light and bond motion. `MoleculeArt` uses the retained molecular sculpture in title/hub artwork.
+![视觉方向基准](visual-reference/battle-painted-biological-fantasy.png)
 
-`UIKit` retains its original palette and controls. Only the art cache and atlas sampler have been added. Paper/wood desk backgrounds and antique pedestals are no longer used.
+基准图表现的是**作用命中瞬间**。它确定笔触、形体、色彩关系与世界气质；持续金色爆光、全屏粒子、主角贴近敌人的位置不应直接当作常态战斗状态。
 
-Generate screenshots with the desktop renderer:
+## 当前整合状态与验收门槛
 
-```
-Godot --path . --script tools/capture_ui.gd
-```
+最新实机检查尚未达到整合目标：同画风素材与手绘框体不等于共同的舞台关系。暂停继续贴图式还原，先按 [BATTLE_LAYOUT_SPEC.md](BATTLE_LAYOUT_SPEC.md) 验证灰盒构图、空间锚点与动态状态，再进行美术整合。此前已接入的资源仅作为候选素材，不视为通过整体美术验收。
 
-The script writes to `.godot/lab-review/` by default; `-- --out=/absolute/path` selects another folder and `--english` captures English. It disables company, settings and run persistence before creating scenes. It captures actual UI, with synthetic review state for rewards/events/endings, without reading or overwriting player save files.
+## 1. 世界的核心表达
 
-Regression checks: `sh tests/run.sh`.
+**玩家操纵一颗不断修饰自身结构的分子，进入由折叠、膜、键和结合腔构成的生命世界。**
 
-## Card identity and artwork bounds
+科学概念决定造型与行为，绘画语言决定它如何被感知。保留环、链、分支、官能团、互补结合、结构弱点的识别逻辑；允许形体夸张、尺度错位和生物地形化。视觉不是化学结构的精确测量工具；精确属性和规则由实时界面说明。
 
-Title strips and outer edges communicate role: red attack, blue defense, green skill, gold power and grey status. A separately colored type label identifies molecular, experiment, clinical, AI and process cards; role icons and rarity marks provide an additional cue.
+全局采用侧向舞台式对抗、轻度俯视的承托面和有限透视。分子、敌人、背景可以分层，但必须共享画面内的光源方向、地面关系和笔触尺度。
 
-Illustrations render in a dedicated clipped child control. Mirroring uses a canvas transform with positive destination dimensions. Atlas source crops remain within their individual cell at hand, pick and detail scales. The live effects panel masks the baked card-frame divider so it cannot cross effect text.
+## 2. 三类对象共用的语言
 
-## Battle composition
+| 设计轴 | 所有对象共用的规则 | 分子主角 | 生物学敌人 | 场景环境 |
+| --- | --- | --- | --- | --- |
+| 基本形状 | 环、折面、带状层叠、分支连接；先剪影后细节 | 开放六边环、细长连接、非对称支链 | 厚重折叠体、深腔、包裹或挤压结构 | 膜层、折叠峡谷、孔洞与键桥 |
+| 力量关系 | 轻重、开合、疏密产生对抗 | 轻、疏、灵活，靠结构变化行动 | 重、密、具有挤压感，靠生物机制行动 | 承托、限制和引导行动 |
+| 明暗 | 深色轮廓、大块中间调、少量亮面 | 青绿与骨白形成清楚结构 | 紫色体块与深色腔体形成压迫 | 灰蓝与暗紫建立远近 |
+| 表面 | 不透明厚涂、断续笔触、局部刻痕 | 凝练的矿物与生物复合质感 | 膜质、壳质与晶化组织 | 与生物体同源的组织地貌 |
+| 动作 | 轮廓变化与接触反馈先于粒子 | 键振动、支链偏转、片段局部亮起 | 开合、折叠、收缩、暴露弱点 | 局部受力、膜振动、少量碎屑 |
 
-Molecules use a live scaffold assembled from pre-rendered chemical fragments: graphite carbon, silver bonds, and sparse element colors. The central aromatic ring is open, without eyes or an instrument disk. See `MOLECULE_ART.md` for the atlas and production prompt. Boss pressure stays around the enemy specimen; screen-edge red is reserved for low HP and brief hit flashes. Intents use compact icon-and-number pairs (including non-attack moves), with full descriptions on hover, and name/health rows share a baseline.
+三者的关系要能从画面直接读出：**分支与腔体互补，敌人的折叠延续为环境地貌，作用会让接触双方同时发生响应。** 不依靠把同一种纹理贴在所有对象上实现统一。
 
-Energy, end-turn and pile controls share dark instrument surfaces and silver borders. Gold denotes energy; green denotes end-turn. Safe attacks remaining sit beside encounter rules. Hands retain a bottom margin at rest and when enlarged. Assay, polarity and counterattack cards use mechanism-specific atlas selections, with a counterattack direction marker.
+## 3. 统一造型与笔触
 
-The capture tool includes a synthetic three-card Boss composition and low-HP state in addition to the normal encounter.
+- 先用实心剪影确认主体与朝向，再分配三到五块主要明暗形。缩小后仍能辨认才进入纹理阶段。
+- 大形优先：主角首先读成“带分支的环”，结合口袋首先读成“会闭合的深腔”，膜场景首先读成“连续的层”。
+- 轮廓有粗细和断续，近景、重叠处及背光处更深；远景减少轮廓线。避免等粗矢量描边包住所有细节。
+- 亮暗交界通过明确的绘画块面表达，允许干刷、刮擦和不规则色块。纹理服从体积，不均匀铺满。
+- 材质差异通过块面形状、裂隙与边缘硬度表达。镜面反射、玻璃透明和金属高光只作极少局部点缀。
+- 金色边缘按受光和动作需要出现，不给每个形体、每条裂隙持续描金。常态画面先确保深色轮廓和中间调成立。
+
+## 4. 色彩与光照
+
+以下色值是调色锚点，不要求每个像素贴合；每个局部仍需形成同色系的亮、中、暗块面。
+
+| 色彩角色 | 锚点 | 用途 |
+| --- | --- | --- |
+| 墨蓝深影 | `#1C2336` | 深腔、接触阴影、前景承托、界面暗底 |
+| 灰蓝环境 | `#536781` | 地貌、远景和常态空气色 |
+| 生物紫 | `#785A85` | 异常组织、敌人主体、局部环境折层 |
+| 生命青绿 | `#397B68` | 分子主角、生命与局部结构响应 |
+| 骨白 | `#DDD0AC` | 主角亮面、主要文字、卡牌阅读面 |
+| 暖金 | `#E4AE53` | 关键接触、局部受光、可操作强调 |
+| 珊瑚红 | `#D96A52` | 攻击意图、伤害和危险提示 |
+| 数据蓝 | `#58A9CE` | AI、数据、护盾等需要区分的界面信息 |
+
+常态战斗中，约 70%–80% 的画面由低至中饱和冷色组织；骨白、青绿和少量温暖亮面构成辨识区。高亮暖金面积通常控制在约 5% 以内，这是一条审核参考，不是引擎硬阈值。
+
+环境常态光源约定为上方偏左，暗部保留冷色。命中可以引入局部第二光源，并短暂照亮主角、敌人及附近地面。发光必须有来源和受光对象。
+
+颜色不能独立承担规则识别：同时使用轮廓、图标、数字或动作。青绿是主角的艺术主色，不表示每个青绿色物体都可治疗；暖金接触光不表示必定成功。
+
+## 5. 分子主角：结构产生角色感
+
+### 固定身份
+
+- 开放的芳香六边环是核心识别锚点，中心保留负空间。
+- 支链轻盈而非对称，轮廓具有明确的作用朝向；连接键保持可读的连续性。
+- 青绿暗面、骨白亮面、少量暖色功能端点构成主色关系。
+- 不增加脸、眼睛、嘴、手脚。行动感来自倾斜、支链张力、结构节奏和局部响应。
+
+### 片段语法
+
+| 结构类别 | 形体规则 | 变化与反馈 |
+| --- | --- | --- |
+| 芳香环 | 开放多边环，保留孔洞；杂环通过缺口、节点形状或局部色块区分 | 更换后改变环的轮廓与嵌套关系 |
+| 连接基团 | 有方向的短链、折角或分叉节点 | 控制支链延展与局部弯折 |
+| 极性基团 | 有收束感的小簇、钩状或向内成组的端点 | 生效时局部青绿亮起，避免全身泛光 |
+| 亲脂与大体积基团 | 紧凑厚块、短分叉与占位感 | 改变外轮廓宽度和空间压迫关系 |
+| 卤素取代 | 单一、清楚的切角端点或小晶核 | 保持小体积与高辨识度 |
+| 毒性警示 | 受影响片段的局部裂纹、偏紫暗面，配实时警示标记 | 待验证、已排除和已确认风险必须由界面区分；不把警示画成“必然邪恶” |
+
+同类片段应保持节点比例、笔触与连接接口一致。不要为了摆姿势旋转单个片段的受光方向；必要时制作少量方向变体。编辑器、总览、战斗和谱系图使用同一套身份特征，缩略图减少细节而非另画一套形象。
+
+### 行为
+
+常态只有轻微结构呼吸和稳定姿态。出招时支链先向目标偏转，作用片段短暂强调，再产生接触反馈。受击时局部片段偏移、键产生有阻尼的振动，随后回位；避免全身变成软胶。升级以结构丰富、连接变化和局部亮面增强表达，避免常驻光环逐级堆叠。
+
+## 6. 生物学敌人：机制成为身体
+
+每个敌人先填写“机制 → 轮廓 → 行动 → 弱点”四项，再画细节。不能只把同一蛋白模型换色、放大。
+
+| 生物概念 | 主剪影与身体设计 | 行为与反馈设计依据 |
+| --- | --- | --- |
+| 靶点结合口袋 | 以不规则深腔为中心，外层厚折片围合，内缘有少量互补位点 | 开口、夹合、暴露腔壁；结合反馈发生在互补位置 |
+| 代谢酶 | 错开的折层、通道或剪切结构，身体有明确处理方向 | 捕获、剪切、转运的动作节奏 |
+| 膜与离子通道 | 膜层中嵌套可开闭的孔道，重复结构围绕一个通口 | 开闭、通透、阻断的轮廓变化 |
+| 毒性相关组织 | 层叠器官状组织或异常增生体，轮廓不平衡 | 压迫、扩散、局部损伤，避免血腥细节堆砌 |
+| 细胞群体 | 重复单元构成的群体轮廓，有明显个体差异 | 分组响应、不同节奏，不能只复制同一主体 |
+
+以上是美术转译示例，不新增或承诺玩法规则。实际动作、弱点显示和预告必须匹配已实现机制，不能暗示不存在的可选目标。
+
+敌人允许尺度夸张，但视觉重量主要来自厚薄、重叠、深腔和姿态。紫色是常用家族色，可按生物类别引入相邻色；危险与目标选择仍由明确图标和状态提示承担。Boss 通过更强的轮廓与身体机制建立身份，不靠满屏红光或更多粒子。
+
+## 7. 场景环境：生命结构即地貌
+
+环境不是实验室器材的缩小版，而是与敌人生物结构同源的地貌。
+
+- 地面：膜层、组织截面或折叠带形成连续承托面，双方有共同投影关系。悬浮时也要表达距地高度。
+- 中景：折叠峡谷、膜丘、孔道与分子键桥提供空间方向；与主体附近的轮廓保持分离。
+- 远景：用灰蓝色大形和有限层级表现尺度，不堆砌清楚的原子、裂纹或装饰球。
+- 前景：少量较暗的大形裁切到画外，形成景深，不能遮住角色状态、目标选择与手牌效果。
+- 重复：磷脂、链、纤维的重复必须有生物组织逻辑，不把它们当作均匀铺满的墙纸。
+
+### 战斗阅读区
+
+常态双方之间保留作用轨迹空间，主角不能持续停在敌人腔体上。角色脚下到状态区的地面细节减少；手牌背后的前景以暗色大块面为主。场景视觉引导指向双方作用关系，而非永远把画面中心照成最亮区域。
+
+更换研发阶段时，应改变地貌组织、空间压力和生物重复方式，再辅以局部色彩变化。避免五个阶段仅更换背景色。
+
+## 8. 光效与动作状态
+
+| 状态 | 光与色 | 形体与信息 |
+| --- | --- | --- |
+| 常态决策 | 冷色环境、稳定受光、极少粒子 | 角色分开，手牌和意图清楚，结构轮廓稳定 |
+| 悬停与选中 | 局部细亮边或轻微亮度提升 | 对象抬升或强调轮廓，不遮住数值 |
+| 作用命中 | 接触点集中暖金亮光，青绿轨迹随动作消退 | 片段、结合位置和敌人身体同时响应 |
+| 敌人行动 | 动作方向明确，预告与实际效果一致 | 折层收缩、孔道开闭或组织位移；反馈有短暂停顿 |
+| 受击与低生命 | 受击短闪；低生命使用克制边缘警示 | 局部振动、数字与血条变化；不能持续把世界染红 |
+
+基准图中的金色裂光与长轨迹属于命中态。不能把这些高光全部烘焙到常态背景或角色基础贴图中。
+
+## 9. 界面与插画的衔接
+
+场景以厚涂块面表达，界面阅读面更简化，但共享墨蓝、骨白、青绿和少量金边。
+
+- 卡牌：骨白或低饱和浅色阅读面、深墨轮廓、手绘插画；角色色、插画色和类型色有明确层级。禁止摄影质感素材拼贴。
+- 控件：手绘切角和克制的生物折层边缘；形状、描边、字体统一，不能每个按钮都成为复杂生物装饰。
+- 金边：只强调可操作轮廓和主要层级，次级元素降低对比；不要把所有框线都画成发光金属。
+- 敌人意图：图标＋数字。状态紧贴所属对象，完整说明由悬停承载。
+- 图像素材不烘焙卡名、效果、数字和可变状态。实时文字使用可读字体，不强制模拟概念图中的手写字形。
+
+## 10. 素材制作与审核
+
+每个主体先提交黑色剪影、三档明度稿，再做色稿与材质。应先通过单体和同场景审核，再扩展大量变体。
+
+素材按背景远中近层、承托阴影、主角核心及可替换片段、敌人身体与动作部件、瞬时光效、界面框体拆分。透明主体保留完整边缘和动作余量；连接接口、朝向、相对尺度与光源约定明确。若采用 2.5D 实现，实时骨架、裁切和状态渲染也必须服从上述绘画语言。
+
+### 验收问题
+
+1. 遮住名字和界面后，能否辨认分子主角、敌人的生物机制和场景所属世界？
+2. 缩到四分之一尺寸或转成灰度后，主角支链、敌人深腔和作用方向是否仍清楚？
+3. 换一个片段能否看出结构变化，而非仅看到颜色变化？
+4. 三者的笔触、边缘和受光是否一致？是否出现某个对象像照片或科研软件模型？
+5. 常态画面是否安静，命中态是否在接触点形成短暂视觉峰值？
+6. 背景与前景是否避让状态、目标和手牌？是否有装饰假装成可交互物？
+7. 界面数值与真实游戏状态是否独立渲染、准确且可读？
+
+### 不采用的方向
+
+写实实验室展台、电影级 PBR 材质堆叠、彩虹原子玩具、带脸的分子吉祥物、无科学机制的通用奇幻怪物、满屏常驻霓虹、均匀细节噪声、让所有素材持续描金，以及只靠调色实现的“统一风格”。
+
+## 11. 通用创作提示词
+
+> 为《最后的分子》设计厚涂微观生物奇幻游戏素材。以科学结构决定造型：开放芳香环与不对称支链构成分子角色，折叠、膜与深结合腔构成敌人与地貌。大块绘画明暗、断续笔触、清楚剪影；墨蓝灰蓝环境，生命青绿主角，生物紫敌人，骨白亮面，暖金仅用于关键接触与局部强调。保持统一的轻俯视侧向视角、上方偏左受光与承托阴影。常态安静，作用命中时局部爆发。优先形体与机制辨识，减少纹理与无意义粒子。不要写实实验室、PBR 渲染、彩虹球、脸、通用怪物或常驻发光描边。
+
+每次追加具体对象的“机制、主剪影、尺度、朝向、状态、部件接口、透明背景或场景层级”要求，不能仅靠这段通用词批量生成。

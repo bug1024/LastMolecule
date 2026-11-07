@@ -1,8 +1,11 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://scripts/map_screen.gd" id="1_map"]
+[ext_resource type="Script" path="res://scripts/ui/painted_style.gd" id="99_skin"]
 
-[sub_resource type="StyleBoxFlat" id="MapPanelStyle"]
+[sub_resource type="StyleBox" id="MapPanelStyle"]
+script = ExtResource("99_skin")
+surface_kind = 0
 bg_color = Color(0.1, 0.12, 0.17, 1)
 border_width_left = 1
 border_width_top = 1
@@ -16,7 +19,8 @@ corner_radius_bottom_left = 14
 shadow_color = Color(0, 0, 0, 0.5)
 shadow_size = 14
 
-[sub_resource type="StyleBoxFlat" id="MapBtnNormal"]
+[sub_resource type="StyleBox" id="MapBtnNormal"]
+script = ExtResource("99_skin")
 bg_color = Color(0.2, 0.5, 0.36, 1)
 corner_radius_top_left = 8
 corner_radius_top_right = 8
@@ -27,7 +31,8 @@ content_margin_top = 10.0
 content_margin_right = 20.0
 content_margin_bottom = 10.0
 
-[sub_resource type="StyleBoxFlat" id="MapBtnHover"]
+[sub_resource type="StyleBox" id="MapBtnHover"]
+script = ExtResource("99_skin")
 bg_color = Color(0.24, 0.58, 0.42, 1)
 corner_radius_top_left = 8
 corner_radius_top_right = 8
@@ -38,7 +43,8 @@ content_margin_top = 10.0
 content_margin_right = 20.0
 content_margin_bottom = 10.0
 
-[sub_resource type="StyleBoxFlat" id="MapBtnPressed"]
+[sub_resource type="StyleBox" id="MapBtnPressed"]
+script = ExtResource("99_skin")
 bg_color = Color(0.16, 0.42, 0.3, 1)
 corner_radius_top_left = 8
 corner_radius_top_right = 8
@@ -49,7 +55,8 @@ content_margin_top = 10.0
 content_margin_right = 20.0
 content_margin_bottom = 10.0
 
-[sub_resource type="StyleBoxFlat" id="MapCloseNormal"]
+[sub_resource type="StyleBox" id="MapCloseNormal"]
+script = ExtResource("99_skin")
 bg_color = Color(0.2, 0.22, 0.28, 1)
 corner_radius_top_left = 8
 corner_radius_top_right = 8
@@ -60,7 +67,8 @@ content_margin_top = 8.0
 content_margin_right = 16.0
 content_margin_bottom = 8.0
 
-[sub_resource type="StyleBoxFlat" id="MapCloseHover"]
+[sub_resource type="StyleBox" id="MapCloseHover"]
+script = ExtResource("99_skin")
 bg_color = Color(0.26, 0.29, 0.36, 1)
 corner_radius_top_left = 8
 corner_radius_top_right = 8

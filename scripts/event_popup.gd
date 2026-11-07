@@ -184,7 +184,7 @@ func _chip(text: String, color: Color) -> Control:
 	return pill
 
 
-func _card_style(accent: Color, hover: bool, enabled: bool) -> StyleBoxFlat:
+func _card_style(accent: Color, hover: bool, enabled: bool) -> PaintedStyle:
 	var sb := UIKit.panel_style(Color(0.07, 0.09, 0.13, 0.95) if not hover else accent.lerp(Color(0.07, 0.09, 0.13), 0.82),
 		Color(accent, 0.9 if hover else (0.45 if enabled else 0.2)), 12)
 	sb.set_border_width_all(2 if hover else 1)

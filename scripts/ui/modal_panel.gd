@@ -65,7 +65,9 @@ func _construct() -> void:
 	add_child(center)
 	_panel = PanelContainer.new()
 	_panel.custom_minimum_size = Vector2(panel_width, 0)
-	_panel.add_theme_stylebox_override("panel", UIKit.panel_style(Color(0.06, 0.08, 0.11, 0.98), Color(accent, 0.45), 18))
+	var skin := UIKit.panel_style(Color(0.10, 0.12, 0.19, 0.98), Color(UIKit.GOLD, 0.58), 4)
+	skin.surface_kind = 0
+	_panel.add_theme_stylebox_override("panel", skin)
 	center.add_child(_panel)
 	var decor := Control.new()
 	decor.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -127,19 +129,8 @@ func _construct() -> void:
 
 ## 面板背景装饰：右上角强调色光晕 + 淡淡的六边形纹理
 func _draw_decor(decor: Control) -> void:
-	var w := decor.size.x
-	var corner := Vector2(w - 60, 40)
-	for i in 8:
-		decor.draw_circle(corner, 170.0 - i * 18.0, Color(accent, 0.02))
-	var r := 18.0
-	for row in 5:
-		for col in 7:
-			var center := Vector2(w - 30 - col * r * 1.732 - (r * 0.866 if row % 2 else 0.0), 20 + row * r * 1.5)
-			var pts := PackedVector2Array()
-			for k in 7:
-				var a := PI / 6 + k * TAU / 6
-				pts.append(center + Vector2(cos(a), sin(a)) * r)
-			decor.draw_polyline(pts, Color(accent, 0.08 * (1.0 - (col + row) / 10.0)), 1.0, true)
+	# Decorative membrane corners are supplied by the shared painted panel skin.
+	pass
 
 
 ## 子类实现：构建内容

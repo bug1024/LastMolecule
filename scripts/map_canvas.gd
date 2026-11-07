@@ -138,23 +138,7 @@ func _curve(from: Vector2, to: Vector2, color: Color, width: float, dashed: bool
 
 ## 背景：淡淡的六边形网格，按阶段着色
 func _draw_grid() -> void:
-	var r := 22.0
-	var dx := r * sqrt(3.0)
-	var dy := r * 1.5
-	var color := Color(tint.lightened(0.3), 0.07)
-	var row := 0
-	var y := 0.0
-	while y < size.y + r:
-		var x := (dx * 0.5 if row % 2 == 1 else 0.0)
-		while x < size.x + r:
-			var pts := PackedVector2Array()
-			for i in 7:
-				var a := PI / 6 + i * TAU / 6
-				pts.append(Vector2(x, y) + Vector2(cos(a), sin(a)) * r)
-			draw_polyline(pts, color, 1.0)
-			x += dx
-		y += dy
-		row += 1
+	PaintedArt.world(self, Rect2(Vector2.ZERO, size), 0.78)
 
 
 func _notification(what: int) -> void:

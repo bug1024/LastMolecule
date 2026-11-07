@@ -92,13 +92,13 @@ func _show(id: String) -> void:
 	_scroll.scroll_vertical = 0
 	for btn in _nav.get_children():
 		var on: bool = btn.name == id
-		var sb := StyleBoxFlat.new()
+		var sb := PaintedStyle.new()
 		sb.bg_color = Color(accent, 0.2) if on else Color(0, 0, 0, 0)
 		sb.border_color = Color(accent, 0.85)
 		sb.border_width_left = 3 if on else 0
 		sb.set_corner_radius_all(8)
 		sb.content_margin_left = 14
-		var hover := sb.duplicate() as StyleBoxFlat
+		var hover := sb.duplicate() as PaintedStyle
 		hover.bg_color = Color(accent, 0.28 if on else 0.1)
 		for state_name in ["normal", "focus"]:
 			btn.add_theme_stylebox_override(state_name, sb)

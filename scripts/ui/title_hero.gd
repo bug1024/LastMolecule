@@ -22,6 +22,7 @@ func _ready() -> void:
 	add_child(_molecule)
 	_avatar = PlayerAvatar.new()
 	add_child(_avatar)
+	_avatar.visible = false
 	_avatar.custom_minimum_size = Vector2(120, 144)
 	_code = UIKit.header("LM-001", 30, UIKit.GOLD)
 	_code.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -87,23 +88,5 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
-	var w := size.x
-	var h := size.y
-	var base_y := h - 70.0
-	var center := Vector2(w * 0.58, base_y - 40 - minf(h - 150, 290) * 0.5)
-	var pulse := 0.5 + 0.5 * sin(_time * 1.3)
-	for i in 12:
-		draw_circle(center, 210.0 - i * 16.0, Color(_glow, 0.018 + 0.006 * pulse))
-	# 光柱底座
-	var base := Vector2(w * 0.58, base_y)
-	var beam := PackedVector2Array([base + Vector2(-60, -30), base + Vector2(60, -30), base + Vector2(140, -330), base + Vector2(-140, -330)])
-	draw_colored_polygon(beam, Color(_glow.lightened(0.3), 0.045 + 0.025 * pulse))
-	draw_set_transform(base + Vector2(0, -12), 0.0, Vector2(1.0, 0.28))
-	draw_circle(Vector2.ZERO, 92, Color(0.08, 0.11, 0.14))
-	draw_arc(Vector2.ZERO, 92, 0, TAU, 64, Color(_glow, 0.7), 4.0, true)
-	draw_circle(Vector2.ZERO, 60, Color(_glow, 0.12 + 0.08 * pulse))
-	draw_set_transform(Vector2.ZERO)
-	# 烧瓶脚下的光圈
-	draw_set_transform(Vector2(w * 0.12 + 60, base_y + 6), 0.0, Vector2(1.0, 0.25))
-	draw_circle(Vector2.ZERO, 56, Color(PlayerAvatar.GREEN, 0.12))
-	draw_set_transform(Vector2.ZERO)
+	# The molecular silhouette stands in the shared biological landscape.
+	pass

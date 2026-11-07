@@ -213,7 +213,7 @@ func _fragment_chip(id: String, count: int) -> Control:
 	var sb := UIKit.panel_style(Color(col, 0.12) if fits else Color(0.07, 0.09, 0.12, 0.8), Color(col, 0.7) if fits else Color(0.3, 0.34, 0.4, 0.5), 10)
 	for state_name in ["normal", "focus"]:
 		btn.add_theme_stylebox_override(state_name, sb)
-	var hover := sb.duplicate() as StyleBoxFlat
+	var hover := sb.duplicate() as PaintedStyle
 	hover.bg_color = Color(col, 0.25)
 	btn.add_theme_stylebox_override("hover", hover)
 	btn.add_theme_stylebox_override("pressed", hover)

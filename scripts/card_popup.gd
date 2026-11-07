@@ -19,6 +19,12 @@ var _pending_upgrade: ResearchCard = null
 
 func _ready() -> void:
 	_skip_button.pressed.connect(_on_skip_pressed)
+	var frame: Control = $Center/Margin
+	frame.draw.connect(func() -> void:
+		var skin := PaintedStyle.new()
+		skin.surface_kind = 0
+		skin.draw(frame.get_canvas_item(), Rect2(Vector2.ZERO, frame.size)))
+	frame.resized.connect(frame.queue_redraw)
 
 
 ## purpose：add / buy / remove / upgrade / view；cost 为每次选择的资金花费

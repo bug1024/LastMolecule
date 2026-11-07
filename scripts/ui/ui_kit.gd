@@ -4,12 +4,15 @@ extends RefCounted
 
 const ICON_DIR := "res://assets/icons/"
 
-const ACCENT := Color(0.31, 0.78, 0.56)
-const ACCENT_BLUE := Color(0.45, 0.75, 1.0)
-const GOLD := Color(0.95, 0.8, 0.4)
-const DANGER := Color(0.93, 0.42, 0.42)
-const TEXT := Color(0.86, 0.9, 0.94)
-const TEXT_DIM := Color(0.58, 0.64, 0.72)
+const ACCENT := Color("69aa87")
+const ACCENT_BLUE := Color("70adce")
+const GOLD := Color("e4ae53")
+const DANGER := Color("d96a52")
+const TEXT := Color("e8dcbd")
+const TEXT_DIM := Color("acaaa6")
+const INK := Color("1c2336")
+const PAPER := Color("ddd0ac")
+const BIO_VIOLET := Color("785a85")
 
 static var _icons := {}
 
@@ -54,14 +57,16 @@ static func style_close_button(btn: Button, accent: Color = ACCENT) -> void:
 	btn.mouse_exited.connect(btn.queue_redraw)
 	btn.draw.connect(func() -> void:
 		var hover := btn.is_hovered()
+		var skin := PaintedStyle.new()
+		skin.surface_kind = 3
+		skin.bg_color = INK
+		skin.border_color = GOLD if hover else Color(GOLD, 0.4)
+		skin.draw(btn.get_canvas_item(), Rect2(Vector2.ZERO, btn.size))
 		var c := btn.size * 0.5
-		var r := minf(btn.size.x, btn.size.y) * 0.5 - 1.0
-		btn.draw_circle(c, r, Color(accent, 0.24 if hover else 0.06))
-		btn.draw_arc(c, r, 0, TAU, 40, Color(accent, 0.9) if hover else Color(0.6, 0.68, 0.76, 0.35), 1.5, true)
-		var k := r * 0.36
-		var ink := Color.WHITE if hover else Color(0.75, 0.8, 0.86)
-		btn.draw_line(c + Vector2(-k, -k), c + Vector2(k, k), ink, 2.0, true)
-		btn.draw_line(c + Vector2(-k, k), c + Vector2(k, -k), ink, 2.0, true))
+		var ink := PAPER if hover else TEXT_DIM
+		btn.draw_line(c + Vector2(-5, -5), c + Vector2(5, 5), ink, 2.0, true)
+		btn.draw_line(c + Vector2(-5, 5), c + Vector2(5, -5), ink, 2.0, true))
+
 
 
 ## kind："normal" / "primary"（主操作，绿色）/ "danger"（危险操作，红色）
@@ -72,6 +77,9 @@ static func button(text: String, icon_name := "", kind := "normal", min_size := 
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	if not icon_name.is_empty():
 		btn.icon = icon(icon_name)
+	if kind == "normal":
+		btn.add_theme_stylebox_override("normal", filled(INK.lightened(0.07), Color("7b7060"), 4))
+		btn.add_theme_stylebox_override("hover", filled(INK.lightened(0.15), GOLD, 4))
 	if kind != "normal":
 		var color := ACCENT if kind == "primary" else DANGER
 		btn.add_theme_stylebox_override("normal", filled(color.darkened(0.45), color.darkened(0.1)))
@@ -81,13 +89,13 @@ static func button(text: String, icon_name := "", kind := "normal", min_size := 
 	return btn
 
 
-static func filled(bg: Color, border: Color, radius := 8) -> StyleBoxFlat:
-	var sb := StyleBoxFlat.new()
+static func filled(bg: Color, border: Color, radius := 8) -> PaintedStyle:
+	var sb := PaintedStyle.new()
 	sb.bg_color = bg
 	sb.border_color = border
 	sb.set_border_width_all(1)
 	sb.border_width_bottom = 2
-	sb.set_corner_radius_all(radius)
+	sb.set_corner_radius_all(mini(radius, 4))
 	sb.content_margin_left = 18
 	sb.content_margin_right = 18
 	sb.content_margin_top = 9
@@ -95,17 +103,19 @@ static func filled(bg: Color, border: Color, radius := 8) -> StyleBoxFlat:
 	return sb
 
 
-static func panel_style(bg := Color(0.085, 0.105, 0.145, 0.88), border := Color(0.22, 0.29, 0.37), radius := 12) -> StyleBoxFlat:
-	var sb := StyleBoxFlat.new()
+static func panel_style(bg := Color(0.11, 0.14, 0.21, 0.97), border := Color(0.49, 0.43, 0.36), radius := 4) -> PaintedStyle:
+	var sb := PaintedStyle.new()
+	sb.surface_kind = 3
 	sb.bg_color = bg
 	sb.border_color = border
 	sb.set_border_width_all(1)
-	sb.set_corner_radius_all(radius)
-	sb.set_content_margin_all(14)
+	sb.set_corner_radius_all(mini(radius, 4))
+	sb.set_content_margin_all(16)
+	sb.content_margin_bottom = 22
 	return sb
 
 
-static func header(text: String, size := 24, color := Color(0.93, 0.96, 0.98)) -> Label:
+static func header(text: String, size := 24, color := TEXT) -> Label:
 	var l := Label.new()
 	l.theme_type_variation = &"HeaderLabel"
 	l.text = text
@@ -148,9 +158,34 @@ static func art(name: String) -> Texture2D:
 
 
 static func atlas(ci: CanvasItem, name: String, cell: int, rect: Rect2, tint := Color.WHITE) -> bool:
+	if name == "painted-enemies":
+		return PaintedArt.sprite(ci, name, cell, rect, tint)
 	var tex := art(name)
 	if not tex:
 		return false
 	var cell_size := tex.get_size() / Vector2(3, 2)
 	ci.draw_texture_rect_region(tex, rect, Rect2(Vector2(cell % 3, cell / 3) * cell_size, cell_size), tint)
 	return true
+
+
+## Meters are data, not buttons: preserve exact semantic fill colors.
+static func meter_style(bg: Color, border: Color, radius := 3) -> PaintedStyle:
+	var skin := filled(bg, border, radius)
+	skin.surface_kind = 4
+	skin.set_content_margin_all(0)
+	return skin
+
+
+## Actor identity is a stable reading plate, independent of the moving body.
+static func identity_plate(label_node: Label) -> void:
+	var plate := Panel.new()
+	plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	plate.show_behind_parent = true
+	plate.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var skin := PaintedStyle.new()
+	skin.surface_kind = 2
+	skin.bg_color = PAPER
+	plate.add_theme_stylebox_override("panel",skin)
+	label_node.add_child(plate)
+	label_node.add_theme_color_override("font_color",INK)
+	label_node.add_theme_constant_override("outline_size",0)

@@ -873,7 +873,7 @@ credits.name.codev,Claude（Anthropic）\nCodex（OpenAI）,Claude (Anthropic)\n
 credits.role.engine,引擎,Engine
 credits.name.engine,Godot Engine 4.7,Godot Engine 4.7
 credits.role.art,美术,Art
-credits.name.art,手写 SVG 图标\n程序绘制的分子、角色与场景,"Hand-written SVG icons\nProcedurally drawn molecules, characters and scenes"
+credits.name.art,手绘风格生物奇幻素材（AI 辅助制作）\n实时分子骨架与 SVG 图标,"Painted biological fantasy art (AI-assisted)\nLive molecular scaffolds and SVG icons"
 credits.role.music,音乐与音效,Music & SFX
 credits.name.music,tools/gen_audio.py 程序合成，无外部素材\nLM-001 主题为编排的固定旋律,"Synthesized by tools/gen_audio.py, no external assets\nThe LM-001 theme is a composed melody"
 credits.dedication,谨以此献给每一位做新药的人。,Dedicated to everyone who makes new medicines.
@@ -1078,3 +1078,8 @@ player.level_up_mol,分子进化！Lv%d %s,Molecule evolved! Lv%d %s
 battle.energy_title,能量,ENERGY
 battle.draw_short,抽牌 %d,Draw %d
 battle.discard_short,弃牌 %d,Discard %d
+
+battle.mechanics_short,阶段规则 · 悬停查看,Stage rules · hover for details
+
+battle.safe_short,安全攻击 ×%d,Safe attacks ×%d
+battle.risk_short,再次攻击将反噬,Next attack backfires

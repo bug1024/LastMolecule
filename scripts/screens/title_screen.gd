@@ -53,9 +53,9 @@ func _build() -> void:
 	var names := VBoxContainer.new()
 	names.alignment = BoxContainer.ALIGNMENT_CENTER
 	names.add_theme_constant_override("separation", 0)
-	var title := UIKit.header(tr("ui.title"), 64, Color(0.93, 0.98, 0.96))
-	title.add_theme_constant_override("outline_size", 14)
-	title.add_theme_color_override("font_outline_color", Color(0.1, 0.4, 0.3, 0.55))
+	var title := UIKit.header(tr("ui.title"), 64, UIKit.PAPER)
+	title.add_theme_constant_override("outline_size", 5)
+	title.add_theme_color_override("font_outline_color", UIKit.INK)
 	names.add_child(title)
 	names.add_child(UIKit.label(tr("title.english"), UIKit.ACCENT, 18))
 	brand.add_child(names)
@@ -153,18 +153,19 @@ func _menu_button(key: String, icon_name: String, action: Callable, primary := f
 		_primary = btn
 
 
-func _menu_style(accent: Color, primary: bool, hover: bool) -> StyleBoxFlat:
-	var sb := StyleBoxFlat.new()
+func _menu_style(accent: Color, primary: bool, hover: bool) -> PaintedStyle:
+	var sb := PaintedStyle.new()
+	sb.surface_kind = 1 if primary else 3
 	sb.bg_color = Color(accent, 0.2 if hover else (0.14 if primary else 0.0)).blend(Color(0.05, 0.08, 0.11, 0.6))
 	sb.border_color = Color(accent, 0.95 if hover else (0.75 if primary else 0.28))
 	sb.set_border_width_all(2 if hover or primary else 1)
-	sb.set_corner_radius_all(12)
+	sb.set_corner_radius_all(3)
 	sb.content_margin_left = 18
 	sb.content_margin_right = 18
 	sb.anti_aliasing = true
 	if hover:
 		sb.shadow_color = Color(accent, 0.3)
-		sb.shadow_size = 10
+		sb.shadow_size = 0
 	return sb
 
 

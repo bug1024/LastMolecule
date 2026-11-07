@@ -4,8 +4,8 @@ var main: Control
 var output := "res://.godot/lab-review"
 func _initialize() -> void:
 	call_deferred("run")
-func shot(name: String) -> void:
-	await create_timer(0.5).timeout
+func shot(name: String, delay := 0.5) -> void:
+	await create_timer(delay).timeout
 	await RenderingServer.frame_post_draw
 	root.get_texture().get_image().save_png(output.path_join(name + ".png"))
 func run() -> void:
@@ -69,13 +69,36 @@ func run() -> void:
 	var battle = main._battle_view
 	var manager = battle._manager
 	manager.hand.clear()
-	for id in ["exp_assay", "exp_counter", "sig_balance"]:
+	for id in ["mol_hit", "exp_assay", "exp_counter", "ai_screen", "sig_balance"]:
 		manager.hand.append(ResearchCard.from_dict(game.get_card_by_id(id)))
 	manager.energy = 1
 	manager.player.hp = 77
 	battle._shown_player_hp = 77
 	battle._refresh_all(true)
 	await shot("battle-boss")
+	var resting_position: Vector2 = battle._mol.position
+	manager.play_card(manager.hand[0],0)
+	await create_timer(0.53).timeout
+	await shot("battle-action",0.01)
+	while battle._busy:
+		await process_frame
+	assert(battle._mol.position.distance_to(resting_position) < 0.5, "Charge must return to its stable stage anchor")
+	for repeat in 2:
+		manager.energy = 3
+		var attack := ResearchCard.from_dict(game.get_card_by_id("mol_hit"))
+		manager.hand.push_front(attack)
+		battle._refresh_all(true)
+		manager.play_card(attack,0)
+		while battle._busy:
+			await process_frame
+		assert(battle._mol.position.distance_to(resting_position) < 0.5, "Consecutive attacks must not drift")
+	for count in [0,3,8,10,5]:
+		manager.energy = 3
+		manager.hand.clear()
+		for i in count:
+			manager.hand.append(ResearchCard.from_dict(game.get_card_by_id(["mol_hit","exp_assay","ai_screen","sig_balance","exp_counter"][i%5])))
+		battle._refresh_all(true)
+		await shot("hand-%d" % count)
 	var displayed_molecule = battle._mol.molecule
 	for preset in ["potent", "selective"]:
 		var candidate := Molecule.create()
@@ -137,6 +160,10 @@ func run() -> void:
 	main.queue_free()
 	await process_frame
 	await process_frame
+	PaintedStyle._texture = null
+	PaintedStyle._regions.clear()
+	PaintedArt._sprite_regions.clear()
+	MoleculeSpecimen._regions.clear()
 	UIKit._art.clear()
 	UIKit._icons.clear()
 	print("Captured UI review to ", ProjectSettings.globalize_path(output))

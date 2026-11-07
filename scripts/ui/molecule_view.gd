@@ -192,8 +192,8 @@ func _draw() -> void:
 	if face and not compact:
 		_draw_form(center, k)
 	var font := get_theme_default_font()
-	var bw := maxf(1.2, k * 0.065)
-	var bond_col := Color(0.64, 0.72, 0.78)
+	var bw := maxf(1.2, k * 0.12)
+	var bond_col := Color("b6c7a5")
 	# 键：环上位点和连接位接在核心环上，末端位接在连接位上
 	var by_id := {}
 	for site in cfg.get("sites", []):
@@ -207,7 +207,8 @@ func _draw() -> void:
 			_:
 				anchor = center + (c - center).normalized() * Vector2(k * 0.64, k * 0.42)
 		var filled := molecule != null and molecule.sites.has(String(site.id))
-		Shading.bond(self, anchor, c, bw * (1.0 if filled else 0.6), Color(bond_col, 1.0 if filled else 0.35))
+		draw_line(anchor, c, Color(UIKit.INK, 1.0 if filled else 0.35), bw + 3, true)
+		draw_line(anchor, c, Color(bond_col, 1.0 if filled else 0.35), bw, true)
 	MoleculeSpecimen.draw_fragment(self, "core", center, k)
 	# 位点：绘制对应化学片段；名字只在编辑器里写
 	var r := _site_r()
@@ -316,3 +317,13 @@ func _draw_alert(p: Vector2, k := 1.0) -> void:
 	draw_colored_polygon(tri, UIKit.GOLD)
 	draw_line(p + Vector2(0, -3) * k, p + Vector2(0, 2) * k, Color(0.1, 0.08, 0.02), 2.0 * k)
 	draw_circle(p + Vector2(0, 4.5) * k, 1.2 * k, Color(0.1, 0.08, 0.02))
+
+
+## Stable structural footprint, independent of bobbing and hit displacement.
+func visual_bounds() -> Rect2:
+	var center := size * Vector2(0.5,0.48)
+	var result := MoleculeSpecimen.bounds("core",center,_scale())
+	for site in Molecule.config().sites:
+		var id := String(molecule.sites.get(String(site.id),"")) if molecule != null else ""
+		result = result.merge(MoleculeSpecimen.bounds("hydrogen" if id.is_empty() else id,site_center(site),_scale()))
+	return result

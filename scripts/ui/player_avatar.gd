@@ -88,6 +88,12 @@ func _liquid_color() -> Color:
 
 
 func _draw() -> void:
+	if UIKit.art("painted-enemies") != null:
+		var base := size * Vector2(0.5, 0.88)
+		_apply_pose(base)
+		PaintedArt.sprite(self, "painted-enemies", 5, Rect2(Vector2(0, size.y * 0.08), size * Vector2(1, 0.78)), Color.WHITE.lerp(Color(1.4, 1.2, 1.0), flash))
+		draw_set_transform(Vector2.ZERO)
+		return
 	var grow := 0.82 + form * 0.06
 	var base := Vector2(size.x * 0.5, size.y * 0.88)
 	var r := minf(size.x, size.y) * 0.3 * grow

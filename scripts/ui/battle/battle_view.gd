@@ -10,7 +10,7 @@ extends Control
 signal continue_pressed()
 signal pile_requested(cards: Array, title_key: String)
 
-const CARD_SCALE := 0.9
+const CARD_SCALE := 0.82
 const HOVER_SCALE := 1.18
 const STAGE_TINT := {
 	"候选化合物发现": Color(0.35, 0.28, 0.6),
@@ -29,7 +29,10 @@ var _victory := false
 var _battle_token := 0      # 每场战斗递增，防止上一场未完成的开场动画干扰新战斗
 
 var _bg: MoleculeBackground
-var _floor: Control
+var _floor: BattleStage
+var _space := {}
+var _mol_motion: Tween
+var _brand: Label
 var _shake_root: Control
 var _player: PlayerAvatar
 var _player_bar: HealthBar
@@ -90,13 +93,13 @@ func _ready() -> void:
 
 func _build() -> void:
 	_bg = MoleculeBackground.new()
+	_bg.battle = true
 	_bg.molecule_count = 8
 	_bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(_bg)
-	_floor = Control.new()
+	_floor = BattleStage.new()
 	_floor.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_floor.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_floor.draw.connect(_draw_floor)
 	add_child(_floor)
 	_shake_root = Control.new()
 	_shake_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -113,6 +116,7 @@ func _build() -> void:
 	_player_tag.add_theme_constant_override("outline_size", 2)
 	_player_tag.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
 	_shake_root.add_child(_player_tag)
+	UIKit.identity_plate(_player_tag)
 	_player_status = StatusRow.new()
 	_shake_root.add_child(_player_status)
 	_dose_button = UIKit.button("", "status_strength", "danger", Vector2(166, 44))
@@ -122,7 +126,11 @@ func _build() -> void:
 			_manager.do_action("dose"))
 	_shake_root.add_child(_dose_button)
 
-	_title = UIKit.header("", 24)
+	_brand = UIKit.header(tr("ui.title"), 26, UIKit.PAPER)
+	_brand.visible = false
+	_brand.position = Vector2(24, 12)
+	add_child(_brand)
+	_title = UIKit.header("", 17, UIKit.PAPER)
 	_title.position = Vector2(24, 12)
 	add_child(_title)
 	_kind_tag = UIKit.label("", UIKit.GOLD, 14)
@@ -131,9 +139,9 @@ func _build() -> void:
 	add_child(_turn_badge)
 	_ai_chip = BattleHud.AiChip.new()
 	add_child(_ai_chip)
-	_mechanic = UIKit.rich("", 14)
+	_mechanic = UIKit.rich("", 13)
 	_mechanic.custom_minimum_size = Vector2(560, 0)
-	_mechanic.position = Vector2(24, 50)
+	_mechanic.position = Vector2(24, 68)
 	_mechanic.size = Vector2(560, 60)
 	add_child(_mechanic)
 	_mol = MoleculeView.new()
@@ -165,10 +173,18 @@ func _build() -> void:
 	_energy_orb.add_child(_energy_label)
 	_rule_label = UIKit.label("", UIKit.GOLD, 14, true)
 	_rule_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	_rule_label.size = Vector2(560, 42)
+	_rule_label.size = Vector2(230,28)
 	_rule_label.tooltip_text = tr("battle.rule_tip")
 	_rule_label.mouse_filter = Control.MOUSE_FILTER_PASS
 	add_child(_rule_label)
+	var rule_back := Panel.new()
+	rule_back.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rule_back.show_behind_parent = true
+	rule_back.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	rule_back.offset_left = -8
+	rule_back.offset_top = -4
+	rule_back.add_theme_stylebox_override("panel",BattleHud.quiet_style(Color(0.06,0.08,0.14,0.7),Color(UIKit.GOLD,0.18)))
+	_rule_label.add_child(rule_back)
 	_draw_button = UIKit.button("", "ui_draw_pile", "normal", Vector2(110, 44))
 	_draw_button.pressed.connect(func() -> void: pile_requested.emit(_sorted(_manager.draw_pile), "battle.pile.draw"))
 	add_child(_draw_button)
@@ -176,8 +192,8 @@ func _build() -> void:
 	_discard_button.pressed.connect(func() -> void: pile_requested.emit(_manager.discard_pile.duplicate(), "battle.pile.discard"))
 	add_child(_discard_button)
 	for button in [_draw_button, _discard_button]:
-		button.add_theme_stylebox_override("normal", UIKit.panel_style(Color("111d29"), Color("536574"), 6))
-		button.add_theme_stylebox_override("hover", UIKit.panel_style(Color("182c35"), UIKit.ACCENT, 6))
+		button.add_theme_stylebox_override("normal", BattleHud.quiet_style(Color(0.06,0.08,0.14,0.8),Color(UIKit.PAPER,0.2)))
+		button.add_theme_stylebox_override("hover", BattleHud.quiet_style(Color(0.12,0.20,0.22,0.9),UIKit.ACCENT))
 	_end_button = BattleHud.EndTurnButton.new()
 	_end_button.pressed.connect(_on_end_turn)
 	add_child(_end_button)
@@ -242,60 +258,77 @@ func _make_vignette(color: Color) -> TextureRect:
 
 
 func _layout() -> void:
+	if size.x < 600 or size.y < 400:
+		return
 	var w := size.x
 	var h := size.y
-	_player.size = _player.custom_minimum_size
-	_player.size = Vector2(200, 240)
-	_player.position = Vector2(w * 0.1, 140)
-	_player_tag.position = Vector2(w * 0.1 - 20, 348)
-	_player_tag.size = Vector2(240, 24)
-	_player_bar.position = Vector2(w * 0.1 + 6, 372)
-	_player_bar.size = Vector2(190, 26)
-	_player_status.position = Vector2(w * 0.1 + 14, 400)
-	_dose_button.position = Vector2(20, h - 174)
-	_mol.position = Vector2(w * 0.1 - 130, 96)
-	_mol_tag.size = Vector2(_mol.size.x + 40, 44)
-	_mol_tag.position = Vector2(_mol.position.x - 20, 440)
-	_kind_tag.position = Vector2(24 + _title.get_combined_minimum_size().x + 14, 20)
-	_turn_badge.position = Vector2(w * 0.5 - 75, 8)
-	_turn_badge.size = _turn_badge.custom_minimum_size
-	_ai_chip.position = Vector2(w - _ai_chip.custom_minimum_size.x - 20, 12)
-	_energy_orb.position = Vector2(34, h - 284)
-	_rule_label.position = Vector2(24, maxf(82.0, _mechanic.position.y + _mechanic.get_content_height() + 8.0))
-	_draw_button.position = Vector2(24, h - 70)
-	_discard_button.position = Vector2(w - maxf(110.0, _discard_button.get_combined_minimum_size().x) - 24, h - 70)
-	_end_button.position = Vector2(w - 168, h - 290)
-	_continue.position = Vector2(w * 0.5 - 120, h * 0.5 + 70)
-	var n := _enemy_widgets.size()
-	var span := w * 0.52
-	for i in n:
+	_space = BattleLayout.compose(size, _enemy_widgets.size())
+	var foot: Vector2 = _space.hero
+	_player.size = Vector2(200,240)
+	_player.position = foot - Vector2(100,220)
+	_mol.size = _space.hero_size
+	var bounds := _mol.visual_bounds()
+	_mol.pivot_offset = bounds.get_center()
+	_mol.rotation = -0.035
+	_mol.position = Vector2(foot.x - bounds.get_center().x, foot.y - 12 - bounds.end.y)
+	_player_tag.position = Vector2(foot.x - 106,foot.y + 14)
+	_player_tag.size = Vector2(212,24)
+	_player_bar.position = Vector2(foot.x - 120,foot.y + 42)
+	_player_bar.size = Vector2(240,24)
+	_player_status.position = Vector2(foot.x - 105,foot.y + 67)
+	if _game != null:
+		_player_tag.tooltip_text = _player_tag.text
+		_player_tag.text = _game.project_code
+	_title.position = Vector2(24,13)
+	_title.size = Vector2(w * 0.58,24)
+	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_kind_tag.visible = false
+	_turn_badge.position = Vector2(w-330,0)
+	_turn_badge.size = Vector2(120,54)
+	_ai_chip.position = Vector2(w-210,8)
+	_energy_orb.position = Vector2(w * 0.035, _space.hand_top + 38)
+	_end_button.position = Vector2(w - _end_button.size.x - w * 0.035,_space.hand_top + 56)
+	_dose_button.position = Vector2(20,h - 133)
+	_draw_button.position = Vector2(24,h - 63)
+	_discard_button.position = Vector2(w - maxf(110,_discard_button.get_combined_minimum_size().x) - 24,h - 63)
+	_rule_label.position = Vector2(32,65)
+	_continue.position = Vector2(w * 0.5 - 120,h * 0.5 + 70)
+	for i in _enemy_widgets.size():
+		var slot: Dictionary = _space.slots[i]
 		var ew := _enemy_widgets[i]
-		var x := w * 0.42 + span * (i + 0.5) / n - EnemyWidget.SIZE.x * 0.5
-		ew.position = Vector2(x, 96)
+		ew.set_stage_pose(slot.body, minf(240, float(slot.body.x) + 8))
+		ew.position = slot.foot - Vector2(EnemyWidget.SIZE.x * 0.5,0)
+	_floor.ground = _space.ground
+	_update_stage()
 	_layout_hand(true)
+
+
+func _update_stage() -> void:
+	if _space.is_empty():
+		return
+	var shadows: Array = []
+	var footprint := _mol.visual_bounds()
+	shadows.append({"center":Vector2(_mol.position.x + footprint.get_center().x,float(_space.ground)),"width":footprint.size.x * 0.75})
+	for ew in _enemy_widgets:
+		if ew.creature.dying < 0.95:
+			shadows.append({"center":Vector2(ew.position.x+ew.creature.position.x+ew.creature.size.x*0.5,float(_space.ground)),"width":ew.creature.visible_body_rect().size.x * 0.72})
+	_floor.shadows = shadows
 	_floor.queue_redraw()
-
-
-func _draw_floor() -> void:
-	var w := _floor.size.x
-	var y := 420.0
-	var tint: Color = STAGE_TINT.get(_game.state.stage if _game else "", Color(0.3, 0.4, 0.5))
-	for i in 10:
-		var r := Vector2(w * 0.55 - i * 30, 70 - i * 6)
-		var pts := PackedVector2Array()
-		for k in 40:
-			var a := TAU * k / 40.0
-			pts.append(Vector2(w * 0.5, y) + Vector2(cos(a) * r.x, sin(a) * r.y))
-		_floor.draw_colored_polygon(pts, Color(tint, 0.035))
-	_floor.draw_line(Vector2(0, y), Vector2(w, y), Color(tint.lightened(0.4), 0.12), 2.0)
 
 
 func _draw_energy() -> void:
 	var full := _manager != null and _manager.energy > 0
 	var accent := UIKit.GOLD if full else UIKit.TEXT_DIM
-	_energy_orb.draw_style_box(UIKit.panel_style(Color("111d29"), Color("536574"), 6), Rect2(Vector2.ZERO, _energy_orb.size))
-	_energy_orb.draw_line(Vector2(12, 3), Vector2(78, 3), accent, 2.0)
+	BattleHud.quiet_style(Color(0.06,0.08,0.14,0.85),Color(UIKit.GOLD,0.3)).draw(_energy_orb.get_canvas_item(),Rect2(Vector2.ZERO,_energy_orb.size))
+	_energy_orb.draw_line(Vector2(18,3),Vector2(72,3),Color(accent,0.45),1.0)
 	_energy_orb.draw_string(get_theme_default_font(), Vector2(16, 20), tr("battle.energy_title"), HORIZONTAL_ALIGNMENT_LEFT, 70, 12, accent)
+	if _manager != null:
+		for i in mini(_manager.max_energy, 6):
+			var pos := Vector2(23 + i * 15, 77)
+			var pts := PackedVector2Array()
+			for j in 6:
+				pts.append(pos + Vector2.from_angle(PI / 6 + j * TAU / 6) * 3.5)
+			_energy_orb.draw_colored_polygon(pts, UIKit.GOLD if i < _manager.energy else UIKit.TEXT_DIM.darkened(0.5))
 
 
 # ---------- 战斗开始 ----------
@@ -337,6 +370,7 @@ func _on_battle_started(encounter: Dictionary) -> void:
 	_title.text = tr("encounter." + String(encounter.get("id", kind))) if kind == "boss" else tr(_manager.enemies[0].name_key)
 	if kind != "boss" and _manager.enemies.size() > 1:
 		_title.text = tr("encounter.group") % [_title.text, _manager.enemies.size()]
+	_title.text = tr("stage." + _game.state.stage) + " · " + _title.text
 	_kind_tag.text = tr("encounter.kind." + kind)
 	_kind_tag.add_theme_color_override("font_color", {"boss": UIKit.DANGER, "elite": UIKit.GOLD}.get(kind, UIKit.TEXT_DIM))
 	_bg.glow_color = STAGE_TINT.get(_game.state.stage, Color(0.2, 0.5, 0.5))
@@ -347,8 +381,10 @@ func _on_battle_started(encounter: Dictionary) -> void:
 		mech_lines.append(_fmt(line))
 	if kind == "boss" and _game.rp2d > 0 and _game.state.stage == "二期临床试验":
 		mech_lines.append(tr("mechanic.rp2d") % _game.rp2d)
-	_mechanic.text = "\n".join(mech_lines.map(func(l: String) -> String: return "[color=#ffcf73]◆[/color] " + l))
-	_mechanic.visible = not mech_lines.is_empty()
+	_mechanic.tooltip_text = "\n".join(mech_lines)
+	_mechanic.text = "[color=#e4ae53]◆[/color] " + tr("battle.mechanics_short")
+	_mechanic.visible = false
+	_rule_label.tooltip_text = tr("battle.rule_tip") + "\n" + _mechanic.tooltip_text
 	var molecule: Molecule = _game.molecule
 	_mol.visible = molecule != null
 	_mol_tag.visible = false   # 分子效果放在悬停提示里，战场上不再堆文字
@@ -559,7 +595,7 @@ func _play_damage(ev: Dictionary) -> void:
 	var amount := int(ev.amount)
 	var p := _side_point(side, index)
 	if amount > 0:
-		_float_text("-%d" % amount, p + Vector2(randf_range(-30, 30), -80), Color(1.0, 0.35, 0.3), 30 + mini(amount, 30))
+		_float_text("-%d" % amount,p+Vector2(12,-26),UIKit.GOLD.lightened(0.25),28+mini(amount,18),0.04)
 		_burst(p, Color(1.0, 0.4, 0.35) if side == "player" else _enemy_color(index), 12 + mini(amount, 20))
 		if side == "player":
 			_player.hit()
@@ -568,7 +604,7 @@ func _play_damage(ev: Dictionary) -> void:
 			GameAudio.sfx("hurt")
 			_screen_flash(0.18 + minf(amount, 30) * 0.01)
 		else:
-			_enemy_widgets[index].creature.hit()
+			_enemy_widgets[index].creature.hit(p - _enemy_widgets[index].position - _enemy_widgets[index].creature.position)
 			_impact(index, p, amount)
 			GameAudio.sfx("hit_heavy" if amount >= 15 else "hit")
 		_shake(3.0 + minf(amount, 30) * 0.4, 0.22)
@@ -577,6 +613,8 @@ func _play_damage(ev: Dictionary) -> void:
 		GameAudio.sfx("block")
 	_set_bar(side, index, int(ev.hp), int(ev.block))
 	await _wait(0.2 + (0.07 if amount >= 12 else 0.0))   # 重击多停一拍（顿帧感）
+	if side == "enemy" and is_instance_valid(_mol_motion) and _mol_motion.is_running():
+		await _mol_motion.finished # Unlock the next action only after the body returns home.
 
 
 ## 用事件里的数值更新血条（hp 为 -1 时保持当前显示）
@@ -599,19 +637,19 @@ func _play_enemy_move(index: int, move: Dictionary) -> void:
 	if index >= _enemy_widgets.size():
 		return
 	var ew := _enemy_widgets[index]
-	_float_text(tr("move." + String(move.get("id", ""))), ew.position + Vector2(EnemyWidget.SIZE.x * 0.5, 70), Color(1, 0.9, 0.7), 20)
-	var origin := ew.position
+	_float_text(tr("move." + String(move.get("id", ""))), ew.position + Vector2(EnemyWidget.SIZE.x * 0.5, -50), Color(1, 0.9, 0.7), 20)
+	var origin := ew.creature.position
 	var tween := create_tween()
 	var enemy: Enemy = _manager.enemies[index]
 	if int(move.get("damage", 0)) > 0 and (enemy.is_boss or enemy.is_elite):
 		GameAudio.sfx("boss_stomp")
 		_shake(10.0 if enemy.is_boss else 6.0, 0.35)
 	if int(move.get("damage", 0)) > 0:
-		tween.tween_property(ew, "position", origin + Vector2(-110 if enemy.is_boss else -70, 10), 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-		tween.tween_property(ew, "position", origin, 0.2).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tween.tween_property(ew.creature, "position", origin + Vector2(-110 if enemy.is_boss else -70, 10), 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		tween.tween_property(ew.creature, "position", origin, 0.2).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	else:
-		tween.tween_property(ew, "scale", Vector2(1.08, 1.08), 0.12)
-		tween.tween_property(ew, "scale", Vector2.ONE, 0.15)
+		tween.tween_property(ew.creature, "scale", Vector2(1.08, 1.08), 0.12)
+		tween.tween_property(ew.creature, "scale", Vector2.ONE, 0.15)
 	await _wait(0.14)
 
 
@@ -724,7 +762,7 @@ func _strike_style_for(card: ResearchCard) -> String:
 			for e in card.effects:
 				if String(e.get("op", "")) == "damage":
 					base = maxi(base, int(e.get("value", 0)))
-			return "charge" if base >= 12 else "fragment"
+			return "charge"
 	return "bolt"
 
 
@@ -789,13 +827,26 @@ func _fragment_throw(to: Vector2) -> void:
 ## 冲撞（只用于重击）：分子冲到敌人面前，撞上后再退回原位
 func _strike_charge(to: Vector2) -> void:
 	var origin := _mol.position
-	var hit_pos := origin + Vector2(to.x - _player_point().x - 150.0, (to.y - _player_point().y) * 0.4)
+	var bounds := _mol.visual_bounds()
+	var tip := _mol.get_transform() * Vector2(bounds.end.x,bounds.get_center().y)
+	var pivot := _mol.pivot_offset
+	var tip_local := Vector2(bounds.end.x,bounds.get_center().y)
+	var destination := to - pivot - (tip_local-pivot).rotated(-0.12)
 	var dash := create_tween()
-	dash.tween_property(_mol, "position", origin + Vector2(-24, 0), 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	dash.tween_property(_mol, "position", hit_pos, 0.13).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_IN)
-	dash.tween_interval(0.16)
-	dash.tween_property(_mol, "position", origin, 0.3).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	await _wait(0.21)
+	_mol_motion = dash
+	dash.tween_property(_mol,"position",origin+Vector2(-22,4),0.09).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	dash.parallel().tween_property(_mol,"rotation",0.05,0.09)
+	dash.tween_property(_mol,"position",destination,0.18).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+	dash.parallel().tween_property(_mol,"rotation",-0.12,0.18)
+	dash.tween_interval(0.09)
+	dash.tween_property(_mol,"position",origin,0.32).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	dash.parallel().tween_property(_mol,"rotation",-0.035,0.32)
+	var ribbon := BattleContact.new()
+	ribbon.from_point = tip
+	ribbon.to_point = to
+	ribbon.burst = false
+	_fx.add_child(ribbon)
+	await _wait(0.27)
 
 
 ## 光束：AI 是带锯齿和像素块的青色数据流；精准光束（precise）是一道又细又亮的直线
@@ -941,16 +992,22 @@ func _projectile(from: Vector2, to: Vector2, color: Color, scale_k := 1.0) -> vo
 
 ## 击中敌人：按出招方式换命中特效，伤害越高越猛；敌人都会被击退
 func _impact(index: int, p: Vector2, amount: int) -> void:
+	var contact := BattleContact.new()
+	contact.from_point = _player_point()
+	contact.to_point = p
+	contact.strength = clampf(0.75 + amount / 30.0,0.8,1.5)
+	_fx.add_child(contact)
+	_floor.impact = p
+	_floor.impact_light = 1.0
+	create_tween().tween_property(_floor,"impact_light",0.0,0.4)
 	var color := _enemy_color(index).lightened(0.3)
 	var heavy := minf(amount, 30)
 	var knock := 10.0 + heavy * 0.8
 	match _strike_style:
 		"charge":   # 冲撞：大冲击波 + 震屏，击退更远
-			_shockwave(p, Color(0.85, 0.8, 1.0), 90.0 + heavy * 5.0)
-			_shockwave(p, Color(1, 1, 1), 50.0 + heavy * 2.0)
-			_burst(p, Color(0.8, 0.75, 1.0), 18 + int(heavy))
-			_shake(6.0 + heavy * 0.3, 0.2)
-			knock *= 1.8
+			_burst(p,UIKit.GOLD,12+int(heavy*0.4))
+			_shake(4.0+heavy*0.18,0.16)
+			knock *= 1.6
 		"beam":     # 数据光束：青色电火花
 			_burst(p, Color(0.45, 0.95, 1.0), 16 + int(heavy))
 			_shockwave(p, Color(0.45, 0.95, 1.0), 50.0 + heavy * 2.0)
@@ -977,10 +1034,10 @@ func _impact(index: int, p: Vector2, amount: int) -> void:
 			_slash(p, Color(1.0, 0.97, 0.9), 70.0 + heavy * 3.0)
 			_burst(p, color, 10 + int(heavy))
 	var ew := _enemy_widgets[index]
-	var origin := ew.position
+	var origin := ew.creature.position
 	var kick := create_tween()
-	kick.tween_property(ew, "position", origin + Vector2(knock, -4), 0.05).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	kick.tween_property(ew, "position", origin, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	kick.tween_property(ew.creature, "position", origin + Vector2(knock, -4), 0.05).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	kick.tween_property(ew.creature, "position", origin, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 ## 溅开的液滴：向四周飞、往下落的小圆点
@@ -1059,7 +1116,7 @@ func _play_death(side: String, index: int) -> void:
 	_burst(_side_point(side, index), _enemy_color(index), 40)
 	var tween := create_tween()
 	tween.tween_property(ew.creature, "dying", 1.0, 0.6)
-	tween.parallel().tween_property(ew, "modulate:a", 0.0, 0.7).set_delay(0.2)
+	tween.parallel().tween_property(ew.creature, "modulate:a", 0.0, 0.7).set_delay(0.2)
 	await _wait(0.35)
 
 
@@ -1122,39 +1179,23 @@ func _layout_hand(instant := false) -> void:
 	var n := cards.size()
 	if n == 0:
 		return
-	var card_w := CardFace.BASE.x * CARD_SCALE
-	var spacing := minf(card_w * 0.95, 820.0 / n)
-	var center_x := size.x * 0.5
-	var edge := (n - 1) * 0.5
-	var fan_margin := maxf(40.0, edge * edge * 2.0 + absf(sin(deg_to_rad(edge * 3.0))) * card_w * 0.5 + 16.0)
-	var base_y := size.y - CardFace.BASE.y * CARD_SCALE - fan_margin
-	var hover_i := cards.find(_hover_card if _selected == null else _selected)
+	var active := cards.find(_hover_card if _selected == null else _selected)
+	var fan := BattleLayout.fan(size,n,active)
 	for i in n:
 		var face: CardFace = _faces[cards[i]]
-		var offset := i - (n - 1) * 0.5
-		var x := center_x + offset * spacing - card_w * 0.5
-		var y := base_y + absf(offset) * absf(offset) * 2.0
-		var rot := deg_to_rad(offset * 3.0)
-		var s := Vector2.ONE
-		if hover_i >= 0 and i != hover_i:
-			x += 30.0 * signf(i - hover_i) / maxf(1.0, absf(i - hover_i))
-		if i == hover_i:
-			y = size.y - CardFace.BASE.y * CARD_SCALE * HOVER_SCALE - 40
-			rot = 0.0
-			s = Vector2(HOVER_SCALE, HOVER_SCALE)
-			face.z_index = 20
-		else:
-			face.z_index = i
-		face.pivot_offset = Vector2(face.size.x * 0.5, face.size.y)
+		var pose: Dictionary = fan[i]
+		face.z_index = 20 if i == active else i
+		face.pivot_offset = Vector2(face.size.x * 0.5,face.size.y)
+		var target_scale := Vector2.ONE * float(pose.scale)
 		if instant:
-			face.position = Vector2(x, y)
-			face.rotation = rot
-			face.scale = s
+			face.position = pose.position
+			face.rotation = pose.rotation
+			face.scale = target_scale
 		else:
 			var tween := face.create_tween().set_parallel(true)
-			tween.tween_property(face, "position", Vector2(x, y), 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-			tween.tween_property(face, "rotation", rot, 0.16)
-			tween.tween_property(face, "scale", s, 0.16)
+			tween.tween_property(face,"position",pose.position,0.16)
+			tween.tween_property(face,"rotation",pose.rotation,0.16)
+			tween.tween_property(face,"scale",target_scale,0.16)
 
 
 func _on_card_hover(card: ResearchCard, on: bool) -> void:
@@ -1256,6 +1297,7 @@ func _process(delta: float) -> void:
 	if not visible:
 		return
 	_time += delta
+	_update_stage()
 	# 没牌可打（能量用完或手里都打不出）时，结束回合按钮呼吸发光提示
 	_end_button.prompt = _should_prompt_end()
 	if _selected != null:
@@ -1343,11 +1385,12 @@ func _refresh_energy() -> void:
 	_rule_label.visible = left >= 0
 	var card := _selected if _selected != null else _hover_card
 	var lines := backfire_lines(_manager.backfire_preview(card, _hover_enemy)) if card != null and card.kind == "attack" else []
+	_rule_label.size.y = maxf(28,lines.size()*20+4)
 	if not lines.is_empty():
 		_rule_label.text = "\n".join(lines)
 		_rule_label.add_theme_color_override("font_color", UIKit.DANGER.lightened(0.15) if lines.size() > 1 or not lines[0].begins_with("✓") else UIKit.ACCENT.lightened(0.2))
 		return
-	_rule_label.text = tr("battle.rule_left") % left if left > 0 else tr("battle.rule_none")
+	_rule_label.text = tr("battle.safe_short") % left if left > 0 else tr("battle.risk_short")
 	_rule_label.add_theme_color_override("font_color", UIKit.GOLD if left > 0 else UIKit.DANGER.lightened(0.15))
 
 
@@ -1416,6 +1459,7 @@ func _refresh_faces() -> void:
 		var face: CardFace = _faces[card]
 		face.refresh(mods if card.is_ai() else {"damage": mods.damage, "block": mods.block}, ai)
 		face.set_state(card == _hover_card or card == _selected, card == _selected, not _manager.can_play(card) and not _busy)
+		face.self_modulate = Color.WHITE if card == _hover_card or card == _selected else Color(0.92,0.92,0.92)
 
 
 func _update_controls() -> void:
@@ -1519,7 +1563,7 @@ func _show_banner(text: String, sub: String, color: Color, hold: float, big: boo
 	await out.finished
 
 
-func _float_text(text: String, pos: Vector2, color: Color, font_size: int) -> void:
+func _float_text(text: String, pos: Vector2, color: Color, font_size: int, delay := 0.0) -> void:
 	var label := UIKit.header(text, font_size, color)
 	label.add_theme_constant_override("outline_size", 7)
 	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
@@ -1528,8 +1572,12 @@ func _float_text(text: String, pos: Vector2, color: Color, font_size: int) -> vo
 	var w := label.get_combined_minimum_size()
 	label.position = pos - w * 0.5
 	label.pivot_offset = w * 0.5
-	label.scale = Vector2(0.5, 0.5)
+	label.scale = Vector2(0.85,0.85) if delay > 0 else Vector2(0.5,0.5)
 	var tween := label.create_tween()
+	if delay > 0:
+		label.modulate.a = 0
+		tween.tween_interval(delay)
+		tween.tween_property(label,"modulate:a",1.0,0.025)
 	tween.tween_property(label, "scale", Vector2(1.15, 1.15), 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tween.tween_property(label, "scale", Vector2.ONE, 0.08)
 	tween.set_parallel(true)
@@ -1603,7 +1651,7 @@ func _side_point(side: String, index: int) -> Vector2:
 	if side == "player" or index < 0 or index >= _enemy_widgets.size():
 		return _player_point()
 	var ew := _enemy_widgets[index]
-	return ew.position + ew.creature.position + ew.creature.size * Vector2(0.5, 0.55)
+	return ew.contact_point()
 
 
 func _player_point() -> Vector2:

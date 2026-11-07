@@ -208,7 +208,7 @@ func _on_ability_hover(panel: Control, accent: Color, hovered: bool) -> void:
 
 
 func _refresh_panel(panel: Control, accent: Color, selected: bool) -> void:
-	var sb := StyleBoxFlat.new()
+	var sb := PaintedStyle.new()
 	sb.bg_color = accent.lerp(PANEL_BG, 0.8) if not selected else CardFace.PICK_GREEN.lerp(PANEL_BG, 0.75)
 	sb.set_border_width_all(4 if selected else 2)
 	sb.set_corner_radius_all(10)

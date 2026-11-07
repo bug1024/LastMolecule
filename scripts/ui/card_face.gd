@@ -57,7 +57,7 @@ var _ai_info := {}
 var _press_time := -1.0
 
 const PICK_GREEN := UIKit.ACCENT
-const MIN_FONT := 14   # 基准字号下限：0.9 倍时约 12.6px
+const MIN_FONT := 15   # 基准字号下限：0.9 倍时约 12.6px
 const LONG_PRESS := 0.5
 # 牌面布局（基准坐标）
 const NAME_RECT := Rect2(6, 6, 168, 34)
@@ -146,7 +146,7 @@ func refresh(mods := {}, ai_info := {}) -> void:
 	_mods = mods
 	_ai_info = ai_info
 	_set_name(tr(card.name) + ("+" if card.upgraded else ""))
-	_name_label.add_theme_color_override("font_color", UIKit.ACCENT_BLUE if card.upgraded else UIKit.TEXT)
+	_name_label.add_theme_color_override("font_color", Color("28634c") if card.upgraded else UIKit.INK)
 	_type_text = tr(card.type_name if not card.type_name.is_empty() else "card.type." + card.type)
 	for child in _rows.get_children():
 		child.queue_free()
@@ -198,7 +198,7 @@ func _make_row(row: Dictionary) -> HBoxContainer:
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_theme_constant_override("separation", int(5 * face_scale))
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_child(UIKit.icon_rect(String(row.icon), 26 * face_scale, row.color))
+	box.add_child(UIKit.icon_rect(String(row.icon), 26 * face_scale, Color(row.color).darkened(0.25)))
 	var number_text := String(row.number)
 	var text := Label.new()
 	text.text = String(row.text)
@@ -221,7 +221,7 @@ func _make_row(row: Dictionary) -> HBoxContainer:
 		number.theme_type_variation = &"HeaderLabel"
 		number.add_theme_font_size_override("font_size", _px(number_size))
 		var change := int(row.get("change", 0))
-		var color: Color = UIKit.ACCENT if change > 0 else (UIKit.DANGER if change < 0 else UIKit.TEXT)
+		var color: Color = Color("28634c") if change > 0 else (Color("a43f38") if change < 0 else UIKit.INK)
 		number.add_theme_color_override("font_color", color)
 		number.add_theme_color_override("font_outline_color", UIKit.TEXT)
 		number.add_theme_constant_override("outline_size", 0)
@@ -232,7 +232,7 @@ func _make_row(row: Dictionary) -> HBoxContainer:
 		text.autowrap_mode = TextServer.AUTOWRAP_WORD   # 只在词间换行，不把单词拆开
 		text.custom_minimum_size.x = avail
 		text.add_theme_constant_override("line_spacing", int(-3 * face_scale))
-	text.add_theme_color_override("font_color", UIKit.TEXT)
+	text.add_theme_color_override("font_color", UIKit.INK)
 	text.add_theme_color_override("font_outline_color", UIKit.TEXT)
 	text.add_theme_constant_override("outline_size", 0)
 	text.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -252,7 +252,7 @@ func _make_note(notes: Array) -> Control:
 		l.custom_minimum_size.x = (BODY_RECT.size.x - 4) * face_scale
 		l.add_theme_font_size_override("font_size", _px(MIN_FONT))
 		l.add_theme_constant_override("line_spacing", int(-3 * face_scale))
-		l.add_theme_color_override("font_color", note.color)
+		l.add_theme_color_override("font_color", Color(note.color).darkened(0.45))
 		l.add_theme_color_override("font_outline_color", UIKit.TEXT)
 		l.add_theme_constant_override("outline_size", 0)
 		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -337,33 +337,30 @@ func _draw() -> void:
 	var role_color := _role_color()
 	var rect := Rect2(Vector2.ZERO, BASE * k)
 	if selected and pick_style:
-		for i in 5:
+		for i in 2:
 			draw_style_box(_box(Color(0, 0, 0, 0), Color(PICK_GREEN, 0.55 - i * 0.09), 14 + i * 3, 3), rect.grow((i + 1) * 3 * k))
 	elif hovered or selected:
 		var glow := Color(role_color.lightened(0.35), 0.35 + 0.15 * sin(_time * 5.0))
-		for i in 4:
+		for i in 1:
 			draw_style_box(_box(Color(0, 0, 0, 0), glow, 14 + i * 2, 2), rect.grow((i + 1) * 2 * k))
-	var plate := UIKit.art("record")
-	if plate:
-		draw_texture_rect(plate, rect.grow(5 * k), false)
-	else:
-		draw_style_box(_box(Color(0.07, 0.09, 0.13), role_color, 8, 2), rect)
-	# Role is visible across the whole title strip; the type badge has its own independent color.
-	draw_style_box(_box(role_color.darkened(0.55), role_color.lightened(0.2), 5, 1), Rect2(NAME_RECT.position * k, NAME_RECT.size * k))
-	draw_style_box(_box(Color(0, 0, 0, 0), Color(role_color, 0.9), 7, 2), rect.grow(-2 * k))
-	# Mask the old frame's taller illustration window so its baked divider cannot cross the live effects.
+	PaintedArt.frame(self, rect, UIKit.PAPER, UIKit.GOLD.darkened(0.25), 1.5 * k)
+	var header := Rect2(NAME_RECT.position * k, NAME_RECT.size * k)
+	draw_style_box(_box(role_color.lerp(UIKit.PAPER, 0.70), Color(role_color, 0.6), 2, 1), header)
 	var body := Rect2(BODY_RECT.position * k, BODY_RECT.size * k)
-	draw_style_box(_box(role_color.lerp(Color(0.055, 0.075, 0.11), 0.94), Color(role_color, 0.2), 4, 1), body)
+	draw_rect(body, UIKit.PAPER)
+	draw_line(body.position, Vector2(body.end.x, body.position.y), Color(UIKit.INK, 0.28), k, true)
 	var code := card.id.to_upper().left(16)
-	draw_string(get_theme_default_font(), Vector2(12, BASE.y - 5) * k, code, HORIZONTAL_ALIGNMENT_LEFT, -1, _px(8), Color(UIKit.TEXT_DIM, 0.65))
+	draw_string(get_theme_default_font(), Vector2(12, BASE.y - 5) * k, code, HORIZONTAL_ALIGNMENT_LEFT, -1, _px(8), Color(UIKit.INK, 0.45))
 	# 左上角费用宝石
 	if not card.unplayable:
 		var font: Font = get_theme_font("font", &"HeaderLabel")
 		var orb := Vector2(24, 23) * k
-		draw_circle(orb, 20 * k, Color(0.055, 0.075, 0.11))
-		draw_circle(orb, 17 * k, UIKit.ACCENT_BLUE)
-		draw_circle(orb, 13 * k, UIKit.ACCENT)
-		draw_circle(orb + Vector2(-5, -5) * k, 6 * k, Color(UIKit.TEXT, 0.3))
+		var gem := PackedVector2Array()
+		for j in 6:
+			gem.append(orb + Vector2.from_angle(PI / 6 + j * TAU / 6) * 19 * k)
+		draw_colored_polygon(gem, Color("397b68"))
+		gem.append(gem[0])
+		draw_polyline(gem, UIKit.PAPER, 2 * k, true)
 		var fs := _px(26)
 		var text := str(card.cost)
 		var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
@@ -425,7 +422,7 @@ static func art_region(card_id: String, cell: int, area: Rect2, texture_size: Ve
 
 
 func _draw_art(art: Rect2) -> void:
-	var tex := UIKit.art("research-illustrations")
+	var tex := UIKit.art("painted-cards")
 	if tex == null:
 		return
 	var geometry := art_region(card.id, _art_cell(), art, tex.get_size())

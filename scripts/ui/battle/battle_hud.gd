@@ -26,25 +26,9 @@ class TurnBadge extends Control:
 			queue_redraw()
 
 	func _draw() -> void:
-		var c := Vector2(30, size.y * 0.5)
-		var r := 24.0 * (1.0 + 0.18 * _pop)
-		var pts := PackedVector2Array()
-		for k in 7:
-			var a := PI / 6 + k * TAU / 6
-			pts.append(c + Vector2(cos(a), sin(a)) * r)
-		draw_colored_polygon(pts, Color(0.05, 0.08, 0.1, 0.92))
-		draw_polyline(pts, Color(UIKit.ACCENT, 0.9), 2.0, true)
-		if _pop > 0.0:
-			draw_circle(c, r + 10 * _pop, Color(UIKit.ACCENT, 0.18 * _pop))
-		var bold: Font = ThemeDB.get_project_theme().get_font("font", &"HeaderLabel") if ThemeDB.get_project_theme() else get_theme_default_font()
-		var text := str(turn)
-		var fs := 24
-		var w := bold.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-		draw_string_outline(bold, c + Vector2(-w * 0.5, fs * 0.36), text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 4, Color(0, 0, 0, 0.7))
-		draw_string(bold, c + Vector2(-w * 0.5, fs * 0.36), text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.WHITE)
 		var font := get_theme_default_font()
-		draw_string(font, Vector2(64, size.y * 0.5 - 2), tr("battle.turn_word"), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UIKit.TEXT_DIM)
-		draw_string(font, Vector2(64, size.y * 0.5 + 16), "ROUND", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(UIKit.ACCENT, 0.7))
+		var label := tr("battle.turn_word") + " " + str(turn)
+		draw_string(font,Vector2(8,25),label,HORIZONTAL_ALIGNMENT_LEFT,-1,14,UIKit.TEXT_DIM)
 
 
 class AiChip extends PanelContainer:
@@ -56,7 +40,7 @@ class AiChip extends PanelContainer:
 	var _icon: TextureRect
 
 	func _init() -> void:
-		custom_minimum_size = Vector2(290, 0)
+		custom_minimum_size = Vector2(190, 0)
 		mouse_filter = Control.MOUSE_FILTER_PASS
 		var col := VBoxContainer.new()
 		col.add_theme_constant_override("separation", 4)
@@ -64,11 +48,11 @@ class AiChip extends PanelContainer:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
 		col.add_child(row)
-		_icon = UIKit.icon_rect("type_ai", 22, UIKit.ACCENT_BLUE)
+		_icon = UIKit.icon_rect("type_ai", 16, UIKit.ACCENT_BLUE)
 		row.add_child(_icon)
-		_tier_label = UIKit.header("", 17)
+		_tier_label = UIKit.header("", 14)
 		row.add_child(_tier_label)
-		_power = UIKit.header("", 17, Color.WHITE)
+		_power = UIKit.header("", 14, UIKit.TEXT_DIM)
 		row.add_child(_power)
 		var spacer := Control.new()
 		spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -76,7 +60,7 @@ class AiChip extends PanelContainer:
 		_miss = UIKit.label("", UIKit.TEXT_DIM, 13)
 		row.add_child(_miss)
 		_bar = ProgressBar.new()
-		_bar.custom_minimum_size = Vector2(0, 6)
+		_bar.custom_minimum_size = Vector2(0, 3)
 		_bar.show_percentage = false
 		col.add_child(_bar)
 		_next = UIKit.label("", Color(0.7, 0.82, 0.95), 12)
@@ -90,14 +74,15 @@ class AiChip extends PanelContainer:
 		# 档位只改文字颜色（低档灰蓝、中档蓝、高档金）；进度条统一用代表「数据」的蓝色，不用红色，以免和敌人混淆
 		var color: Color = {"low": Color(0.62, 0.7, 0.8), "mid": UIKit.ACCENT_BLUE, "high": UIKit.GOLD}.get(id, UIKit.ACCENT_BLUE)
 		var bar_color: Color = UIKit.ACCENT_BLUE
-		var sb := UIKit.panel_style(Color(0.04, 0.06, 0.09, 0.72), Color(0.3, 0.4, 0.5, 0.45), 12)
-		sb.content_margin_left = 12
-		sb.content_margin_right = 12
-		sb.content_margin_top = 8
-		sb.content_margin_bottom = 8
-		add_theme_stylebox_override("panel", sb)
+		var sb := BattleHud.quiet_style(Color(0,0,0,0),Color(0,0,0,0))
+		sb.content_margin_left = 4
+		sb.content_margin_right = 4
+		sb.content_margin_top = 1
+		sb.content_margin_bottom = 1
+		add_theme_stylebox_override("panel",sb)
+
 		_icon.self_modulate = UIKit.ACCENT_BLUE
-		_tier_label.text = "AI · " + tr("tier." + id)
+		_tier_label.text = "AI"
 		_tier_label.add_theme_color_override("font_color", color.lightened(0.2))
 		_power.text = "×" + String.num(float(tier.get("multiplier", 1.0)), 2)
 		_miss.text = tr("battle.ai_miss") % miss
@@ -106,10 +91,12 @@ class AiChip extends PanelContainer:
 		_bar.max_value = 1.0
 		_bar.step = 0.001
 		_bar.value = 1.0 if need < 0 else clampf(float(effective) / maxf(1.0, float(tier.get("max", effective + need))), 0.0, 1.0)
-		_bar.add_theme_stylebox_override("fill", UIKit.filled(bar_color, bar_color, 3))
-		_bar.add_theme_stylebox_override("background", UIKit.filled(Color(0.12, 0.15, 0.2), Color(0.12, 0.15, 0.2), 3))
+		_bar.add_theme_stylebox_override("fill", UIKit.meter_style(bar_color, bar_color, 3))
+		_bar.add_theme_stylebox_override("background", UIKit.meter_style(Color(0.12, 0.15, 0.2), Color(0.12, 0.15, 0.2), 3))
 		_next.text = BattleView.ai_next_text(tier)
-		tooltip_text = tr("battle.ai_chip") % [effective, tr("tier." + id), float(tier.get("multiplier", 1.0)), miss]
+		_next.visible = false
+		_miss.visible = false
+		tooltip_text = tr("battle.ai_chip") % [effective, tr("tier." + id), float(tier.get("multiplier", 1.0)), miss] + "\n" + _next.text
 
 
 ## 结束回合：深色仪器面板、金属边框、绿色提示线，底部保留「E」键帽；
@@ -122,7 +109,7 @@ class EndTurnButton extends Button:
 
 	func _init() -> void:
 		text = ""
-		custom_minimum_size = Vector2(D, D)
+		custom_minimum_size = Vector2(166, 60)
 		size = custom_minimum_size
 		pivot_offset = size * 0.5
 		focus_mode = Control.FOCUS_NONE
@@ -147,23 +134,28 @@ class EndTurnButton extends Button:
 		queue_redraw()
 
 	func _draw() -> void:
-		var c := size * 0.5
 		var on := not disabled
-		var accent: Color = UIKit.ACCENT if on else Color(0.4, 0.45, 0.5)
-		var hover := on and is_hovered()
-		var panel := Rect2(Vector2(0, 6), Vector2(size.x, size.y - 12))
-		draw_style_box(UIKit.panel_style(Color("182c35") if hover else Color("111d29"), Color("536574"), 6), panel)
-		var alpha := 0.7 + 0.3 * sin(_time * 3.0) if on and prompt else 0.7
-		draw_line(Vector2(12, 9), Vector2(size.x - 12, 9), Color(accent, alpha), 2.0)
-		var ink := Color(0.95, 1.0, 0.97) if on else Color(0.62, 0.66, 0.7)
-		if _icon_tex:
-			draw_texture_rect(_icon_tex, Rect2(c + Vector2(-13, -34), Vector2(26, 26)), false, ink)
-		var font := get_theme_default_font()
+		BattleHud.quiet_style(UIKit.ACCENT.darkened(0.65) if on else UIKit.INK,Color(UIKit.GOLD,0.65 if is_hovered() and on else 0.3)).draw(get_canvas_item(),Rect2(Vector2.ZERO,size))
+		var ink := UIKit.PAPER if on else UIKit.TEXT_DIM
+		var font := get_theme_font("font", &"HeaderLabel")
 		var label := TranslationServer.translate("ui.end_turn")
-		var fs := 16
+		var fs := 18
 		var w := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-		draw_string(font, c + Vector2(-w * 0.5, 14), label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, ink)
-		var cap := Rect2(c + Vector2(-10, 22), Vector2(20, 18))
-		draw_rect(cap, Color(0, 0, 0, 0.3))
-		draw_rect(cap, Color(ink, 0.5), false, 1.0)
-		draw_string(font, cap.position + Vector2(6, 14), "E", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(ink, 0.85))
+		draw_string(font, Vector2((size.x - 28 - w) * 0.5, size.y * 0.5 + 6), label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, ink)
+		var cap := Rect2(Vector2(size.x - 34, size.y * 0.5 - 11), Vector2(20, 22))
+		draw_rect(cap, Color(0.06, 0.08, 0.13, 0.6))
+		draw_rect(cap, Color(ink, 0.6), false, 1.0)
+		draw_string(get_theme_default_font(), cap.position + Vector2(5, 16), "E", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, ink)
+		if on and prompt:
+			var a := 0.4 + 0.3 * sin(_time * 3.0)
+			draw_line(Vector2(25, size.y - 9), Vector2(size.x - 25, size.y - 9), Color(UIKit.GOLD, a), 2, true)
+
+
+static func quiet_style(bg: Color, edge: Color) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = bg
+	style.border_color = edge
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(3)
+	style.set_content_margin_all(8)
+	return style

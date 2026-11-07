@@ -16,6 +16,7 @@ var _time := 0.0
 var _seed := 0.0
 var _blink := 0.0
 var _next_blink := 2.0
+var _hit_spot := Vector2.ZERO
 var hp_ratio := 1.0                 # 当前生命比例（molecule 形态用来熄灭原子）
 var _mol_atoms: Array[Vector2] = []  # molecule 形态：单位半径内的原子坐标（外圈在后）
 var _mol_bonds: Array[Vector2i] = []
@@ -34,8 +35,10 @@ func setup(def: Dictionary, boss := false, elite := false) -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
-func hit() -> void:
+func hit(point := Vector2(-1,-1)) -> void:
 	flash = 1.0
+	var body := visible_body_rect()
+	_hit_spot = point if point.x >= 0 else body.position + body.size * Vector2(0.28,0.52)
 
 
 func _process(delta: float) -> void:
@@ -50,38 +53,19 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
-	var c := Vector2(size.x * 0.5, size.y * 0.55)
-	var breathe := 1.0 + 0.03 * sin(_time * 2.0 + _seed)
-	var r := radius * breathe * (1.0 - dying * 0.4)
 	var alpha := 1.0 - dying
-	var body := color.lerp(Color.WHITE, flash * 0.85)
-	body.a = alpha
-	draw_set_transform(Vector2.ZERO)
-	_ellipse(c + Vector2(0, r * 1.05), Vector2(r * 0.9, r * 0.18), Color(0, 0, 0, 0.35 * alpha))
-	for i in 4:
-		draw_circle(c, r * (1.5 - i * 0.12), Color(color, 0.03 * alpha))
-	# 标本图集只有 6 种形态：每个敌人再按自己的颜色上色、按 id 左右翻转 / 微转，并在身后衬一圈本色光晕，
-	# 这样同一形态的不同敌人也一眼分得开（两只天然配体之间也略有差别）
-	var cells := {"blob": 0, "cell": 1, "crystal": 2, "cloud": 3, "spiky": 4, "molecule": 5}
-	var cell: int = cells.get(shape, 0)
-	Shading.glow(self, c, r * 1.55, Color(color, (0.42 if menace > 0 else 0.3) * alpha))
-	var flip := 1.0 if int(_seed * 10.0) % 2 == 0 else -1.0
-	var tint := color.lerp(Color.WHITE, 0.5).lerp(Color.WHITE, flash * 0.8)
+	var cells := {"blob":0,"cell":1,"crystal":2,"cloud":3,"spiky":4,"molecule":5}
+	var pivot := Vector2(size.x * 0.5, size.y)
+	var breathing := 1.0 + sin(_time * 1.6 + _seed) * 0.008
+	var lean := -0.028 if menace == 2 else 0.0
+	draw_set_transform(pivot,lean+sin(_time*1.2+_seed)*0.012+sin(_time*54)*flash*0.018,Vector2(breathing+flash*0.045,1.0-dying*0.3-flash*0.06))
+	var tint := Color(0.85,0.86,0.93).lerp(Color(1.18,1.10,1.0),flash*0.55)
 	tint.a = alpha
-	draw_set_transform(c, sin(_time * 0.6 + _seed) * 0.04 + (_seed - 5.0) * 0.02, Vector2(flip, 1.0))
-	var rect := Rect2(-Vector2(r * 1.45, r * 1.28), Vector2(r * 2.9, r * 2.56))
-	var ok := UIKit.atlas(self, "specimens", cell, rect, tint)
+	PaintedArt.sprite(self,"painted-enemies",int(cells.get(shape,0)),Rect2(-pivot,size),tint,true)
 	draw_set_transform(Vector2.ZERO)
-	if not ok:
-		_draw_cell(c, r, body, alpha)
-	if menace > 0:   # 精英 / Boss：一圈实验仪器刻度环，标出它的分量
-		var ring := r * 1.42
-		for i in 36:
-			var a0 := i * TAU / 36.0 + _time * 0.05
-			var long := i % 3 == 0
-			draw_line(c + Vector2.from_angle(a0) * ring, c + Vector2.from_angle(a0) * (ring + (9.0 if long else 4.0)),
-				Color(UIKit.GOLD if menace == 1 else UIKit.DANGER, 0.7 * alpha), 1.5, true)
-
+	if flash > 0:
+		Shading.glow(self,_hit_spot,85,Color(UIKit.GOLD,flash*0.65))
+		draw_arc(_hit_spot,28+flash*14,-1.1,1.2,20,Color(UIKit.PAPER,flash*0.8),2,true)
 
 
 func _wobble_points(c: Vector2, r: float, amp: float, lobes: int, speed: float) -> PackedVector2Array:
@@ -306,3 +290,11 @@ func _ellipse(center: Vector2, radii: Vector2, col: Color) -> void:
 		var a := TAU * i / 32.0
 		pts.append(center + Vector2(cos(a) * radii.x, sin(a) * radii.y))
 	draw_colored_polygon(pts, col)
+
+
+func visible_body_rect() -> Rect2:
+	var cells := {"blob":0,"cell":1,"crystal":2,"cloud":3,"spiky":4,"molecule":5}
+	var source: Rect2 = PaintedArt._sprite_regions.get("painted-enemies"+str(cells.get(shape,0)),Rect2(Vector2.ZERO,size))
+	var factor := minf(size.x/maxf(1,source.size.x),size.y/maxf(1,source.size.y))
+	var extent := source.size*factor
+	return Rect2(Vector2((size.x-extent.x)*0.5,size.y-extent.y),extent)

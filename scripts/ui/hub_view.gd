@@ -309,60 +309,7 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
-	var w := size.x
-	var h := size.y
-	var bench_y := h - BENCH_FROM_BOTTOM
-	var rect := Rect2(Vector2.ZERO, size)
-	# 后墙：深色渐变 + 阶段色灯光
-	draw_style_box(UIKit.filled(Color(0.05, 0.08, 0.11, 0.96), Color(0.2, 0.28, 0.34), 14), rect)
-	var pulse := 0.5 + 0.5 * sin(_time * 1.2)
-	var light := Vector2(w * 0.56, bench_y - 150)
-	for i in 10:
-		draw_circle(light, (330.0 - i * 28.0), Color(_tint.lightened(0.2), 0.022 + 0.006 * pulse))
-	# 货架与瓶罐
-	for shelf in 2:
-		var y := bench_y - 200.0 + shelf * 92.0
-		if y < 70:
-			continue
-		draw_rect(Rect2(w * 0.03, y, w * 0.94, 4), Color(0.25, 0.32, 0.38, 0.55))
-		for prop in _props:
-			if int(prop[1]) != shelf:
-				continue
-			var px: float = float(prop[0]) * w
-			if px > w * 0.42 and px < w * 0.7:
-				continue   # 分子周围留空
-			var pw: float = float(prop[2]) * w
-			var ph: float = prop[3]
-			var c: Color = prop[4]
-			draw_rect(Rect2(px, y - ph, pw, ph), Color(c, 0.16))
-			draw_rect(Rect2(px, y - ph * 0.45, pw, ph * 0.45), Color(c, 0.22))
-			draw_rect(Rect2(px + pw * 0.3, y - ph - 6, pw * 0.4, 6), Color(c, 0.18))
-	# 分析仪：分子下方的底座与向上的光柱
-	var base := Vector2(w * 0.56, bench_y)
-	var beam := PackedVector2Array([base + Vector2(-70, -40), base + Vector2(70, -40), base + Vector2(150, -300), base + Vector2(-150, -300)])
-	draw_colored_polygon(beam, Color(_tint.lightened(0.4), 0.05 + 0.03 * pulse))
-	draw_style_box(UIKit.filled(Color(0.12, 0.16, 0.2), Color(_tint.lightened(0.3), 0.8), 10), Rect2(base + Vector2(-90, -44), Vector2(180, 44)))
-	draw_rect(Rect2(base + Vector2(-60, -30), Vector2(120, 6)), Color(_tint.lightened(0.5), 0.6 + 0.3 * pulse))
-	# 实验台：台面高光 + 正面
-	draw_rect(Rect2(0, bench_y, w, 14), Color(0.32, 0.4, 0.46))
-	draw_rect(Rect2(0, bench_y + 14, w, h - bench_y - 14), Color(0.09, 0.12, 0.15))
-	draw_line(Vector2(0, bench_y), Vector2(w, bench_y), Color(0.6, 0.72, 0.8, 0.6), 2.0)
-	for x in range(1, 6):
-		draw_line(Vector2(w * x / 6.0, bench_y + 14), Vector2(w * x / 6.0, h), Color(0, 0, 0, 0.25), 2.0)
-	# 台面小道具：右侧试管架与烧杯
-	var rack := Vector2(w * 0.8, bench_y)
-	if w > 900:
-		for i in 4:
-			var tube := Rect2(rack + Vector2(i * 16 - 32, -46), Vector2(9, 40))
-			draw_rect(tube, Color(0.7, 0.85, 0.95, 0.25))
-			draw_rect(Rect2(tube.position + Vector2(0, 22), Vector2(9, 18)), Color([UIKit.ACCENT, UIKit.ACCENT_BLUE, UIKit.GOLD, UIKit.DANGER][i], 0.55))
-		draw_rect(Rect2(rack + Vector2(-40, -18), Vector2(78, 6)), Color(0.4, 0.48, 0.55))
-	# 阴影：烧瓶脚下（烧瓶不出场时不画）
-	if avatar != null and avatar.visible:
-		var feet := Vector2(w * 0.3, bench_y + 4)
-		draw_set_transform(feet, 0.0, Vector2(1.0, 0.22))
-		draw_circle(Vector2.ZERO, 70, Color(0, 0, 0, 0.35))
-		draw_set_transform(Vector2.ZERO)
+	PaintedArt.world(self, Rect2(Vector2.ZERO, size), 0.30)
 
 
 func _glass_panel() -> PanelContainer:
@@ -383,8 +330,8 @@ func _bar(width: float, height: float) -> ProgressBar:
 
 
 func _style_bar(b: ProgressBar, color: Color) -> void:
-	b.add_theme_stylebox_override("fill", UIKit.filled(color, color, 4))
-	b.add_theme_stylebox_override("background", UIKit.filled(Color(0.1, 0.12, 0.16), Color(0.25, 0.3, 0.36), 4))
+	b.add_theme_stylebox_override("fill", UIKit.meter_style(color, color, 4))
+	b.add_theme_stylebox_override("background", UIKit.meter_style(Color(0.1, 0.12, 0.16), Color(0.25, 0.3, 0.36), 4))
 
 
 func _chip(grid: GridContainer, icon_name: String, color: Color, text: String) -> Label:

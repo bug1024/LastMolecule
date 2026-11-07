@@ -25,6 +25,9 @@ var _intent_icons: HBoxContainer
 var _name: Label
 var _time := 0.0
 var _hover := false
+var _base_radius := 80.0
+var _boss := false
+var _intent_y := 4.0
 
 
 func setup(enemy: Enemy, enemy_index: int) -> void:
@@ -44,7 +47,9 @@ func setup(enemy: Enemy, enemy_index: int) -> void:
 	add_child(_intent_box)
 	creature = CreatureView.new()
 	creature.setup(enemy.data, enemy.is_boss, enemy.is_elite)
-	creature.radius = clampf(creature.radius * 1.2, 70, 92)
+	_base_radius = clampf(creature.radius * 1.2, 70, 92)
+	_boss = enemy.is_boss
+	creature.radius = _base_radius
 	creature.custom_minimum_size = Vector2(creature.radius * 2.8, creature.radius * 2.6)
 	var cs := creature.custom_minimum_size
 	creature.size = cs
@@ -60,6 +65,7 @@ func setup(enemy: Enemy, enemy_index: int) -> void:
 	_name.add_theme_constant_override("outline_size", 5)
 	_name.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
 	add_child(_name)
+	UIKit.identity_plate(_name)
 	bar = HealthBar.new()
 	bar.position = Vector2(30, 276)
 	bar.size = Vector2(SIZE.x - 60, 22)
@@ -151,7 +157,7 @@ func refresh(enemy: Enemy) -> void:
 func _process(delta: float) -> void:
 	_time += delta
 	if _intent_box and _intent_box.visible:
-		_intent_box.position.y = 4.0
+		_intent_box.position.y = _intent_y
 		var s := 1.0 + (0.025 * absf(sin(_time * 6.0)) if danger else 0.0)
 		_intent_box.pivot_offset = _intent_box.size * 0.5
 		_intent_box.scale = Vector2(s, s)
@@ -159,13 +165,30 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
-	if targetable and creature and creature.dying <= 0.0:
-		var c := creature.position + creature.size * Vector2(0.5, 0.55)
-		var r := creature.radius * 1.35
-		var pulse := 0.5 + 0.5 * sin(_time * 6.0)
-		var color := Color(1, 0.85, 0.3, 0.5 + 0.4 * pulse) if _hover else Color(1, 1, 1, 0.18)
-		draw_arc(c, r, 0, TAU, 64, color, 3.0 if _hover else 2.0, true)
-		if _hover:
-			for i in 4:
-				var a := _time * 1.5 + i * TAU / 4.0
-				draw_line(c + Vector2(cos(a), sin(a)) * (r + 4), c + Vector2(cos(a), sin(a)) * (r + 18), color, 3.0, true)
+	if targetable and creature and creature.dying <= 0:
+		var area := creature.visible_body_rect()
+		area.position += creature.position
+		var edge := PaintedArt.contour(area.grow(6),12)
+		edge.append(edge[0])
+		draw_polyline(edge,UIKit.GOLD if _hover else Color(UIKit.PAPER,0.3),2 if _hover else 1,true)
+
+
+## A single boss can own the stage; groups retain separate target silhouettes.
+func set_stage_pose(body_size: Vector2, meta_width: float) -> void:
+	creature.size = body_size
+	creature.position = Vector2(SIZE.x * 0.5 - body_size.x * 0.5, -body_size.y)
+	_name.position = Vector2((SIZE.x - meta_width) * 0.5, 14)
+	_name.size = Vector2(meta_width, 24)
+	bar.position = Vector2((SIZE.x - meta_width) * 0.5, 42)
+	bar.size = Vector2(meta_width, 24)
+	statuses.position = Vector2((SIZE.x - meta_width) * 0.5 + 8, 67)
+	_intent_y = -body_size.y - 31
+
+
+func contact_point() -> Vector2:
+	var body := creature.visible_body_rect()
+	return position + creature.position + body.position + body.size * Vector2(0.28, 0.52)
+
+
+func _has_point(point: Vector2) -> bool:
+	return Rect2(creature.position,creature.size).grow(8).has_point(point) or Rect2(Vector2(0,18),Vector2(SIZE.x,90)).has_point(point)

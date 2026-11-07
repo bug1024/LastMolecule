@@ -15,7 +15,7 @@ static var _regions: Dictionary = {}
 
 
 static func region(id: String) -> Rect2:
-	var texture := UIKit.art("molecular-fragments")
+	var texture := UIKit.art("painted-fragments")
 	if texture == null:
 		return Rect2()
 	if _regions.is_empty():
@@ -23,13 +23,17 @@ static func region(id: String) -> Rect2:
 		var cell_size := Vector2i(img.get_width() / 4, img.get_height() / 4)
 		for key in CELLS:
 			var index: int = CELLS[key]
-			var cell := Rect2i(Vector2i(index % 4, index / 4) * cell_size, cell_size)
+			var row := index / 4
+			var cuts := [0.0, 0.25, 0.5, 0.71875, 1.0]
+			var y := roundi(img.get_height() * float(cuts[row]))
+			var end_y := roundi(img.get_height() * float(cuts[row + 1]))
+			var cell := Rect2i(Vector2i((index % 4) * cell_size.x, y), Vector2i(cell_size.x, end_y - y))
 			# Use alpha bounds so padding in the production atlas cannot change atom scale.
 			var tile := img.get_region(cell)
 			var mask := BitMap.new()
 			mask.create_from_image_alpha(tile, 0.2)
 			var used := Rect2()
-			for contour in mask.opaque_to_polygons(Rect2i(Vector2i.ZERO, cell_size), 1.0):
+			for contour in mask.opaque_to_polygons(Rect2i(Vector2i.ZERO, cell.size), 1.0):
 				var part := Rect2(contour[0], Vector2.ZERO)
 				for point in contour:
 					part = part.expand(point)
@@ -38,7 +42,7 @@ static func region(id: String) -> Rect2:
 					used = part if used.size == Vector2.ZERO else used.merge(part)
 			if used.size == Vector2.ZERO:
 				used = Rect2(tile.get_used_rect())
-			used = used.grow(2).intersection(Rect2(Vector2.ZERO, Vector2(cell_size)))
+			used = used.grow(2).intersection(Rect2(Vector2.ZERO, Vector2(cell.size)))
 			_regions[key] = Rect2(used.position + Vector2(cell.position), used.size)
 	return _regions.get(id, _regions.get("carbon", Rect2()))
 
@@ -51,7 +55,7 @@ static func bounds(id: String, center: Vector2, unit: float) -> Rect2:
 
 
 static func draw_fragment(canvas: CanvasItem, id: String, center: Vector2, unit: float, tint := Color.WHITE) -> void:
-	var texture := UIKit.art("molecular-fragments")
+	var texture := UIKit.art("painted-fragments")
 	if texture == null:
 		return
 	canvas.draw_texture_rect_region(texture, bounds(id, center, unit), region(id), tint)

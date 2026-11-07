@@ -1,8 +1,11 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://scripts/reward_popup.gd" id="1_rew"]
+[ext_resource type="Script" path="res://scripts/ui/painted_style.gd" id="99_skin"]
 
-[sub_resource type="StyleBoxFlat" id="PanelStyle"]
+[sub_resource type="StyleBox" id="PanelStyle"]
+script = ExtResource("99_skin")
+surface_kind = 0
 bg_color = Color(0.11, 0.13, 0.18, 1)
 border_width_left = 1
 border_width_top = 1
@@ -16,7 +19,8 @@ corner_radius_bottom_left = 14
 shadow_color = Color(0, 0, 0, 0.5)
 shadow_size = 14
 
-[sub_resource type="StyleBoxFlat" id="BtnNormal"]
+[sub_resource type="StyleBox" id="BtnNormal"]
+script = ExtResource("99_skin")
 bg_color = Color(0.2, 0.5, 0.36, 1)
 corner_radius_top_left = 8
 corner_radius_top_right = 8
@@ -27,7 +31,8 @@ content_margin_top = 10.0
 content_margin_right = 20.0
 content_margin_bottom = 10.0
 
-[sub_resource type="StyleBoxFlat" id="BtnHover"]
+[sub_resource type="StyleBox" id="BtnHover"]
+script = ExtResource("99_skin")
 bg_color = Color(0.24, 0.58, 0.42, 1)
 corner_radius_top_left = 8
 corner_radius_top_right = 8
@@ -38,7 +43,8 @@ content_margin_top = 10.0
 content_margin_right = 20.0
 content_margin_bottom = 10.0
 
-[sub_resource type="StyleBoxFlat" id="BtnPressed"]
+[sub_resource type="StyleBox" id="BtnPressed"]
+script = ExtResource("99_skin")
 bg_color = Color(0.16, 0.42, 0.3, 1)
 corner_radius_top_left = 8
 corner_radius_top_right = 8
@@ -49,7 +55,8 @@ content_margin_top = 10.0
 content_margin_right = 20.0
 content_margin_bottom = 10.0
 
-[sub_resource type="StyleBoxFlat" id="BtnDisabled"]
+[sub_resource type="StyleBox" id="BtnDisabled"]
+script = ExtResource("99_skin")
 bg_color = Color(0.16, 0.18, 0.22, 1)
 corner_radius_top_left = 8
 corner_radius_top_right = 8

@@ -60,7 +60,7 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
-	if UIKit.atlas(self, "specimens", 5, Rect2(Vector2.ZERO, size)):
+	if UIKit.atlas(self, "painted-enemies", 5, Rect2(Vector2.ZERO, size)):
 		return
 	if _atoms.is_empty():
 		return

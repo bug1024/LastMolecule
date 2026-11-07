@@ -57,6 +57,7 @@ func _run() -> void:
 	_test_ai_next_tier()
 	_test_card_face_readable()
 	_test_card_art_bounds()
+	_test_battle_layout()
 	_test_project_types()
 	_test_backfire_preview()
 	_test_program_decisions()
@@ -1401,7 +1402,7 @@ func _test_title_screen() -> void:
 
 ## The visual refactor must preserve picking and every legal fragment at all display sizes.
 func _test_molecule_specimen() -> void:
-	var texture := UIKit.art("molecular-fragments")
+	var texture := UIKit.art("painted-fragments")
 	_expect(texture != null, "Molecular specimen atlas is packaged with the project")
 	if texture == null:
 		return
@@ -1428,3 +1429,36 @@ func _test_molecule_specimen() -> void:
 					issues.append("unselectable " + String(site.id))
 	_expect(issues.is_empty(), "Every legal fragment stays visible and selectable: " + ", ".join(issues))
 	view.free()
+
+
+## Layout is independent of art and must survive the dynamic composition extremes.
+func _test_battle_layout() -> void:
+	var failures: Array[String] = []
+	for viewport in [Vector2(1280,720),Vector2(1280,800),Vector2(1600,900),Vector2(1024,640)]:
+		for targets in [1,2,3]:
+			var layout := BattleLayout.compose(viewport,targets)
+			if float(layout.ground)+100 > float(layout.hand_top):
+				failures.append("status/hand collision")
+			for i in range(1,layout.slots.size()):
+				var previous: Dictionary = layout.slots[i-1]
+				var current: Dictionary = layout.slots[i]
+				if previous.foot.x + previous.body.x*0.5 > current.foot.x - current.body.x*0.5:
+					failures.append("target silhouettes overlap")
+			for slot in layout.slots:
+				var foot: Vector2 = slot.foot
+				var body: Vector2 = slot.body
+				if foot.y-body.y < 60 or foot.x-body.x*0.5 < 0 or foot.x+body.x*0.5 > viewport.x:
+					failures.append("actor outside stage")
+		for count in [0,3,5,8,10]:
+			for active in [-1,0,count-1]:
+				var poses := BattleLayout.fan(viewport,count,active)
+				if poses.size() != count:
+					failures.append("hand count")
+				for pose in poses:
+					var dims: Vector2 = pose.size
+					var pivot := Vector2(dims.x*0.5,dims.y)
+					for corner in [Vector2.ZERO,Vector2(dims.x,0),dims,Vector2(0,dims.y)]:
+						var point: Vector2 = pose.position+pivot+((corner-pivot)*float(pose.scale)).rotated(float(pose.rotation))
+						if not Rect2(Vector2.ZERO,viewport).has_point(point):
+							failures.append("hand clipped")
+	_expect(failures.is_empty(),"Stage actors, stable statuses and 0–10 resting/hovered cards fit all supported viewport sizes: "+", ".join(failures))

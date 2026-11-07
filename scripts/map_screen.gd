@@ -85,8 +85,8 @@ func _build_header() -> void:
 	_research_bar.custom_minimum_size = Vector2(180, 8)
 	_research_bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_research_bar.show_percentage = false
-	_research_bar.add_theme_stylebox_override("fill", UIKit.filled(UIKit.ACCENT_BLUE, UIKit.ACCENT_BLUE, 4))
-	_research_bar.add_theme_stylebox_override("background", UIKit.filled(Color(0.1, 0.12, 0.16), Color(0.25, 0.3, 0.36), 4))
+	_research_bar.add_theme_stylebox_override("fill", UIKit.meter_style(UIKit.ACCENT_BLUE, UIKit.ACCENT_BLUE, 4))
+	_research_bar.add_theme_stylebox_override("background", UIKit.meter_style(Color(0.1, 0.12, 0.16), Color(0.25, 0.3, 0.36), 4))
 	chip.add_child(_research_bar)
 	parent.remove_child(_pos_label)
 	chip.add_child(_pos_label)
@@ -138,8 +138,8 @@ func refresh() -> void:
 	_hp_bar.value = hp
 	var hp_color: Color = UIKit.ACCENT if hp > 60 else (UIKit.GOLD if hp > 30 else UIKit.DANGER)
 	_hp_label.add_theme_color_override("font_color", hp_color.lightened(0.15))
-	_hp_bar.add_theme_stylebox_override("fill", UIKit.filled(hp_color, hp_color, 4))
-	_hp_bar.add_theme_stylebox_override("background", UIKit.filled(Color(0.1, 0.12, 0.16), Color(0.25, 0.3, 0.36), 4))
+	_hp_bar.add_theme_stylebox_override("fill", UIKit.meter_style(hp_color, hp_color, 4))
+	_hp_bar.add_theme_stylebox_override("background", UIKit.meter_style(Color(0.1, 0.12, 0.16), Color(0.25, 0.3, 0.36), 4))
 	_canvas.rest_heal = _game.get_rest_heal()
 	_canvas.tint = BattleView.STAGE_TINT.get(s.stage, Color(0.2, 0.5, 0.5))
 	_year_label.text = tr("ui.year") % s.year
