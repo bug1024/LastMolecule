@@ -12,6 +12,7 @@ static var music_volume := 0.6
 static var sfx_volume := 0.8
 static var fullscreen := false
 static var locale := "zh_CN"
+static var fx_level := "normal"     # 战斗特效强度：normal 正常 / lite 精简
 static var reduce_motion := false   # 降低动态效果：角色动作幅度变小、震屏减弱
 static var _loaded := false
 
@@ -30,6 +31,7 @@ static func ensure_loaded() -> void:
 	sfx_volume = clampf(float(cfg.get_value("audio", "sfx", sfx_volume)), 0.0, 1.0)
 	fullscreen = bool(cfg.get_value("display", "fullscreen", fullscreen))
 	reduce_motion = bool(cfg.get_value("display", "reduce_motion", reduce_motion))
+	fx_level = "lite" if String(cfg.get_value("display", "fx_level", fx_level)) == "lite" else "normal"
 	var saved_locale := String(cfg.get_value("general", "locale", locale))
 	locale = saved_locale if LOCALES.has(saved_locale) else "zh_CN"
 
@@ -43,6 +45,7 @@ static func save() -> void:
 	cfg.set_value("audio", "sfx", sfx_volume)
 	cfg.set_value("display", "fullscreen", fullscreen)
 	cfg.set_value("display", "reduce_motion", reduce_motion)
+	cfg.set_value("display", "fx_level", fx_level)
 	cfg.set_value("general", "locale", locale)
 	cfg.save(save_path)
 

@@ -1113,3 +1113,7 @@ event.scene.2,资本谈判,Funding Talks
 event.scene.3,监管审查,Regulatory Review
 settings.reduce_motion,降低动态效果,Reduce Motion
 settings.reduce_motion_hint,角色动作幅度变小、震屏减弱，适合容易晕动的玩家。,"Smaller character movement and weaker screen shake, for players sensitive to motion."
+settings.fx_level,战斗特效,Battle Effects
+settings.fx_normal,正常,Normal
+settings.fx_lite,精简,Minimal
+settings.fx_level_hint,精简：减少次要特效、震屏和闪光，重复动作演出更快。,"Minimal: fewer secondary effects, less shake and flash, faster repeated actions."

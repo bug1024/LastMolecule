@@ -37,6 +37,7 @@ var starter := false           # 起始专属卡（判断牌组套路时不计�
 var upgraded := false          # 每张卡只有两级：普通 → 升级（+），升级即满级
 var copies := 1                # 牌库里同名卡的张数（升级界面显示「×4 张一起升级」）
 var site := ""                 # 片段卡：来自分子上的哪个位点（打出时那个片段发亮，被敌人专攻时受损）
+var synergy_site := ""         # 片段联动：和哪个相邻位点联动（打出时两个片段依次亮起）
 var damaged := false           # 片段被敌人专攻：本场费用 +1
 var upgrade_preview: ResearchCard = null   # 升级界面用：这张卡升级后的样子
 

@@ -552,6 +552,7 @@ func molecule_cards() -> Array:
 			continue
 		var card := _make_card(data)
 		card.site = String(entry.site)
+		card.synergy_site = String(data.get("synergy_site", ""))
 		card.starter = true   # 套路判断只看玩家自己构筑的牌
 		card.type_name = tr("mol.fragment_tag_synergy" if data.has("synergy_with") else "mol.fragment_tag")
 		cards.append(card)

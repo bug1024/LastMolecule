@@ -403,6 +403,7 @@ func site_card(site_id: String) -> Dictionary:
 				if not merged:
 					(data.effects as Array).append((bonus as Dictionary).duplicate(true))
 			data["synergy_with"] = other_frag
+			data["synergy_site"] = other
 			break
 	return data
 

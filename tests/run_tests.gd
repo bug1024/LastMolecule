@@ -75,6 +75,7 @@ func _run() -> void:
 	_test_milestone_terminate()
 	_test_molecule_specimen()
 	_test_character_motion()
+	_test_battle_director()
 	_test_molecule()
 	_test_molecule_in_run()
 	_test_disease_campaign()
@@ -1592,6 +1593,59 @@ func _test_character_motion() -> void:
 	_expect(deform_issues.is_empty(), "Every enemy deforms within bounds and settles back: " + ", ".join(deform_issues.slice(0, 5)))
 	_expect(CharacterProfiles.personality("activity_cliff", "crystal") == "pocket" and CharacterProfiles.personality("resistant_clone", "cell") == "shell"
 		and CharacterProfiles.personality("placebo", "blob") == "pulse", "Pocket, resistant clone and infected cell each get their own personality")
+
+
+## 演出调度：三张代表卡分属不同强度；重复动作被压缩；震屏、闪屏只留给高强度；数字互相错开
+func _test_battle_director() -> void:
+	var make := func(data: Dictionary) -> ResearchCard: return ResearchCard.from_dict(data)
+	var hit: ResearchCard = make.call({"id": "mol_hit", "type": "molecular", "kind": "attack", "cost": 1, "target": "enemy", "effects": [{"op": "damage", "value": 6}]})
+	var assay: ResearchCard = make.call({"id": "exp_assay", "type": "experiment", "kind": "skill", "cost": 1, "target": "self", "effects": [{"op": "block", "value": 5}]})
+	var screen: ResearchCard = make.call({"id": "ai_screen", "type": "ai", "kind": "attack", "cost": 1, "target": "enemy", "effects": [{"op": "damage", "value": 9}, {"op": "data", "value": 1}]})
+	_expect(BattleDirector.card_tier(assay) == BattleDirector.Tier.QUIET, "Defence plays as a quiet level-1 action")
+	_expect(BattleDirector.card_tier(hit) == BattleDirector.Tier.DIRECT, "A plain molecular attack is a directional level-2 action")
+	_expect(BattleDirector.card_tier(screen) == BattleDirector.Tier.BURST, "An AI-boosted attack is a level-3 burst")
+	_expect(BattleDirector.card_tier(screen, true) == BattleDirector.Tier.DIRECT, "A misjudged AI card loses its burst")
+	var linked: ResearchCard = make.call({"id": "frag_phenyl", "type": "molecular", "kind": "attack", "cost": 1, "target": "enemy", "effects": [{"op": "damage", "value": 9}]})
+	linked.synergy_site = "L1"
+	_expect(BattleDirector.card_tier(linked) == BattleDirector.Tier.BURST, "A fragment synergy card is a level-3 burst")
+	_expect(BattleDirector.damage_tier(30, true, true) == BattleDirector.Tier.SIGNATURE and BattleDirector.damage_tier(6, false, false) == BattleDirector.Tier.DIRECT,
+		"Boss kills are signature moments; ordinary hits stay level 2")
+	_expect(BattleDirector.shake_for(BattleDirector.Tier.DIRECT, 9) == 0.0 and BattleDirector.flash_for(BattleDirector.Tier.BURST) == 0.0,
+		"Ordinary attacks never shake or flash the screen")
+	_expect(BattleDirector.shake_for(BattleDirector.Tier.SIGNATURE, 20) > BattleDirector.shake_for(BattleDirector.Tier.BURST, 20) and BattleDirector.hitstop_for(BattleDirector.Tier.SIGNATURE) <= 0.06,
+		"Signature moments hit harder, with a hitstop of at most 60 ms")
+	var director := BattleDirector.new()
+	var plans: Array = []
+	for i in 20:
+		plans.append(director.begin_card(hit, false))
+	_expect(float(plans[0].pace) == 1.0 and not plans[0].compressed and float(plans[19].pace) <= 1.7 and plans[19].compressed,
+		"Twenty repeated attacks speed up and drop secondary effects, within a cap")
+	var big := director.begin_card(screen, false)
+	_expect(not big.compressed, "A burst-level card is never stripped down by repetition")
+	director.new_turn()
+	_expect(float(director.begin_card(hit, false).pace) == 1.0, "A new turn restores full presentation")
+	GameSettings.fx_level = "lite"
+	_expect(BattleDirector.new().begin_card(hit, false).compressed and BattleDirector.shake_for(BattleDirector.Tier.SIGNATURE, 20) < 5.0, "Minimal effects trims secondary effects and shake")
+	GameSettings.fx_level = "normal"
+	var spots: Array = []
+	for i in 4:
+		spots.append(director.number_slot(Vector2(500, 300)))
+	var apart := true
+	for i in spots.size():
+		for j in range(i + 1, spots.size()):
+			apart = apart and (spots[i] as Vector2).distance_to(spots[j]) >= 40.0
+	_expect(apart, "Rapid damage numbers fan out instead of stacking on the body")
+	var m := CharacterMotion.new(CharacterProfiles.molecule(), 2)
+	m.attack(Vector2(300, 0), "attack")
+	for i in 12:
+		m.step(1.0 / 60.0)
+	var held := m.offset()
+	m.freeze(0.05)
+	m.step(1.0 / 60.0)
+	_expect(m.offset() == held, "Hitstop holds the pose locally")
+	var quick := CharacterMotion.new(CharacterProfiles.molecule(), 2)
+	quick.pace = 1.5
+	_expect(absf(float(quick.attack(Vector2(300, 0), "attack").impact) - 0.22 / 1.5) < 0.001, "Strike timing follows the timeline (impact at 220 ms) and the pace")
 
 
 ## The visual refactor must preserve picking and every legal fragment at all display sizes.

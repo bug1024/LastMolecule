@@ -81,6 +81,13 @@ func snap(site_id: String, from := Vector2.INF) -> void:
 			_jolt[id] = [Vector2.ZERO, (other - c).normalized() * 150.0]
 
 
+## 片段卡出手：这个片段先亮起并向前一顶（冲着敌人的方向），再回弹
+func pulse_site(site_id: String, color := Color(0.55, 1.0, 0.8)) -> void:
+	_site_flash[site_id] = [1.0, color]
+	_snap[site_id] = 1.0
+	_jolt[site_id] = [Vector2.ZERO, Vector2(260.0, -60.0)]
+
+
 ## 点亮组合涉及的化学键：一道光沿键跑过
 func link_glow(pairs: Array, color: Color) -> void:
 	for pair in pairs:
@@ -416,6 +423,21 @@ func _draw_character(center: Vector2, k: float) -> void:
 		for prop in _flash:
 			if int(frag.get("fx", {}).get(prop, 0)) > 0:
 				draw_arc(point, k * 0.33, -PI, 0.75, 16, Color(MoleculeCharacter.BONE, _flash[prop]), 1.8, true)
+	for link in _links:   # 片段联动：两个片段之间亮起一道光，光点从出手片段跑向联动片段
+		if not points.has(link.a) or not points.has(link.b):
+			continue
+		var a := body * (points[link.a] as Vector2)
+		var b := body * (points[link.b] as Vector2)
+		var lt := float(link.t)
+		var col: Color = link.color
+		draw_line(a, b, Color(col, 0.4 * lt), k * 0.32, true)
+		draw_line(a, b, Color(col.lightened(0.5), lt), maxf(2.0, k * 0.07), true)
+		Shading.glow(self, a.lerp(b, clampf((1.0 - lt) * 2.5, 0.0, 1.0)), k * 0.45, Color(1, 1, 1, lt))
+	for id in _snap:   # 被点到的片段：一圈切面光环向外扩
+		if points.has(id):
+			var ring := float(_snap[id])
+			draw_arc(body * (points[id] as Vector2), k * (0.3 + (1.0 - ring) * 0.55), 0, TAU, 24,
+				Color(MoleculeCharacter.BONE, ring), 1.0 + 2.5 * ring, true)
 	if _shell > 0.0:
 		_draw_shell(body, k)
 	if _glow_burst > 0.0:
@@ -430,9 +452,16 @@ func _draw_shell(body: Transform2D, k: float) -> void:
 	open = 1.0 + 2.2 * pow(open - 1.0, 3) + 1.2 * pow(open - 1.0, 2)   # 带一点回弹的展开
 	var alpha := clampf(_shell * 2.4, 0.0, 1.0)
 	var center := MoleculeCharacter.FRAME.get_center()
-	var radii := Vector2(4.1, 3.3) * (0.72 + 0.28 * open)
+	var radii := Vector2(4.1, 3.3) * (0.18 + 0.82 * open)   # 从分子中心长出来，向外推到身体外缘
 	var ink := Color(PaintedStyle.INK_EDGE, 0.85 * alpha)
 	var light := PaintedStyle.LIGHT.normalized()
+	# 半透明的膜：先于切面板形成，像一层被撑开的薄膜
+	var membrane := PackedVector2Array([body * center])
+	for n in 17:
+		var a := lerpf(-1.3, 1.3, n / 16.0) * open
+		membrane.append(body * (center + Vector2(cos(a) * radii.x, sin(a) * radii.y) * 1.04))
+	if open > 0.3:
+		draw_colored_polygon(membrane, Color("9fe3cf", 0.10 * alpha))
 	for n in 7:
 		var a := lerpf(0.0, (n - 3) * 0.36, open)    # 折叠时都叠在正面，展开后排成弧
 		var mid := center + Vector2(cos(a) * radii.x, sin(a) * radii.y)

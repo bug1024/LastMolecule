@@ -59,6 +59,23 @@ func _build(box: VBoxContainer) -> void:
 		GameSettings.save())
 	motion_row.add_child(calm)
 	box.add_child(motion_row)
+	var fx_row := HBoxContainer.new()
+	var fx_label := UIKit.label(tr("settings.fx_level"), UIKit.TEXT, 16)
+	fx_label.custom_minimum_size = Vector2(140, 0)
+	fx_label.tooltip_text = tr("settings.fx_level_hint")
+	fx_label.mouse_filter = Control.MOUSE_FILTER_PASS
+	fx_row.add_child(fx_label)
+	var fx := OptionButton.new()
+	fx.custom_minimum_size = Vector2(200, 40)
+	fx.add_item(tr("settings.fx_normal"), 0)
+	fx.add_item(tr("settings.fx_lite"), 1)
+	fx.selected = 1 if GameSettings.fx_level == "lite" else 0
+	fx.tooltip_text = tr("settings.fx_level_hint")
+	fx.item_selected.connect(func(index: int) -> void:
+		GameSettings.fx_level = "lite" if index == 1 else "normal"
+		GameSettings.save())
+	fx_row.add_child(fx)
+	box.add_child(fx_row)
 	var lang_row := HBoxContainer.new()
 	var lang_label := UIKit.label(tr("settings.language"), UIKit.TEXT, 16)
 	lang_label.custom_minimum_size = Vector2(140, 0)

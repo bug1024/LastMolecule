@@ -27,6 +27,8 @@ var lag := Vector2.ZERO          # 末端片段：滞后于身体位移的量（
 var trail := Vector2.ZERO        # 丝带：比末端更软的跟随
 var heavy := false               # 本次受击是否重击
 var tint := Color(1, 1, 1, 0)    # 状态影响的着色（a 为强度，自行衰减）
+var pace := 1.0                  # 动作播放速度（演出压缩时 > 1）；待机不受影响
+var _hold := 0.0                 # 顿帧：命中瞬间冻结姿态的剩余秒数
 
 var _reach := Vector2.ZERO       # 本次攻击要到达的偏移（单位）
 var _chain: Array = []           # 待播放的状态队列：[State, phases]
@@ -68,6 +70,8 @@ func reset() -> void:
 		_target[c] = float(REST.get(c, 0.0))
 		_stiff[c] = _default_spring(c)
 	_adjust = {}
+	_hold = 0.0
+	pace = 1.0
 	_adjust_left = _rng.randf_range(1.5, 3.5)
 	_idle_weight = 1.0
 	_lag_pos = Vector2.ZERO
@@ -98,7 +102,7 @@ func attack(reach_px := Vector2.ZERO, variant := "") -> Dictionary:
 		if String(p.get("cue", "")) == "impact":
 			break
 		impact += float(p.t)
-	return {"release": release, "impact": impact, "total": remaining()}
+	return {"release": release / pace, "impact": impact / pace, "total": remaining()}
 
 
 ## 受击：strength 约等于伤害 / 10；超过 1.2 为重击（更大的后挫、更长的硬直）
@@ -163,7 +167,12 @@ func remaining() -> float:
 		total += float(_phases[i].t)
 	for entry in _chain:
 		total += _duration(entry[1])
-	return total
+	return total / pace
+
+
+## 顿帧：保持当前姿态 seconds 秒，之后从原速度继续（只冻结这个角色，不阻塞战斗）
+func freeze(seconds: float) -> void:
+	_hold = maxf(_hold, seconds)
 
 
 # ---------- 输出 ----------
@@ -196,6 +205,11 @@ func transform(pivot: Vector2) -> Transform2D:
 
 func step(delta: float) -> void:
 	delta = minf(delta, 0.1)
+	if _hold > 0.0:
+		_hold -= delta
+		return
+	if state != State.IDLE:
+		delta *= pace
 	time += delta
 	amount = 0.35 if GameSettings.reduce_motion else 1.0
 	_advance(delta)
