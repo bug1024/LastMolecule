@@ -59,7 +59,7 @@ var _mechanic: RichTextLabel
 var _mol: MoleculeView          # 设计了分子的项目：分子就是战场上的主角（代替烧瓶）；属性生效、被敌人针对时对应片段会闪
 var _mol_tag: Label
 var _strike_style := ""          # 最近一张牌的出招方式（命中特效跟着变）
-var _strike_color := Color.WHITE  # 甩出的片段颜色（命中特效用）
+var _strike_ai := false
 var _fx: Control
 var _arrow: Control
 var _banner: Control
@@ -75,7 +75,6 @@ var _flash_rect: ColorRect
 var _tip: PanelContainer
 var _is_boss := false
 var _heart_timer := 0.0
-var _time := 0.0
 var _pending_level := 0
 var _shown_player_hp := 100
 
@@ -150,8 +149,7 @@ func _build() -> void:
 	_mechanic.size = Vector2(560, 60)
 	add_child(_mechanic)
 	_mol = MoleculeView.new()
-	_mol.idle_bob = true
-	_mol.face = true
+	_mol.character = true
 	_mol.tooltip_text = " "
 	_mol.mouse_filter = Control.MOUSE_FILTER_PASS
 	_mol.size = Vector2(460, 280)
@@ -282,8 +280,8 @@ func _layout() -> void:
 	_mol.size = _space.hero_size
 	var bounds := _mol.visual_bounds()
 	_mol.pivot_offset = bounds.get_center()
-	_mol.rotation = -0.035
-	_mol.position = Vector2(foot.x - bounds.get_center().x, foot.y - 12 - bounds.end.y)
+	_mol.rotation = 0.0
+	_mol.position = Vector2(foot.x - bounds.get_center().x, foot.y - bounds.end.y)
 	_player_tag.position = Vector2(foot.x - 106,foot.y + 14)
 	_player_tag.size = Vector2(212,24)
 	_player_bar.position = Vector2(foot.x - 120,foot.y + 42)
@@ -355,6 +353,12 @@ func _on_battle_started(encounter: Dictionary) -> void:
 	_victory = false
 	_queue.clear()
 	_busy = true
+	if _mol_motion != null:
+		_mol_motion.kill()
+	_mol_motion = null
+	_mol.strike_pose = 0.0
+	_strike_style = ""
+	_strike_ai = false
 	_reset_intro()
 	_selected = null
 	_hover_card = null
@@ -567,7 +571,7 @@ func _boss_entrance() -> void:
 	tween.tween_callback(func() -> void:
 		GameAudio.sfx("boss_stomp")
 		_shake(13.0, 0.45)
-		_shockwave(Vector2(foot, ground), accent, 340.0)
+		_cue(BattleCue.Kind.ENTRY, Vector2(foot, ground), Vector2(foot, ground), Vector2.ZERO, 1.18)
 		_floor.impact = Vector2(foot, ground)
 		_floor.impact_light = 1.0
 		if _mol.visible:
@@ -636,6 +640,10 @@ func _dose_surge(dose: int) -> void:
 			_enemy_widgets[i].creature.strain = strain
 			_enemy_widgets[i].creature.surge()
 	GameAudio.sfx("boss_stomp")
+	for ew in _enemy_widgets:
+		if ew.creature.strain > 0.0:
+			var foot := ew.position + Vector2(EnemyWidget.SIZE.x * 0.5, 0)
+			_cue(BattleCue.Kind.BOSS, foot, foot, Vector2.ZERO, 0.7 + strain * 0.4)
 	_shake(6.0 + strain * 8.0, 0.35)
 	if _mol.visible:
 		_mol.level_up()
@@ -688,9 +696,9 @@ func _update_pressure(delta: float) -> void:
 			_floor.pressure_color = _boss_accent()
 	_pressure = move_toward(_pressure, target, delta * 0.9)
 	_update_music(delta)
-	_floor.pressure = _pressure * (0.86 + 0.14 * sin(_time * 1.7))
+	_floor.pressure = _pressure * 0.82
 	_pressure_dim.color.a = maxf(0.2 * _pressure, _intro_dark)
-	_vignette_boss.modulate.a = _pressure * (0.3 + 0.07 * sin(_time * 1.7))
+	_vignette_boss.modulate.a = _pressure * 0.28
 
 
 # ---------- 事件播放 ----------
@@ -719,10 +727,16 @@ func _play(ev: Dictionary) -> void:
 	match String(ev.t):
 		"card":
 			var played: ResearchCard = ev.card
-			GameAudio.sfx("zap" if played.is_ai() else ("slash" if played.kind == "attack" else "card_play"))
+			_strike_ai = played.is_ai()
+			_strike_style = _strike_style_for(played)
+			GameAudio.sfx("zap" if _strike_ai else ("slash" if played.kind == "attack" else "card_play"))
 			if not played.site.is_empty() and _mol.visible:   # 片段卡：分子上那个片段出手
 				_mol.flash_sites([played.site], Color(0.55, 1.0, 0.8))
-			await _animate_card_out(played, int(ev.get("target", -1)))
+			var target := int(ev.get("target", -1))
+			if _strike_ai:
+				var aim := _side_point("enemy", target) if target >= 0 else _player_point()
+				_body_cue(BattleCue.Kind.AI, "player", 0, aim)
+			await _animate_card_out(played, target)
 		"deviation":
 			GameAudio.sfx("deviation")
 			_float_text(tr("battle.fx.deviation"), _player_point() + Vector2(0, -150), Color(0.95, 0.45, 0.95), 26)
@@ -733,8 +747,7 @@ func _play(ev: Dictionary) -> void:
 		"block":
 			var p := _side_point(String(ev.side), int(ev.index))
 			_float_text(tr("battle.fx.block") % int(ev.amount), p + Vector2(0, -40), Color(0.5, 0.75, 1.0), 22)
-			if String(ev.side) == "player" and _mol.visible:
-				_shockwave(p, Color(0.5, 0.75, 1.0), 120.0, true)   # 护盾：一圈蓝光向内收拢
+			_body_cue(BattleCue.Kind.SHIELD, String(ev.side), int(ev.index), p)
 			_set_bar(String(ev.side), int(ev.index), -1, int(ev.block))
 			GameAudio.sfx("block")
 			await _wait(0.16)
@@ -744,6 +757,8 @@ func _play(ev: Dictionary) -> void:
 			if id == "cleanse":
 				_float_text(tr("battle.fx.cleanse"), p + Vector2(0, -60), Color(0.6, 1.0, 0.8), 20)
 			else:
+				if id == "poison" and int(ev.amount) > 0:
+					_cue(BattleCue.Kind.TOXIN, p, p, Vector2.ZERO, 0.85)
 				var bad := Combatant.DEBUFFS.has(id)
 				_float_text("%s %+d" % [tr("status." + id), int(ev.amount)], p + Vector2(0, -60),
 					Color(0.95, 0.5, 0.55) if bad else Color(0.5, 0.95, 0.6), 18)
@@ -751,9 +766,12 @@ func _play(ev: Dictionary) -> void:
 			_refresh_statuses()
 			await _wait(0.16)
 		"data":
-			_float_text(tr("battle.fx.data") % int(ev.amount), _player_point() + Vector2(70, -110), Color(0.55, 0.8, 1.0), 18)
+			var meter := _ai_chip.position + Vector2(33, 27)
+			_cue(BattleCue.Kind.DATA, _player_point() + Vector2(25, -48), meter)
+			_float_text(tr("battle.fx.data") % int(ev.amount), meter + Vector2(32, 44), Color("a3e1bd"), 21, 0.16)
+			GameAudio.sfx("gain")
 			_refresh_top()
-			await _wait(0.08)
+			await _wait(0.14)
 		"draw":
 			_sync_hand(ev.get("hand", []))
 			if int(ev.count) > 0:
@@ -768,7 +786,8 @@ func _play(ev: Dictionary) -> void:
 			GameAudio.sfx("deviation")
 			await _wait(0.45)
 		"enemy_turn":
-			_strike_style = ""   # 敌人回合里的伤害（中毒等）不沿用上一张牌的命中特效
+			_strike_style = ""
+			_strike_ai = false
 			await _show_banner(tr("battle.banner.enemy_turn"), "", Color(1.0, 0.55, 0.5), 0.4, false)
 		"enemy_move":
 			await _play_enemy_move(int(ev.index), ev.move)
@@ -821,27 +840,37 @@ func _play_damage(ev: Dictionary) -> void:
 	var index := int(ev.index)
 	var amount := int(ev.amount)
 	var p := _side_point(side, index)
+	var cause := String(ev.get("cause", ""))
+	var toxin := cause == "poison" or cause == "toxin_burst"
+	if int(ev.blocked) > 0:
+		_body_cue(BattleCue.Kind.SHIELD, side, index, p)
 	if amount > 0:
-		_float_text("-%d" % amount,p+Vector2(12,-26),UIKit.GOLD.lightened(0.25),28+mini(amount,18),0.04)
-		_burst(p, Color(1.0, 0.4, 0.35) if side == "player" else _enemy_color(index), 12 + mini(amount, 20))
+		var ink := Color("d8a3df") if toxin else UIKit.GOLD.lightened(0.25)
+		_float_text("-%d" % amount, p + Vector2(12, -26), ink, 28 + mini(amount, 16), 0.045)
+		if toxin:
+			_cue(BattleCue.Kind.TOXIN, p, p, Vector2.ZERO, 1.65 if cause == "toxin_burst" else 1.12)
 		if side == "player":
 			_player.hit()
-			_mol.hit(amount / 10.0)   # 片段被震开再弹回，表情吃痛
-			_shockwave(p, Color(1.0, 0.35, 0.3), 70.0 + minf(amount, 30) * 3.0)
-			GameAudio.sfx("hurt")
-			_screen_flash(0.18 + minf(amount, 30) * 0.01)
+			_mol.hit(amount / 10.0)
+			if not toxin:
+				_cue(BattleCue.Kind.HIT, p + Vector2(120, 0), p, Vector2.ZERO, 0.85)
+				_screen_flash(0.13 + minf(amount, 30) * 0.007)
+			GameAudio.sfx("debuff" if toxin else "hurt")
 		else:
-			_enemy_widgets[index].creature.hit(p - _enemy_widgets[index].position - _enemy_widgets[index].creature.position)
-			_impact(index, p, amount)
-			GameAudio.sfx("hit_heavy" if amount >= 15 else "hit")
-		_shake(3.0 + minf(amount, 30) * 0.4, 0.22)
+			var ew := _enemy_widgets[index]
+			if not toxin:
+				ew.creature.hit(p - ew.position - ew.creature.position)
+				_impact(index, p, amount)
+			GameAudio.sfx("debuff" if toxin else ("hit_heavy" if amount >= 15 else "hit"))
+		if not toxin:
+			_shake(2.0 + minf(amount, 30) * 0.26, 0.16)
 	elif int(ev.blocked) > 0:
 		_float_text(tr("battle.fx.blocked"), p + Vector2(0, -80), Color(0.5, 0.75, 1.0), 22)
 		GameAudio.sfx("block")
 	_set_bar(side, index, int(ev.hp), int(ev.block))
-	await _wait(0.2 + (0.07 if amount >= 12 else 0.0))   # 重击多停一拍（顿帧感）
+	await _wait(0.19 + (0.07 if amount >= 12 else 0.0))
 	if side == "enemy" and is_instance_valid(_mol_motion) and _mol_motion.is_running():
-		await _mol_motion.finished # Unlock the next action only after the body returns home.
+		await _mol_motion.finished
 
 
 ## 用事件里的数值更新血条（hp 为 -1 时保持当前显示）
@@ -868,9 +897,15 @@ func _play_enemy_move(index: int, move: Dictionary) -> void:
 	var origin := ew.creature.position
 	var tween := create_tween()
 	var enemy: Enemy = _manager.enemies[index]
-	if int(move.get("damage", 0)) > 0 and (enemy.is_boss or enemy.is_elite):
+	if enemy.is_boss:
+		var foot := ew.position + Vector2(EnemyWidget.SIZE.x * 0.5, 0)
+		var landing := Vector2(_player_point().x, foot.y) if int(move.get("damage", 0)) > 0 else foot
+		_cue(BattleCue.Kind.BOSS, foot, landing)
 		GameAudio.sfx("boss_stomp")
-		_shake(10.0 if enemy.is_boss else 6.0, 0.35)
+		_shake(7.0, 0.23)
+	elif enemy.is_elite and int(move.get("damage", 0)) > 0:
+		GameAudio.sfx("boss_stomp")
+		_shake(4.0, 0.18)
 	if int(move.get("damage", 0)) > 0:
 		tween.tween_property(ew.creature, "position", origin + Vector2(-110 if enemy.is_boss else -70, 10), 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 		tween.tween_property(ew.creature, "position", origin, 0.2).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
@@ -893,13 +928,10 @@ func _molecule_cast(card: ResearchCard, face: CardFace, target: int, color: Colo
 	tween.chain().tween_callback(face.queue_free)
 	_layout_hand()
 	await _wait(0.16)
-	_strike_style = _strike_style_for(card)
 	if _strike_style == "self":
-		_shockwave(home, color, 110.0, true)
-		_burst(home, color, 12)
-		await _wait(0.1)
 		return
-	_mol.attack()
+	if _strike_style != "charge":
+		_mol.attack()
 	var targets: Array = [target] if target >= 0 else []
 	if targets.is_empty():
 		for i in _manager.enemies.size():
@@ -907,7 +939,7 @@ func _molecule_cast(card: ResearchCard, face: CardFace, target: int, color: Colo
 				targets.append(i)
 	if targets.is_empty():
 		return
-	var muzzle := home + Vector2(60, -10)
+	var muzzle := _mol.get_transform() * _mol.attack_tip()
 	var to := _side_point("enemy", int(targets[0]))
 	match _strike_style:
 		"charge":
@@ -936,16 +968,11 @@ func _molecule_cast(card: ResearchCard, face: CardFace, target: int, color: Colo
 			var hits := 1
 			for e in card.effects:
 				hits = maxi(hits, int(e.get("times", 1)))
+			_mol_recoil(6.0)
 			for h in hits:
-				_mol_recoil(6.0)
 				_projectile(muzzle + Vector2(0, randf_range(-14, 14)), to + Vector2(randf_range(-18, 18), randf_range(-18, 18)), color, 0.6)
 				await _wait(0.07)
 			await _wait(0.1)
-		"fragment":
-			_mol_lean()
-			for i in targets:
-				_fragment_throw(_side_point("enemy", int(i)))
-			await _wait(0.22)
 		"wave":
 			_mol_recoil(18.0)
 			_sweep(home, color)
@@ -958,7 +985,7 @@ func _molecule_cast(card: ResearchCard, face: CardFace, target: int, color: Colo
 
 
 ## 卡牌的出招方式：打全体＝扫荡波，多段＝连射，上破绽＝锁定精准光束，AI＝数据光束，
-## 临床＝抛出药剂，实验＝掷出试剂瓶，分子设计牌＝甩出一个片段（重击才亲自冲撞）；只作用自己的牌为 self
+## 临床与实验抛掷药剂，分子设计攻击由分子亲自突进。只作用自己的牌为 self。
 func _strike_style_for(card: ResearchCard) -> String:
 	if card.target == "self":
 		return "self"
@@ -984,11 +1011,6 @@ func _strike_style_for(card: ResearchCard) -> String:
 		"molecular":
 			if card.kind != "attack":
 				return "bolt"
-			# 只有重击（基础伤害 ≥12）才让分子亲自冲撞，其余的分子设计攻击是甩出一个片段，分子基本不离开原位
-			var base := 0
-			for e in card.effects:
-				if String(e.get("op", "")) == "damage":
-					base = maxi(base, int(e.get("value", 0)))
 			return "charge"
 	return "bolt"
 
@@ -1001,79 +1023,31 @@ func _mol_recoil(amount: float) -> void:
 	t.tween_property(_mol, "position", origin, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
-## 前倾一下（甩片段）：位移很小，视觉重心不跟着跑
-func _mol_lean() -> void:
-	var origin := _mol.position
-	var t := create_tween()
-	t.tween_property(_mol, "position", origin + Vector2(22, -4), 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	t.tween_property(_mol, "position", origin, 0.2).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
-
-
-## 甩出片段：从分子上随机一个片段的位置飞出一颗同色的原子，旋转着砸向目标
-func _fragment_throw(to: Vector2) -> void:
-	var molecule: Molecule = _game.molecule
-	var from := _player_point()
-	var col := Color(0.8, 0.75, 1.0)
-	if molecule != null and not molecule.sites.is_empty():
-		var site_ids: Array = molecule.sites.keys()
-		var site_id := String(site_ids[randi() % site_ids.size()])
-		for site in Molecule.config().get("sites", []):
-			if String(site.id) == site_id:
-				from = _mol.position + _mol.site_center(site)
-		col = Color.from_string(String(Molecule.fragment(String(molecule.sites[site_id])).get("color", "#c8b8ff")), col)
-		_mol.flash_sites([site_id], col.lightened(0.3))
-	_strike_color = col
-	var atom := Control.new()
-	atom.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_fx.add_child(atom)
-	var trail: Array = []
-	var state := [0.0]
-	atom.draw.connect(func() -> void:
-		for i in trail.size():
-			var k := float(i + 1) / trail.size()
-			atom.draw_circle(trail[i], 4.0 + 8.0 * k, Color(col, 0.08 + 0.25 * k))
-		if trail.is_empty():
-			return
-		var p: Vector2 = trail.back()
-		atom.draw_circle(p, 17.0, Color(col, 0.3))
-		atom.draw_circle(p, 12.0, col.darkened(0.2))
-		atom.draw_arc(p, 12.0, 0, TAU, 24, col.lightened(0.4), 2.5, true)
-		var spin: float = state[0] * TAU * 2.0
-		atom.draw_arc(p, 17.0, spin, spin + 1.2, 10, Color(1, 1, 1, 0.8), 2.0, true))
-	var arc := Vector2(0, -minf(70.0, from.distance_to(to) * 0.15))
-	var tween := atom.create_tween()
-	tween.tween_method(func(t: float) -> void:
-		state[0] = t
-		trail.append(from.lerp(to, t) + arc * 4.0 * t * (1.0 - t))
-		if trail.size() > 8:
-			trail.pop_front()
-		atom.queue_redraw(), 0.0, 1.0, 0.22).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tween.tween_callback(atom.queue_free)
-
-
-## 冲撞（只用于重击）：分子冲到敌人面前，撞上后再退回原位
+## 蓄力、推进、接触停顿、回到原位。等待出招的 Tween 结束才推进伤害事件。
 func _strike_charge(to: Vector2) -> void:
 	var origin := _mol.position
-	var bounds := _mol.visual_bounds()
-	var tip := _mol.get_transform() * Vector2(bounds.end.x,bounds.get_center().y)
+	var tip := _mol.get_transform() * _mol.attack_tip()
 	var pivot := _mol.pivot_offset
-	var tip_local := Vector2(bounds.end.x,bounds.get_center().y)
-	var destination := to - pivot - (tip_local-pivot).rotated(-0.12)
+	var tip_local := _mol.attack_tip(1.0)
+	var destination := to - pivot - (tip_local - pivot).rotated(-0.10)
+	const ANTICIPATION := 0.08
+	const STRIKE := 0.15
 	var dash := create_tween()
 	_mol_motion = dash
-	dash.tween_property(_mol,"position",origin+Vector2(-22,4),0.09).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	dash.parallel().tween_property(_mol,"rotation",0.05,0.09)
-	dash.tween_property(_mol,"position",destination,0.18).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
-	dash.parallel().tween_property(_mol,"rotation",-0.12,0.18)
-	dash.tween_interval(0.09)
-	dash.tween_property(_mol,"position",origin,0.32).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	dash.parallel().tween_property(_mol,"rotation",-0.035,0.32)
-	var ribbon := BattleContact.new()
-	ribbon.from_point = tip
-	ribbon.to_point = to
-	ribbon.burst = false
-	_fx.add_child(ribbon)
-	await _wait(0.27)
+	dash.tween_property(_mol, "position", origin + Vector2(-18, 2), ANTICIPATION).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	dash.parallel().tween_property(_mol, "rotation", 0.05, ANTICIPATION)
+	dash.parallel().tween_property(_mol, "strike_pose", -0.35, ANTICIPATION)
+	dash.tween_callback(func() -> void: _cue(BattleCue.Kind.TRAIL, tip, to))
+	dash.tween_property(_mol, "position", destination, STRIKE).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+	dash.parallel().tween_property(_mol, "rotation", -0.10, STRIKE)
+	dash.parallel().tween_property(_mol, "strike_pose", 1.0, STRIKE)
+	await dash.finished
+	var recover := create_tween()
+	_mol_motion = recover
+	recover.tween_interval(0.09)
+	recover.tween_property(_mol, "position", origin, 0.24).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	recover.parallel().tween_property(_mol, "rotation", 0.0, 0.24)
+	recover.parallel().tween_property(_mol, "strike_pose", 0.0, 0.24)
 
 
 ## 光束：AI 是带锯齿和像素块的青色数据流；精准光束（precise）是一道又细又亮的直线
@@ -1219,118 +1193,44 @@ func _projectile(from: Vector2, to: Vector2, color: Color, scale_k := 1.0) -> vo
 
 ## 击中敌人：按出招方式换命中特效，伤害越高越猛；敌人都会被击退
 func _impact(index: int, p: Vector2, amount: int) -> void:
-	var contact := BattleContact.new()
-	contact.from_point = _player_point()
-	contact.to_point = p
-	contact.strength = clampf(0.75 + amount / 30.0,0.8,1.5)
-	_fx.add_child(contact)
+	var strength := clampf(0.72 + amount / 33.0, 0.8, 1.44)
+	if _strike_ai:
+		_cue(BattleCue.Kind.AI, p, p, Vector2(76, 65), strength)
+	else:
+		var from := p - Vector2(120, 8) if _strike_style == "charge" else _player_point()
+		_cue(BattleCue.Kind.HIT, from, p, Vector2.ZERO, strength)
 	_floor.impact = p
-	_floor.impact_light = 1.0
-	create_tween().tween_property(_floor,"impact_light",0.0,0.4)
-	var color := _enemy_color(index).lightened(0.3)
-	var heavy := minf(amount, 30)
-	var knock := 10.0 + heavy * 0.8
-	match _strike_style:
-		"charge":   # 冲撞：大冲击波 + 震屏，击退更远
-			_burst(p,UIKit.GOLD,12+int(heavy*0.4))
-			_shake(4.0+heavy*0.18,0.16)
-			knock *= 1.6
-		"beam":     # 数据光束：青色电火花
-			_burst(p, Color(0.45, 0.95, 1.0), 16 + int(heavy))
-			_shockwave(p, Color(0.45, 0.95, 1.0), 50.0 + heavy * 2.0)
-		"lock":     # 精准命中：金色准星一闪 + 斩痕
-			_shockwave(p, Color(1.0, 0.85, 0.4), 70.0 + heavy * 3.0, true)
-			_slash(p, Color(1.0, 0.9, 0.6), 90.0 + heavy * 3.0)
-			_burst(p, Color(1.0, 0.85, 0.4), 12)
-		"dose":     # 药剂：溅开一圈药液和气泡
-			_splash(p, Color(0.55, 0.95, 0.5), 22 + int(heavy))
-			_shockwave(p, Color(0.55, 0.95, 0.5), 60.0 + heavy * 2.0)
-		"flask":    # 试剂瓶：玻璃碎片 + 彩色试剂
-			_splash(p, Color(0.95, 0.75, 0.35), 16 + int(heavy))
-			_burst(p, Color(0.9, 0.97, 1.0), 20)
-			_slash(p, Color(0.9, 0.97, 1.0), 50.0)
-		"fragment": # 片段砸中：片段颜色的冲击和碎屑
-			_shockwave(p, _strike_color.lightened(0.3), 60.0 + heavy * 3.0)
-			_burst(p, _strike_color, 12 + int(heavy))
-		"volley":   # 连射：每段一个小冲击
-			_shockwave(p, Color(1.0, 0.95, 0.8), 40.0 + heavy * 1.5)
-			_burst(p, color, 6)
-			knock *= 0.5
-		_:
-			_shockwave(p, Color(1.0, 0.95, 0.8), 60.0 + heavy * 4.0)
-			_slash(p, Color(1.0, 0.97, 0.9), 70.0 + heavy * 3.0)
-			_burst(p, color, 10 + int(heavy))
+	_floor.impact_light = 0.7
+	create_tween().tween_property(_floor, "impact_light", 0.0, 0.30)
 	var ew := _enemy_widgets[index]
 	var origin := ew.creature.position
+	var knock := (9.0 + minf(amount, 28) * 0.72) * (0.52 if _strike_style == "volley" else 1.0)
 	var kick := create_tween()
-	kick.tween_property(ew.creature, "position", origin + Vector2(knock, -4), 0.05).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	kick.tween_property(ew.creature, "position", origin, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	kick.tween_property(ew.creature, "position", origin + Vector2(knock, -3), 0.045).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	kick.tween_interval(0.025)
+	kick.tween_property(ew.creature, "position", origin, 0.11).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
-## 溅开的液滴：向四周飞、往下落的小圆点
-func _splash(pos: Vector2, color: Color, amount: int) -> void:
-	var p := CPUParticles2D.new()
-	p.position = pos
-	p.emitting = false
-	p.one_shot = true
-	p.amount = amount
-	p.lifetime = 0.7
-	p.explosiveness = 1.0
-	p.direction = Vector2(0, -1)
-	p.spread = 80.0
-	p.initial_velocity_min = 180.0
-	p.initial_velocity_max = 380.0
-	p.gravity = Vector2(0, 900)
-	p.scale_amount_min = 0.5
-	p.scale_amount_max = 1.2
-	p.texture = _spark_texture()
-	var ramp := Gradient.new()
-	ramp.set_color(0, Color(color.lightened(0.3), 1.0))
-	ramp.set_color(1, Color(color, 0.0))
-	p.color_ramp = ramp
-	_fx.add_child(p)
-	p.emitting = true
-	get_tree().create_timer(1.0).timeout.connect(p.queue_free)
+func _cue(kind: BattleCue.Kind, origin: Vector2, target: Vector2, extent := Vector2(130, 100), power := 1.0) -> void:
+	var cue := BattleCue.new()
+	cue.kind = kind
+	cue.origin = origin
+	cue.target = target
+	cue.extent = extent
+	cue.power = power
+	_fx.add_child(cue)
 
 
-## 扩散（或 inward 时收拢）的光环
-func _shockwave(pos: Vector2, color: Color, radius: float, inward := false) -> void:
-	var ring := Control.new()
-	ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	ring.position = pos
-	_fx.add_child(ring)
-	var state := [0.0]
-	ring.draw.connect(func() -> void:
-		var t: float = state[0]
-		var r := lerpf(radius, radius * 0.35, t) if inward else lerpf(12.0, radius, t)
-		ring.draw_arc(Vector2.ZERO, r, 0, TAU, 56, Color(color, 1.0 - t), 2.0 + 8.0 * (1.0 - t), true)
-		ring.draw_circle(Vector2.ZERO, r, Color(color, 0.12 * (1.0 - t))))
-	var tween := ring.create_tween()
-	tween.tween_method(func(t: float) -> void:
-		state[0] = t
-		ring.queue_redraw(), 0.0, 1.0, 0.38).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tween.tween_callback(ring.queue_free)
-
-
-## 交叉斩痕：两道亮线一闪而过
-func _slash(pos: Vector2, color: Color, length: float) -> void:
-	var mark := Control.new()
-	mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	mark.position = pos
-	_fx.add_child(mark)
-	var angle := randf_range(-0.4, 0.4)
-	var state := [0.0]
-	mark.draw.connect(func() -> void:
-		var t: float = state[0]
-		for a in [angle + 0.7, angle - 0.7]:
-			var d := Vector2.from_angle(a) * length * 0.5 * minf(1.0, t * 3.0)
-			mark.draw_line(-d, d, Color(color, 1.0 - t), 7.0 * (1.0 - t) + 1.0, true)
-			mark.draw_line(-d * 0.9, d * 0.9, Color(1, 1, 1, 1.0 - t), 2.0, true))
-	var tween := mark.create_tween()
-	tween.tween_method(func(t: float) -> void:
-		state[0] = t
-		mark.queue_redraw(), 0.0, 1.0, 0.3)
-	tween.tween_callback(mark.queue_free)
+func _body_cue(kind: BattleCue.Kind, side: String, index: int, target: Vector2) -> void:
+	var area: Rect2
+	if side == "player":
+		area = _mol.visual_bounds() if _mol.visible else Rect2(Vector2(22, 35), _player.size * 0.77)
+		area.position += _mol.position if _mol.visible else _player.position
+	else:
+		var ew := _enemy_widgets[index]
+		area = ew.creature.visible_body_rect()
+		area.position += ew.position + ew.creature.position
+	_cue(kind, area.get_center(), target, area.size)
 
 
 func _play_death(side: String, index: int) -> void:
@@ -1340,11 +1240,18 @@ func _play_death(side: String, index: int) -> void:
 		return
 	var ew := _enemy_widgets[index]
 	GameAudio.sfx("enemy_die")
-	_burst(_side_point(side, index), _enemy_color(index), 40)
+	var body := ew.creature
+	var area := body.visible_body_rect()
+	var enemy := _manager.enemies[index]
+	var boss := enemy.is_boss
+	ew.show_intent(enemy, 0)
+	_cue(BattleCue.Kind.DEATH, ew.position + body.position + area.get_center(), Vector2.ZERO, area.size, 1.45 if boss else 0.95)
 	var tween := create_tween()
-	tween.tween_property(ew.creature, "dying", 1.0, 0.6)
-	tween.parallel().tween_property(ew.creature, "modulate:a", 0.0, 0.7).set_delay(0.2)
-	await _wait(0.35)
+	tween.tween_property(body, "modulate", Color(1.75, 1.37, 1.06), 0.055)
+	tween.tween_interval(0.05)
+	tween.tween_property(body, "dying", 1.0, 0.46).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tween.parallel().tween_property(body, "modulate", Color(0.44, 0.42, 0.52, 0.0), 0.46)
+	await _wait(0.50 if boss else 0.31)
 
 
 func _animate_card_out(card: ResearchCard, target: int) -> void:
@@ -1360,6 +1267,8 @@ func _animate_card_out(card: ResearchCard, target: int) -> void:
 		await _molecule_cast(card, face, target, color)
 		return
 	var dest := _side_point("enemy", target) if target >= 0 else Vector2(size.x * 0.5, size.y * 0.42)
+	if card.kind == "attack" and not _strike_ai:
+		_cue(BattleCue.Kind.TRAIL, _player_point(), dest, Vector2.ZERO, 0.80)
 	face.z_index = 50
 	face.set_state(true)
 	var tween := create_tween().set_parallel(true)
@@ -1523,7 +1432,6 @@ func _draw_arrow() -> void:
 func _process(delta: float) -> void:
 	if not visible:
 		return
-	_time += delta
 	_update_stage()
 	# 没牌可打（能量用完或手里都打不出）时，结束回合按钮呼吸发光提示
 	_end_button.prompt = _should_prompt_end()
@@ -1531,7 +1439,7 @@ func _process(delta: float) -> void:
 		_arrow.queue_redraw()
 	var max_hp := _manager.player.max_hp if _manager and _manager.player else 100
 	var low := float(_shown_player_hp) / max_hp <= 0.3 and not (_ended and not _victory)
-	var target_low := (0.35 + 0.25 * sin(_time * 5.0)) if low else 0.0
+	var target_low := 0.29 if low else 0.0
 	_vignette_low.modulate.a = move_toward(_vignette_low.modulate.a, target_low, delta * 3.0)
 	_update_pressure(delta)
 	if low and not _ended:
@@ -1889,10 +1797,6 @@ func _player_point() -> Vector2:
 	if _mol.visible:
 		return _mol.position + _mol.size * Vector2(0.5, 0.48)
 	return _player.position + _player.size * Vector2(0.5, 0.6)
-
-
-func _enemy_color(index: int) -> Color:
-	return _enemy_widgets[index].creature.color if index < _enemy_widgets.size() else Color.WHITE
 
 
 func _fmt(line: Dictionary) -> String:

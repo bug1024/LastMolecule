@@ -1,25 +1,36 @@
 class_name MoleculeView
 extends Control
-## Live scaffold with pre-rendered chemical fragments: shared by battle, hub and editor.
-## Site identity, picking, pocket hints and property flashes remain tied to the actual molecule.
-## Reactions use local charge light and bond motion; the core has no face or instrument disk.
+## Live scaffold shared by battle, hub and editor. Battle and hub paint a character pose;
+## editing and compact views show the structure and its fragment positions.
 
 signal site_clicked(site_id: String)
 
 var molecule: Molecule = null
 var interactive := false
 var selected := ""
-var unit := 0.0
+var unit := 0.0:
+	set(value):
+		if not is_equal_approx(value, unit):
+			unit = value
+			queue_redraw()
 var _time := 0.0
 var _hover := ""
 var compact := false
+var character := false  # Character illustration in battle and observation; editor remains a readable plan.
+var _profile := ""
+var strike_pose := 0.0:
+	set(value):
+		strike_pose = value
+		queue_redraw()
 var _flash := {}        # 属性 → 剩余闪光强度（1 → 0）
 var _site_flash := {}   # 位点 → [剩余强度, 颜色]（被敌人攻击的片段闪红）
 var _hit := 0.0         # 受击：抖动 + 泛红
 var _cheer := 0.0       # 胜利：跳一跳、发光
 var idle_bob := false   # 战斗中：轻轻浮动，像活着
-var face := false       # Enable ambient evolution/reaction light in battle and hub.
-var form := 1           # 进化形态 1–5
+var form := 1:          # 进化形态 1–5
+	set(value):
+		form = value
+		queue_redraw()
 var mood := ""          # 持续反应：focus / sad；空为按 ratio 自动（idle / worried）
 var ratio := 1.0        # 生命比例（低了会担心）
 var _react := ""        # 短暂反应：hurt / happy / fierce
@@ -37,6 +48,7 @@ const TYPE_MARK := {"linker": "连", "ring": "环", "terminal": "端"}
 
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	resized.connect(queue_redraw)
 	if interactive:
 		mouse_filter = Control.MOUSE_FILTER_STOP
 	elif tooltip_text.is_empty():
@@ -121,10 +133,20 @@ func expression() -> String:
 
 func set_molecule(m: Molecule) -> void:
 	molecule = m
+	_profile = ""
+	if character and m != null:
+		var props := m.properties()
+		if int(props.potency) >= 5 and int(props.potency) > int(props.selectivity):
+			_profile = "potent"
+		elif int(props.selectivity) >= 4 and int(props.selectivity) > int(props.potency):
+			_profile = "selective"
 	queue_redraw()
 
 
 func _process(delta: float) -> void:
+	if character and not idle_bob and _hit <= 0.0 and _cheer <= 0.0 and _glow_burst <= 0.0 \
+		and _react_t <= 0.0 and _flash.is_empty() and _site_flash.is_empty() and _jolt.is_empty():
+		return
 	if is_visible_in_tree():
 		_time += delta
 		for prop in _flash.keys():
@@ -164,10 +186,14 @@ func _site_r() -> float:
 
 
 func _scale() -> float:
-	return unit if unit > 0 else minf(size.x / 8.0, size.y / 4.9)
+	if unit > 0:
+		return unit
+	return minf(size.x / 8.0, size.y / (5.4 if character else 4.9))
 
 
 func site_center(site: Dictionary) -> Vector2:
+	if character:
+		return size * Vector2(0.5, 0.48) + (MoleculeCharacter.ANCHORS[String(site.id)] as Vector2) * _scale()
 	var p: Array = site.get("pos", [0, 0])
 	var projected := Vector2(float(p[0]) + float(p[1]) * 0.12, float(p[1]) * 0.88)
 	return size * Vector2(0.5, 0.48) + projected * _scale()
@@ -219,11 +245,12 @@ func _draw() -> void:
 		offset.y += sin(_time * 2.0) * 3.0
 	offset.y -= absf(sin(_time * 9.0)) * 10.0 * _cheer
 	_offset = offset
+	if character:
+		_draw_character(center + offset, k)
+		return
 	draw_set_transform(offset)
 	if _cheer > 0:
 		Shading.glow(self, center, k * 2.6, Color(0.55, 1.0, 0.75, 0.3 * _cheer))
-	if face and not compact:
-		_draw_form(center, k)
 	var font := get_theme_default_font()
 	var bw := maxf(1.2, k * 0.12)
 	var bond_col := Color("b6c7a5")
@@ -304,6 +331,48 @@ func _draw() -> void:
 		_draw_pocket(font)
 
 
+func _draw_character(center: Vector2, k: float) -> void:
+	if k <= 0.0:
+		return
+	var pose := strike_pose
+	if _react == "fierce" and is_zero_approx(pose):
+		pose = sin(clampf(_react_t / 0.45, 0.0, 1.0) * PI * 0.5)
+	var points := {}
+	for site in Molecule.config().sites:
+		var id := String(site.id)
+		var anchor: Vector2 = MoleculeCharacter.ANCHORS[id]
+		anchor += _pose_shift(anchor, pose)
+		points[id] = anchor + (_pos(site) - site_center(site)) * 0.62 / k
+	draw_set_transform(center, 0.0, Vector2.ONE * k)
+	MoleculeCharacter.draw(self, points, molecule.sites if molecule != null else {}, form, _profile, pose)
+	draw_set_transform(Vector2.ZERO)
+	for site in Molecule.config().sites:
+		var id := String(site.id)
+		var point := center + (points[id] as Vector2) * k
+		var frag := Molecule.fragment(String(molecule.sites.get(id, ""))) if molecule != null else {}
+		if _site_flash.has(id):
+			var cue: Array = _site_flash[id]
+			draw_arc(point, k * 0.28, -0.8, 4.3, 20, Color(cue[1], cue[0]), 2.2, true)
+		for prop in _flash:
+			if int(frag.get("fx", {}).get(prop, 0)) > 0:
+				draw_arc(point, k * 0.33, -PI, 0.75, 16, Color(MoleculeCharacter.BONE, _flash[prop]), 1.8, true)
+	if _glow_burst > 0.0:
+		draw_arc(center, k * (1.2 + 0.45 * (1.0 - _glow_burst)), -2.1, 1.3, 36,
+			Color(MoleculeCharacter.GOLD, _glow_burst), 2.5, true)
+
+
+func _pose_shift(anchor: Vector2, pose: float) -> Vector2:
+	return Vector2(0.30 + maxf(anchor.x, 0.0) * 0.17, -0.15) * pose
+
+
+func attack_tip(pose := 0.0) -> Vector2:
+	if character:
+		var tip := MoleculeCharacter.FRONT
+		return size * Vector2(0.5, 0.48) + (tip + _pose_shift(tip, pose)) * _scale()
+	var bounds := visual_bounds()
+	return Vector2(bounds.end.x, bounds.get_center().y)
+
+
 func _draw_links(by_id: Dictionary) -> void:
 	for link in _links:
 		if not by_id.has(link.a) or not by_id.has(link.b):
@@ -355,22 +424,6 @@ func _draw_pocket(font: Font) -> void:
 			y += 13.0
 
 
-## Local electronic-density light keeps the structure, rather than a face, expressive.
-func _draw_form(center: Vector2, k: float) -> void:
-	var col := Color(0.25, 0.66, 0.75)
-	if ratio < 0.35:
-		col = Color(0.8, 0.38, 0.25)
-	var reaction := maxf(_glow_burst, _react_t * 0.3)
-	if _react == "hurt" and _react_t > 0:
-		col = Color(0.9, 0.25, 0.22)
-	var strength := 0.035 * mini(form, 5) + reaction * 0.12
-	Shading.glow(self, center, k * 2.3, Color(col, strength))
-	if reaction > 0.02:
-		for site in Molecule.config().get("sites", []):
-			if molecule != null and molecule.sites.has(String(site.id)):
-				Shading.glow(self, _pos(site), k * 0.5, Color(col, reaction * 0.2))
-
-
 func _draw_alert(p: Vector2, k := 1.0) -> void:
 	var tri := PackedVector2Array([p + Vector2(0, -9) * k, p + Vector2(9, 7) * k, p + Vector2(-9, 7) * k])
 	draw_colored_polygon(tri, UIKit.GOLD)
@@ -381,6 +434,9 @@ func _draw_alert(p: Vector2, k := 1.0) -> void:
 ## Stable structural footprint, independent of bobbing and hit displacement.
 func visual_bounds() -> Rect2:
 	var center := size * Vector2(0.5,0.48)
+	if character:
+		var frame := MoleculeCharacter.FRAME
+		return Rect2(center + frame.position * _scale(), frame.size * _scale())
 	var result := MoleculeSpecimen.bounds("core",center,_scale())
 	for site in Molecule.config().sites:
 		var id := String(molecule.sites.get(String(site.id),"")) if molecule != null else ""

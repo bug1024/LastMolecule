@@ -123,7 +123,7 @@ func _body_transform() -> Transform2D:
 	var jitter := Vector2(sin(_time * 37.0), cos(_time * 41.0)) * (_shown_strain * 2.4 + _surge * 4.0)
 	var angle := lean + _windup * 0.05 + sin(_time * float(motion.sway_speed) + _seed) * float(motion.sway)
 	angle += sin(_time * 54.0) * flash * 0.018
-	var deformation := Vector2((breathing + flash * 0.045) * swell * (2.0 - squeeze),
+	var deformation := Vector2((breathing + flash * 0.045 - dying * 0.32) * swell * (2.0 - squeeze),
 		(1.0 - dying * 0.3 - flash * 0.06) * swell * squeeze)
 	return Transform2D(angle, deformation, 0.0, pivot + jitter + Vector2(_windup * 10.0, 0))
 

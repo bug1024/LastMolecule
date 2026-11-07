@@ -66,8 +66,7 @@ func _build() -> void:
 	molecule_art = MoleculeArt.new()
 	add_child(molecule_art)
 	mol_view = MoleculeView.new()
-	mol_view.face = true
-	mol_view.idle_bob = true
+	mol_view.character = true
 	mol_view.visible = false
 	add_child(mol_view)
 	_mol_line = UIKit.label("", Color(0.82, 0.75, 1.0), 14)
@@ -314,7 +313,7 @@ func _process(delta: float) -> void:
 		_time += delta
 		_growth = move_toward(_growth, _target_growth, delta * 0.45)
 		_scan = maxf(0.0, _scan - delta * 0.7)
-		var base_unit := minf(mol_view.size.x / 8.0, mol_view.size.y / 4.9)
+		var base_unit := minf(mol_view.size.x / 8.0, mol_view.size.y / 5.4)
 		mol_view.unit = base_unit * lerpf(0.78, 1.04, _growth)
 		queue_redraw()
 

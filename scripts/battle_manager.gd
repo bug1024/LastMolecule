@@ -573,7 +573,7 @@ func _apply_card_effect(effect: Dictionary, card: ResearchCard, target: int, mul
 		"detonate":
 			if target >= 0:
 				var amount := enemies[target].get_status("poison") * value
-				_attack(player, "player", 0, enemies[target], "enemy", target, amount, false)
+				_attack(player, "player", 0, enemies[target], "enemy", target, amount, false, "toxin_burst")
 		"add_card":
 			if card_factory.is_valid():
 				for k in maxi(1, value):
@@ -582,11 +582,11 @@ func _apply_card_effect(effect: Dictionary, card: ResearchCard, target: int, mul
 
 
 func _attack(attacker: Combatant, a_side: String, a_index: int, defender: Combatant, d_side: String, d_index: int,
-		base: int, use_strength: bool) -> void:
+		base: int, use_strength: bool, cause := "") -> void:
 	if not defender.is_alive() or not attacker.is_alive():
 		return
 	var amount := _calc_damage(attacker, defender, base, use_strength)
-	_hurt(defender, d_side, d_index, amount, false)
+	_hurt(defender, d_side, d_index, amount, false, cause)
 	if defender is Enemy:
 		(defender as Enemy).damaged_this_turn = true
 	var thorns := defender.get_status("thorns")
@@ -603,10 +603,10 @@ func _calc_damage(attacker: Combatant, defender: Combatant, base: int, use_stren
 	return maxi(0, int(floor(amount)))
 
 
-func _hurt(target: Combatant, side: String, index: int, amount: int, ignore_block: bool) -> void:
+func _hurt(target: Combatant, side: String, index: int, amount: int, ignore_block: bool, cause := "") -> void:
 	var result := target.take_damage(amount, ignore_block)
 	_emit({"t": "damage", "side": side, "index": index, "amount": result.lost, "blocked": result.blocked,
-		"hp": target.hp, "block": target.block})
+		"hp": target.hp, "block": target.block, "cause": cause})
 	if not target.is_alive():
 		_emit({"t": "death", "side": side, "index": index})
 
@@ -628,7 +628,7 @@ func _tick_poison(target: Combatant, side: String, index: int) -> void:
 	var poison := target.get_status("poison")
 	if poison <= 0:
 		return
-	_hurt(target, side, index, poison, true)
+	_hurt(target, side, index, poison, true, "poison")
 	target.add_status("poison", -1)
 
 

@@ -70,7 +70,9 @@ func _draw() -> void:
 	_draw_groove(rect)
 	var inner := rect.grow(-2.0)
 	var trail_w := inner.size.x * clampf(_trail / max_value, 0.0, 1.0)
-	draw_colored_polygon(_bar_shape(inner, trail_w), Color(1, 0.95, 0.8, 0.8))
+	var trail_shape := _bar_shape(inner, trail_w)
+	if trail_shape.size() >= 3:
+		draw_colored_polygon(trail_shape, Color(1, 0.95, 0.8, 0.8))
 	var fill_w := inner.size.x * clampf(_shown / max_value, 0.0, 1.0)
 	var fill := Color(0.2, 0.6, 0.46) if is_player else Color(0.72, 0.27, 0.22)
 	var shape := _bar_shape(inner, fill_w)
