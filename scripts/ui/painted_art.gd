@@ -35,13 +35,13 @@ static func atlas_region(name: String, cell: int, columns := 3, rows := 2) -> Re
 static var _sprite_regions := {}
 
 
-static func sprite(ci: CanvasItem, name: String, cell: int, area: Rect2, tint := Color.WHITE, bottom_align := false) -> bool:
+static func sprite_source(name: String, cell: int, columns := 3, rows := 2) -> Rect2:
 	var texture := UIKit.art(name)
 	if texture == null:
-		return false
-	var key := name + str(cell)
+		return Rect2()
+	var key := "%s/%d" % [name, cell]
 	if not _sprite_regions.has(key):
-		var tile := Rect2i(atlas_region(name, cell))
+		var tile := Rect2i(atlas_region(name, cell, columns, rows))
 		if name == "painted-enemies":
 			# Alpha-separated exported subjects have deliberately unequal gutter widths.
 			var cuts := [0.0, 0.3125, 0.6628, 1.0] if cell < 3 else [0.0, 0.36, 0.65, 1.0]
@@ -53,7 +53,11 @@ static func sprite(ci: CanvasItem, name: String, cell: int, area: Rect2, tint :=
 		var image := texture.get_image().get_region(tile)
 		var used := image.get_used_rect()
 		_sprite_regions[key] = Rect2(tile.position + used.position, used.size)
-	var source: Rect2 = _sprite_regions[key]
+	return _sprite_regions[key]
+
+
+static func sprite(ci: CanvasItem, name: String, cell: int, area: Rect2, tint := Color.WHITE, bottom_align := false) -> bool:
+	var source := sprite_source(name, cell)
 	if not source.has_area():
 		return false
 	var factor := minf(area.size.x / source.size.x, area.size.y / source.size.y)
@@ -61,8 +65,24 @@ static func sprite(ci: CanvasItem, name: String, cell: int, area: Rect2, tint :=
 	var origin := area.get_center() - extent * 0.5
 	if bottom_align:
 		origin.y = area.end.y - extent.y
-	ci.draw_texture_rect_region(texture, Rect2(origin, extent), source, tint)
+	ci.draw_texture_rect_region(UIKit.art(name), Rect2(origin, extent), source, tint)
 	return true
+
+
+static func cover(ci: CanvasItem, name: String, area: Rect2, tile: Rect2, tint := Color.WHITE) -> bool:
+	if not tile.has_area() or not area.has_area():
+		return false
+	var factor := maxf(area.size.x / tile.size.x, area.size.y / tile.size.y)
+	var visible := area.size / factor
+	ci.draw_texture_rect_region(UIKit.art(name), area, Rect2(tile.get_center() - visible * 0.5, visible), tint)
+	return true
+
+
+static func stage_world(ci: CanvasItem, area: Rect2, stage: int, shade: float) -> void:
+	if not cover(ci, "stage-worlds", area, atlas_region("stage-worlds", clampi(stage, 0, 5), 2, 3).grow(-2)):
+		world(ci, area, shade)
+		return
+	ci.draw_rect(area, Color(0.045, 0.06, 0.10, shade))
 
 
 static func world(ci: CanvasItem, area: Rect2, shade := 0.0) -> void:

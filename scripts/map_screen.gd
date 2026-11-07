@@ -141,7 +141,7 @@ func refresh() -> void:
 	_hp_bar.add_theme_stylebox_override("fill", UIKit.meter_style(hp_color, hp_color, 4))
 	_hp_bar.add_theme_stylebox_override("background", UIKit.meter_style(Color(0.1, 0.12, 0.16), Color(0.25, 0.3, 0.36), 4))
 	_canvas.rest_heal = _game.get_rest_heal()
-	_canvas.tint = BattleView.STAGE_TINT.get(s.stage, Color(0.2, 0.5, 0.5))
+	_canvas.stage_index = maxi(_game.get_stages().find(map.get_stage()), 0)
 	_year_label.text = tr("ui.year") % s.year
 	_hint_label.text = tr("ui.map_hint_fast") if _game.fast_track else tr("ui.map_hint")
 	var boss: Dictionary = _game.get_boss_info()

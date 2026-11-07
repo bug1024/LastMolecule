@@ -309,7 +309,10 @@ func _layout() -> void:
 	for i in _enemy_widgets.size():
 		var slot: Dictionary = _space.slots[i]
 		var ew := _enemy_widgets[i]
-		ew.set_stage_pose(slot.body, minf(240, float(slot.body.x) + 8))
+		var body: Vector2 = slot.body
+		if _manager != null and _manager.enemies[i].mechanic == "dose":
+			body.y = minf(body.y, (float(_space.ground) - 111.0) / 1.2)
+		ew.set_stage_pose(body, minf(240, body.x + 8))
 		ew.position = slot.foot - Vector2(EnemyWidget.SIZE.x * 0.5,0)
 	_floor.ground = _space.ground
 	_update_stage()
@@ -420,7 +423,8 @@ func _on_battle_started(encounter: Dictionary) -> void:
 	_layout()
 	_refresh_all(true)
 	# 最终 Boss（LM-001）用专属曲：LM-001 主题的战斗版
-	GameAudio.music("boss_final" if String(encounter.get("id", "")) == "boss_final" else ("boss" if kind == "boss" else "battle"))
+	GameAudio.battle_theme(_game.get_stages().find(_game.state.stage), kind == "boss",
+		String(encounter.get("id", "")) == "boss_final")
 	await _intro_banner(kind)
 	if token != _battle_token:
 		return
@@ -540,7 +544,7 @@ func _boss_entrance() -> void:
 	skip.gui_input.connect(func(event: InputEvent) -> void:
 		if event is InputEventMouseButton and event.pressed:
 			tween.set_speed_scale(6.0))
-	GameAudio.sfx("boss")
+	GameAudio.sfx("boss_entrance")
 	tween.tween_property(top_bar, "position:y", 0.0, 0.35).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 	tween.tween_property(low_bar, "position:y", h - 58, 0.35).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 	tween.tween_property(self, "_intro_dark", 0.66, 0.4)

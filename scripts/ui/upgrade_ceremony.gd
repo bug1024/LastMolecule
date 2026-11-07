@@ -72,7 +72,7 @@ func _ready() -> void:
 func _play() -> void:
 	var face_size := CardFace.BASE * FACE_SCALE
 	var tween := create_tween()
-	GameAudio.sfx("level_up")
+	GameAudio.sfx("card_upgrade")
 	tween.tween_method(func(v: float) -> void: _charge = v, 0.0, 1.0, 0.34).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tween.parallel().tween_property(_old, "scale", Vector2(0.93, 0.93), 0.34).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tween.tween_property(_old, "scale", Vector2(0.0, 1.0), 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)

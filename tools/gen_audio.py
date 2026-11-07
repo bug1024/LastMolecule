@@ -697,8 +697,86 @@ def music_layers():
     _layer_danger(136, BOSS_CYCLE, "boss")
 
 
+# Each stage changes harmony, lead instrument, and rhythmic phrasing.
+STAGE_SCORES = {
+    "preclinical": (94, [(38, [62, 65, 69]), (41, [60, 65, 69]), (34, [58, 62, 65]), (33, [61, 64, 70])],
+                    (0.0, 1.5, 3.25), (0, 2, 1), "bell"),
+    "phase1": (112, [(36, [60, 63, 67]), (44, [60, 63, 68]), (41, [60, 65, 68]), (43, [59, 62, 67])],
+               (0.0, 0.75, 2.0, 2.75), (0, 1, 2, 1), "bass"),
+    "phase2": (104, [(38, [62, 65, 69, 71]), (43, [62, 67, 71, 74]), (36, [60, 64, 67, 74]), (45, [61, 64, 69, 71])],
+               (0.5, 1.25, 2.5, 3.5), (0, 2, 3, 1), "epiano"),
+    "phase3": (126, [(35, [59, 62, 66]), (43, [59, 62, 67]), (38, [62, 66, 69]), (42, [58, 61, 66])],
+               (0.0, 0.5, 1.75, 2.5, 3.25), (0, 2, 1, 2, 0), "pluck"),
+}
+
+
+def stage_score(name, score, boss=False):
+    bpm, cycle, offsets, motif, instrument = score
+    beat = 60 / bpm
+    bar = beat * 4
+    mix = Mix(bar * 16)
+    for phrase in range(8):
+        root, notes = cycle[phrase % len(cycle)]
+        start = phrase * bar * 2
+        harmony = [n - 12 for n in notes] + ([root + 12] if boss else [])
+        mix.add(start, pad(harmony, 2 * bar, 0.45, 1.0, 5 if boss else 2.5), 0.46, 0, 0.55)
+        for measure in range(2):
+            t = start + measure * bar
+            for step, offset in enumerate(offsets):
+                n = notes[motif[step]] + (12 if measure and step == len(offsets) - 1 else 0)
+                if instrument == "bell":
+                    lead = bell(n, 1, 2.2, 2.01, 1.4)
+                elif instrument == "bass":
+                    lead = pluck(n - 12, 0.26, 1, 2.8)
+                elif instrument == "epiano":
+                    lead = epiano(n, 0.7)
+                else:
+                    lead = pluck(n, 0.23, 1, 1.7)
+                mix.add(t + offset * beat, lead, 0.24, -0.27 if step % 2 else 0.27, 0.44)
+            mix.add(t, bass(root, beat * 1.5), 0.48, 0, 0.1)
+            mix.add(t + beat * 2.5, bass(root + (7 if measure else 12), beat), 0.32, 0, 0.1)
+            if boss:
+                for offset in (0, 1.5, 3):
+                    mix.add(t + offset * beat, TAIKO, 0.45, -0.15, 0.28)
+            elif instrument in ("bass", "pluck"):
+                mix.add(t, KICK, 0.38, 0, 0.08)
+                mix.add(t + beat * 2.5, SHAKER, 0.13, 0.3, 0.18)
+    suffix = "_boss" if boss else ""
+    write(mix.render(wet_gain=0.54, rt=2.0), os.path.join(ROOT, "music", name + suffix + ".ogg"))
+
+
+def ceremony_audio():
+    sfx("boss_entrance", layer(
+        (fade(noise_sweep(1.18, 140, 1900, 2.4), 0.18, 0.18), 0.45, 0),
+        (punch(0.95, 118, 45, 0.36), 0.7, 0.18),
+        (metal([108, 153, 221], 0.65, 0.28), 0.25, 0.46)), 0.54)
+    sfx("card_upgrade", layer(
+        (crunch(0.16, 1350, 0.065), 0.27, 0),
+        (bell(69, 1, 0.72, 2.01, 0.65), 0.50, 0.045),
+        (bell(76, 1, 0.82, 2.01, 0.55), 0.39, 0.15),
+        (bell(81, 1, 0.92, 2.01, 0.48), 0.32, 0.24)), 0.52)
+    sfx("molecule_modify", layer(
+        (fade(punch(0.17, 520, 180, 0.058), 0.007, 0.018), 0.62, 0),
+        (click(), 0.15, 0.026),
+        (metal([305, 608, 933], 0.28, 0.11), 0.46, 0.05)), 0.46)
+
+
+def research_audio():
+    for name, score in STAGE_SCORES.items():
+        bpm, cycle, _, _, _ = score
+        stage_score(name, score)
+        stage_score(name, score, boss=True)
+        layer_cycle = [(notes, root) for root, notes in cycle]
+        _layer_drive(bpm, layer_cycle, name)
+        _layer_danger(bpm, layer_cycle, name)
+    ceremony_audio()
+
+
 if __name__ == "__main__":
     import sys
+    if "--research-only" in sys.argv:
+        research_audio()
+        sys.exit(0)
     if "--layers-only" in sys.argv:   # 只生成动态战斗层，不动已有音乐和音效
         music_layers()
         sys.exit(0)
@@ -718,6 +796,7 @@ if __name__ == "__main__":
     sting("campaign_approved", _campaign_approved, tail=27.0)
     sting("campaign_archive", _campaign_archive, tail=21.0)
     music_layers()
+    research_audio()
     if "--music-only" not in sys.argv:   # 只改音乐时加 --music-only，音效保持不变
         make_sfx()
     sfx_end_turn()

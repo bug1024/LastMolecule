@@ -1,12 +1,18 @@
 class_name CreatureView
 extends Control
-## 程序绘制的敌人形象：细胞 / 团块 / 尖刺 / 晶体 / 毒云五种形态，用 Shading 画出明暗、膜、细胞器与刺突等细节，
-## 带呼吸、眨眼、受击闪白与死亡消散。
-## 另有最终 Boss 专用的 molecule 形态：就是标题页上那颗 LM-001 分子（多环结构 + 金色光环 + 核心里的脸），
-## 受伤时外圈原子逐个熄灭，生命低于一半时转得更快并泛红。
-## 眼睛朝向左侧（玩家方向）；精英与 Boss 的上眼睑压低。
+## 独立插画决定敌人的剪影，形态分类决定呼吸和摆动节奏。
+## 受击、蓄力和剂量变化通过共用的姿态变形和局部特效表现。
+
+const LEGACY_CELLS := {"blob": 0, "cell": 1, "crystal": 2, "cloud": 3, "spiky": 4, "molecule": 5}
+const PORTRAIT_SHEETS := {
+	"enemies-a": ["off_target", "poor_solubility", "metabolite", "herg", "hepatotox", "animal_bias", "free_radical", "genotox"],
+	"enemies-b": ["tox_storm", "infusion_reaction", "pk_variance", "cytokine_storm", "dlt", "placebo", "enroll_drag", "resistant_clone"],
+	"enemies-c": ["progression", "endpoint_miss", "protocol_dev", "safety_signal", "center_pd", "center_ae", "center_drop"],
+}
 
 var shape := "blob"
+var _portrait := "painted-enemies"
+var _source := Rect2()
 var color := Color(0.6, 0.5, 0.9)
 var radius := 60.0
 var menace := 0        # 0 普通 / 1 精英 / 2 Boss
@@ -31,17 +37,28 @@ var _fx: Control         # 不受身份色着色的效果层（受击光、裂�
 
 
 func setup(def: Dictionary, boss := false, elite := false) -> void:
+	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	shape = String(def.get("shape", "blob"))
 	color = Color.from_string(String(def.get("color", "#9b6cf2")), Color(0.6, 0.5, 0.9))
 	radius = 58.0 * float(def.get("size", 1.0))
 	menace = 2 if boss else (1 if elite else 0)
 	_seed = float(hash(String(def.get("id", ""))) % 1000) / 100.0
 	_id = String(def.get("id", ""))
+	_source = PaintedArt.sprite_source(_portrait, int(LEGACY_CELLS.get(shape, 0)))
+	for sheet in PORTRAIT_SHEETS:
+		var cell: int = PORTRAIT_SHEETS[sheet].find(_id)
+		if cell < 0:
+			continue
+		var source := PaintedArt.sprite_source(sheet, cell, 4, 2)
+		if source.has_area():
+			_portrait = sheet
+			_source = source
+		break
 	if shape != "molecule":
 		var tint := ShaderMaterial.new()
 		tint.shader = load("res://assets/shaders/enemy_tint.gdshader")
 		tint.set_shader_parameter("target_hue", color.h)
-		tint.set_shader_parameter("strength", 0.82 if color.s > 0.25 else 0.35)
+		tint.set_shader_parameter("strength", 0.22 if _portrait != "painted-enemies" else (0.82 if color.s > 0.25 else 0.35))
 		material = tint
 	_fx = Control.new()
 	_fx.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -84,22 +101,31 @@ func surge() -> void:
 
 
 func _draw() -> void:
-	var alpha := 1.0 - dying
-	var cells := {"blob":0,"cell":1,"crystal":2,"cloud":3,"spiky":4,"molecule":5}
+	if not _source.has_area():
+		return
+	var pivot := Vector2(size.x * 0.5, size.y)
+	draw_set_transform_matrix(_body_transform())
+	var tint := Color(0.85, 0.86, 0.93).lerp(Color(1.18, 1.10, 1.0), flash * 0.55)
+	tint.a = 1.0 - dying
+	var body := visible_body_rect()
+	body.position -= pivot
+	draw_texture_rect_region(UIKit.art(_portrait), body, _source, tint)
+	draw_set_transform(Vector2.ZERO)
+
+
+func _body_transform() -> Transform2D:
 	var pivot := Vector2(size.x * 0.5, size.y)
 	var motion := _motion()
 	var breathing := 1.0 + sin(_time * float(motion.speed) + _seed) * float(motion.breath)
 	var lean := -0.028 if menace == 2 else 0.0
-	# 蓄力：向后缩、压低；剂量毒性：整体膨胀，越高越抖
 	var swell := 1.0 + _shown_strain * 0.12 + _surge * 0.08
 	var squeeze := 1.0 - _windup * (0.035 + 0.01 * sin(_time * 9.0))
 	var jitter := Vector2(sin(_time * 37.0), cos(_time * 41.0)) * (_shown_strain * 2.4 + _surge * 4.0)
-	draw_set_transform(pivot + jitter + Vector2(_windup * 10.0, 0), lean + _windup * 0.05 + sin(_time*float(motion.sway_speed)+_seed)*float(motion.sway) + sin(_time*54)*flash*0.018,
-		Vector2((breathing+flash*0.045) * swell * (2.0 - squeeze), (1.0-dying*0.3-flash*0.06) * swell * squeeze))
-	var tint := Color(0.85,0.86,0.93).lerp(Color(1.18,1.10,1.0),flash*0.55)
-	tint.a = alpha
-	PaintedArt.sprite(self,"painted-enemies",int(cells.get(shape,0)),Rect2(-pivot,size),tint,true)
-	draw_set_transform(Vector2.ZERO)
+	var angle := lean + _windup * 0.05 + sin(_time * float(motion.sway_speed) + _seed) * float(motion.sway)
+	angle += sin(_time * 54.0) * flash * 0.018
+	var deformation := Vector2((breathing + flash * 0.045) * swell * (2.0 - squeeze),
+		(1.0 - dying * 0.3 - flash * 0.06) * swell * squeeze)
+	return Transform2D(angle, deformation, 0.0, pivot + jitter + Vector2(_windup * 10.0, 0))
 
 
 ## 每种造型自己的待机节奏：团块慢慢涌动、细胞快速搏动、晶体几乎不动、毒云飘摇、通道类有节律地开合
@@ -121,7 +147,10 @@ func _draw_fx() -> void:
 	if _windup > 0.01:
 		Shading.glow(_fx, Vector2(c.x, body.end.y - 6), r * 1.3, Color(1.0, 0.3, 0.2, 0.32 * _windup * alpha))
 	if _id == "dlt" or strain > 0.0:
-		_draw_toxicity(c, r, alpha)
+		var pivot := Vector2(size.x * 0.5, size.y)
+		var chest := body.position + body.size * Vector2(0.69, 0.57)
+		var pose := _body_transform()
+		_draw_toxicity(pose * (chest - pivot), r * 0.47 * pose.x.length(), alpha)
 	if flash > 0:
 		Shading.glow(_fx,_hit_spot,85,Color(UIKit.GOLD,flash*0.65))
 		_fx.draw_arc(_hit_spot,28+flash*14,-1.1,1.2,20,Color(UIKit.PAPER,flash*0.8),2,true)
@@ -132,13 +161,13 @@ func _draw_toxicity(c: Vector2, r: float, alpha: float) -> void:
 	var s := _shown_strain
 	var throb := 0.6 + 0.4 * sin(_time * (2.0 + s * 6.0))
 	var hot := Color(1.0, 0.55, 0.2)
-	var cracks := int(round(2 + s * 10)) + (3 if hp_ratio < 0.5 else 0)
+	var cracks := int(round(2 + s * 7)) + (2 if hp_ratio < 0.5 else 0)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 731
 	for i in 15:
 		var a := rng.randf() * TAU
-		var len := r * rng.randf_range(0.45, 0.9)
-		var pts := PackedVector2Array([c + Vector2.from_angle(a) * r * 0.12])
+		var len := r * rng.randf_range(0.30, 0.66)
+		var pts := PackedVector2Array([c + Vector2.from_angle(a) * r * rng.randf_range(0.14, 0.50)])
 		for k in 4:
 			a += rng.randf_range(-0.45, 0.45)
 			pts.append(pts[pts.size() - 1] + Vector2.from_angle(a) * len / 4.0)
@@ -387,8 +416,7 @@ func _ellipse(center: Vector2, radii: Vector2, col: Color) -> void:
 
 
 func visible_body_rect() -> Rect2:
-	var cells := {"blob":0,"cell":1,"crystal":2,"cloud":3,"spiky":4,"molecule":5}
-	var source: Rect2 = PaintedArt._sprite_regions.get("painted-enemies"+str(cells.get(shape,0)),Rect2(Vector2.ZERO,size))
-	var factor := minf(size.x/maxf(1,source.size.x),size.y/maxf(1,source.size.y))
-	var extent := source.size*factor
+	var source_size := _source.size if _source.has_area() else size
+	var factor := minf(size.x / maxf(1, source_size.x), size.y / maxf(1, source_size.y))
+	var extent := source_size * factor
 	return Rect2(Vector2((size.x-extent.x)*0.5,size.y-extent.y),extent)

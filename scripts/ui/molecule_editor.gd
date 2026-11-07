@@ -206,7 +206,6 @@ func _place(fragment_id: String, chip: Control = null) -> void:
 	var placement := _work.sites.duplicate()
 	placement[site] = fragment_id
 	if _work.apply_layout(placement):
-		GameAudio.sfx("card_play")
 		_view.snap(site, from)
 		# 自动跳到下一个空位点，减少点击
 		for s in Molecule.config().get("sites", []):
@@ -223,6 +222,8 @@ func _snapshot() -> Dictionary:
 
 ## 一次改动之后：属性闪动、结构响应，新组合和新警示各有自己的表现
 func _after_change(before: Dictionary) -> void:
+	if before.sites != _work.sites:
+		GameAudio.sfx("molecule_modify")
 	var props := _work.properties()
 	_prop_delta.clear()
 	for p in Molecule.PROPS:

@@ -443,7 +443,39 @@ static func art_region(card_id: String, cell: int, area: Rect2, texture_size: Ve
 	return {"source": Rect2(Vector2(cell % 3, cell / 3) * cell_size + offset, region_size), "destination": area.abs(), "mirrored": (h / 7) % 2 == 1}
 
 
+const CARD_SHEETS := {
+	"cards-a": [
+		"mol_hit", "mol_target", "mol_analog", "mol_scaffold", "mol_selectivity",
+		"mol_broad", "mol_prodrug", "mol_multivalent", "mol_sar", "mol_covalent",
+		"exp_assay", "exp_tox_screen", "exp_organoid", "exp_controls", "exp_hts",
+		"exp_glp", "exp_biomarker", "exp_counter", "exp_stable_platform", "exp_safety_net",
+		"exp_replicate", "clin_dosing", "clin_protocol", "clin_site", "clin_monitor",
+	],
+	"cards-b": [
+		"clin_combo", "clin_endpoint", "clin_network", "ai_screen", "ai_tox_predict",
+		"ai_design", "ai_governance", "ai_intel", "ai_structure", "ai_generate",
+		"ai_stratify", "ai_agent", "ai_lead_opt", "ai_mlops", "proc_sop",
+		"proc_qbd", "proc_lims", "proc_platform", "proc_formulation", "proc_review",
+		"sig_stacking", "sig_balance", "sig_shield", "noise", "ae_card",
+	],
+}
+
+
 func _draw_art(art: Rect2) -> void:
+	for sheet in CARD_SHEETS:
+		var cell: int = CARD_SHEETS[sheet].find(card.id)
+		if cell < 0:
+			continue
+		var tile := PaintedArt.atlas_region(sheet, cell, 5, 5)
+		if tile.has_area():
+			# The second atlas has uneven painted row boundaries.
+			if sheet == "cards-b":
+				var cuts := [0.0, 209.0, 422.0, 686.0, 913.0, 1122.0]
+				var row := cell / 5
+				tile.position.y = cuts[row]
+				tile.size.y = cuts[row + 1] - cuts[row]
+			if PaintedArt.cover(_art_layer, sheet, art, tile.grow(-7)):
+				return
 	var tex := UIKit.art("painted-cards")
 	if tex == null:
 		return
@@ -468,12 +500,6 @@ func _draw_fragment_portrait(art: Rect2) -> void:
 	var bounds := MoleculeSpecimen.bounds(frag_id, c, unit)
 	unit *= minf(art.size.y * 0.78 / maxf(bounds.size.y, 1.0), art.size.x * 0.6 / maxf(bounds.size.x, 1.0))
 	MoleculeSpecimen.draw_fragment(_art_layer, frag_id, c, unit)
-	if card.id == "exp_counter":
-		var a := art.position + art.size * Vector2(0.28, 0.68)
-		var b := art.position + art.size * Vector2(0.78, 0.28)
-		_art_layer.draw_line(a, b, Color(0.04, 0.08, 0.12, 0.9), 7.0, true)
-		_art_layer.draw_line(a, b, UIKit.DANGER.lightened(0.3), 3.0, true)
-		_art_layer.draw_colored_polygon(PackedVector2Array([b + Vector2(5, -2), b + Vector2(-9, -2), b + Vector2(-2, 9)]), UIKit.DANGER.lightened(0.3))
 
 
 ## 插画嵌在卡面里，不是贴在上面

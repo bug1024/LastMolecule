@@ -1,8 +1,6 @@
 class_name MapCanvas
 extends Control
-## 分层分支地图画布（纯 UI）：研发路线从左往右推进，每一列是一层，节点是六边形徽章（MapNode）。
-## 背景是按阶段着色的淡六边形网格；已走过的路线是绿色粗线，从当前位置出发可走的路线是流动的金色虚线，
-## 其余为淡线；当前位置头顶有一个小烧瓶标记。
+## 路网仍按研发层推进。不同阶段有自己的地貌和路线起伏。
 
 signal node_pressed(index: int)
 
@@ -19,7 +17,14 @@ const NODE_META := {
 }
 
 var rest_heal := 25   # 平台建设「安全评估」能回多少血（由地图界面按项目类型设置，显示在节点提示里）
-var tint := Color(0.35, 0.28, 0.6)   # 阶段色（背景网格与光晕）
+var stage_index := 0
+const TERRAIN_PROFILES := [
+	[0.2, 0.5, -0.35, -0.8, -0.1, 0.4],
+	[0.5, -0.3, 0.1, -0.55, 0.2, -0.6],
+	[-0.4, -0.55, -0.2, 0.55, 0.45, 0.2],
+	[0.35, -0.15, 0.45, 0.25, -0.4, -0.7],
+	[0.45, 0.6, -0.4, -0.45, 0.35, -0.4],
+]
 var _layers: Array = []
 var _path: Array = []
 var _choices: Array = []
@@ -66,20 +71,27 @@ func _build_node(node: Dictionary, layer: int, index: int) -> MapNode:
 	return view
 
 
-## 按当前尺寸排布：列均分宽度，每列节点在高度上均分
+## 节点沿地貌起伏，同时保持同一层的目标间距。
 func _place() -> void:
 	var cols := _layers.size()
 	if cols == 0:
 		return
-	var w := maxf(size.x, 600.0)
+	var w := size.x
 	var h := maxf(size.y, 420.0)
+	var profile: Array = TERRAIN_PROFILES[clampi(stage_index, 0, TERRAIN_PROFILES.size() - 1)]
 	for i in cols:
 		var nodes: Array = _nodes[i]
-		var x := w * (i + 0.5) / cols
+		var travel := float(i) / maxf(1, cols - 1)
+		var x := lerpf(60.0, w - 74.0, travel)
+		var elevation := float(profile[roundi(travel * (profile.size() - 1))])
+		var spacing := minf(108.0, (h - 112.0) / maxf(1, nodes.size() - 1))
 		for j in nodes.size():
 			var view: MapNode = nodes[j]
-			var y := h * (j + 0.5) / nodes.size()
-			view.position = Vector2(x - view.size.x * 0.5, y - view.radius() - 4)
+			var lane := j - (nodes.size() - 1) * 0.5
+			var y := h * 0.49 + lane * spacing + elevation * (55.0 if nodes.size() < 3 else 18.0)
+			var stagger := clampf(lane * 9.0 * (-1.0 if i % 2 else 1.0), -16.0, 16.0)
+			view.position.x = x + stagger - view.size.x * 0.5
+			view.position.y = y - view.radius() - 4
 	queue_redraw()
 
 
@@ -90,7 +102,7 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
-	_draw_grid()
+	_draw_landscape()
 	if _nodes.is_empty():
 		return
 	for i in _layers.size() - 1:
@@ -107,7 +119,7 @@ func _draw() -> void:
 				elif open:
 					_curve(from, to, UIKit.GOLD, 3.0, true)
 				else:
-					_curve(from, to, Color(0.55, 0.62, 0.72, 0.28), 2.0, false)
+					_curve(from, to, Color(0.68, 0.73, 0.73, 0.4), 1.8, false)
 	# 当前位置：头顶的小烧瓶
 	if not _path.is_empty():
 		var current: MapNode = _nodes[_path.size() - 1][int(_path.back())]
@@ -128,6 +140,7 @@ func _curve(from: Vector2, to: Vector2, color: Color, width: float, dashed: bool
 		var t := k / 24.0
 		var u := 1.0 - t
 		pts.append(from * u * u * u + c1 * 3 * u * u * t + c2 * 3 * u * t * t + to * t * t * t)
+	draw_polyline(pts, Color(0.045, 0.06, 0.10, 0.62), width + 4, true)
 	if not dashed:
 		draw_polyline(pts, color, width, true)
 		return
@@ -136,11 +149,14 @@ func _curve(from: Vector2, to: Vector2, color: Color, width: float, dashed: bool
 		draw_line(pts[k], pts[mini(k + 2, pts.size() - 1)], color, width, true)
 
 
-## 背景：淡淡的六边形网格，按阶段着色
-func _draw_grid() -> void:
+func _draw_landscape() -> void:
 	var area := Rect2(Vector2.ZERO, size)
-	PaintedArt.world(self, area, 0.78)
-	UIKit.inset(self, area, 12.0)   # 地图是嵌进面板的一扇窗，不是盖在面板上的方块
+	PaintedArt.stage_world(self, area, stage_index, 0.36)
+	UIKit.inset(self, area, 12.0)
+	var key := "map.biome.%d" % stage_index
+	var font := get_theme_default_font()
+	draw_string_outline(font, Vector2(18, 26), tr(key), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, 5, Color(0.04, 0.05, 0.08))
+	draw_string(font, Vector2(18, 26), tr(key), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, UIKit.PAPER)
 
 
 func _notification(what: int) -> void:

@@ -7,8 +7,10 @@ extends Node
 
 const MUSIC_DIR := "res://assets/audio/music/"
 const SFX_DIR := "res://assets/audio/sfx/"
-const LOOPS := ["title", "lab", "battle"]
-const LAYERED := ["battle", "boss"]   # 有动态层的曲子：<曲名>_drive / <曲名>_danger，与主曲同长同步循环
+const STAGE_TRACKS := ["", "preclinical", "phase1", "phase2", "phase3"]
+const DRIVE_DB := -12.0
+const DANGER_DB := -9.0
+const BATTLE_DB := -5.0
 const SILENT_DB := -60.0
 const FADE := 0.8
 const SFX_VOICES := 8
@@ -19,6 +21,11 @@ var _sting: AudioStreamPlayer
 var _sfx_players: Array[AudioStreamPlayer] = []
 var _sfx_next := 0
 var _current := ""
+var _active_music: AudioStreamPlayer
+var _music_tweens := {}
+var _base_gain_db := 0.0
+var _duck_db := 0.0
+var _duck_tween: Tween
 var _cache := {}
 var _last_hover_ms := 0
 var _drive: AudioStreamPlayer
@@ -33,6 +40,20 @@ static func music(track: String) -> void:
 	var node := _instance()
 	if node:
 		node.play_music(track)
+
+
+static func battle_theme(stage: int, boss: bool, final_boss: bool) -> void:
+	var node := _instance()
+	if node == null:
+		return
+	var theme := String(STAGE_TRACKS[stage]) if stage >= 0 and stage < STAGE_TRACKS.size() else ""
+	var track := "boss" if boss else "battle"
+	if final_boss:
+		node.play_music("boss_final", "", BATTLE_DB)
+	elif theme.is_empty():
+		node.play_music(track, track, BATTLE_DB)
+	else:
+		node.play_music(theme + ("_boss" if boss else ""), theme, BATTLE_DB)
 
 
 ## 播放一段不循环的短乐句（胜负、结局），期间背景乐压低
@@ -107,32 +128,35 @@ func _load(path: String, loop: bool) -> AudioStream:
 	return stream
 
 
-func play_music(track: String) -> void:
+func play_music(track: String, layer_theme := "", gain_db := 0.0) -> void:
 	if track == _current:
 		return
 	_current = track
+	_base_gain_db = gain_db
 	var stream := _load(MUSIC_DIR + track + ".ogg", true) if not track.is_empty() else null
-	var outgoing := _music_a if _music_a.playing else _music_b
+	var outgoing := _active_music
 	var incoming := _music_b if outgoing == _music_a else _music_a
 	_fade_out(outgoing)
-	if stream == null:
-		return
-	incoming.stream = stream
-	incoming.volume_db = -40.0
-	incoming.play()
-	var tween := create_tween()
-	tween.tween_property(incoming, "volume_db", 0.0, FADE)
-	_start_layers(track)
+	_active_music = incoming if stream != null else null
+	if stream != null:
+		_cancel_music_tween(incoming)
+		incoming.stream = stream
+		incoming.volume_db = -40.0
+		incoming.play()
+		_fade_music(incoming, gain_db + _duck_db, FADE)
+	_start_layers(layer_theme if stream != null else "")
 
 
-## 动态层和主曲同一帧从头起播，长度相同，循环点一致
-func _start_layers(track: String) -> void:
+## 主曲与两层在同一帧起播。Boss 编曲与普通战斗共用同调同拍的阶段分轨。
+func _start_layers(theme: String) -> void:
 	_want_drive = 0.0
 	_want_danger = 0.0
+	_level_drive = 0.0
+	_level_danger = 0.0
 	for pair in [[_drive, "_drive"], [_danger, "_danger"]]:
 		var player: AudioStreamPlayer = pair[0]
 		player.stop()
-		var layer := _load(MUSIC_DIR + track + String(pair[1]) + ".ogg", true) if LAYERED.has(track) else null
+		var layer := _load(MUSIC_DIR + theme + String(pair[1]) + ".ogg", true) if not theme.is_empty() else null
 		player.stream = layer
 		if layer != null:
 			player.volume_db = SILENT_DB
@@ -142,35 +166,53 @@ func _start_layers(track: String) -> void:
 func _process(delta: float) -> void:
 	if _drive == null:
 		return
-	# 进来快、退得慢：紧张感涌上来要及时，消退要留余韵
+	# 进来快、退得慢。独立的音量上限给主旋律和出牌反馈留出空间。
 	_level_drive = move_toward(_level_drive, _want_drive, delta * (0.8 if _want_drive > _level_drive else 0.25))
 	_level_danger = move_toward(_level_danger, _want_danger, delta * (0.9 if _want_danger > _level_danger else 0.3))
 	if _drive.playing:
-		_drive.volume_db = linear_to_db(maxf(_level_drive, 0.001))
+		_drive.volume_db = DRIVE_DB + _duck_db + linear_to_db(maxf(_level_drive, 0.001))
 	if _danger.playing:
-		_danger.volume_db = linear_to_db(maxf(_level_danger, 0.001))
+		_danger.volume_db = DANGER_DB + _duck_db + linear_to_db(maxf(_level_danger, 0.001))
+	if _active_music != null and not _music_tweens.has(_active_music):
+		_active_music.volume_db = _base_gain_db + _duck_db
 
 
 func play_sting(track: String) -> void:
 	var stream := _load(MUSIC_DIR + track + ".ogg", false)
 	if stream == null:
 		return
-	for player in [_music_a, _music_b]:
-		if player.playing:
-			var tween := create_tween()
-			tween.tween_property(player, "volume_db", -18.0, 0.3)
-			tween.tween_interval(maxf(stream.get_length() - 1.0, 0.5))
-			tween.tween_property(player, "volume_db", 0.0, 1.2)
+	if _duck_tween != null:
+		_duck_tween.kill()
+	if _active_music != null:
+		_cancel_music_tween(_active_music)
+	_duck_tween = create_tween()
+	_duck_tween.tween_property(self, "_duck_db", -18.0, 0.3)
+	_duck_tween.tween_interval(maxf(stream.get_length() - 1.0, 0.5))
+	_duck_tween.tween_property(self, "_duck_db", 0.0, 1.2)
 	_sting.stream = stream
 	_sting.play()
 
 
-func _fade_out(player: AudioStreamPlayer) -> void:
-	if not player.playing:
-		return
+func _cancel_music_tween(player: AudioStreamPlayer) -> void:
+	if _music_tweens.has(player):
+		(_music_tweens[player] as Tween).kill()
+		_music_tweens.erase(player)
+
+
+func _fade_music(player: AudioStreamPlayer, db: float, duration: float, stop := false) -> void:
+	_cancel_music_tween(player)
 	var tween := create_tween()
-	tween.tween_property(player, "volume_db", -40.0, FADE)
-	tween.tween_callback(player.stop)
+	_music_tweens[player] = tween
+	tween.tween_property(player, "volume_db", db, duration)
+	tween.tween_callback(func() -> void:
+		if stop:
+			player.stop()
+		_music_tweens.erase(player))
+
+
+func _fade_out(player: AudioStreamPlayer) -> void:
+	if player != null and player.playing:
+		_fade_music(player, -40.0, FADE, true)
 
 
 func play_sfx(id: String) -> void:

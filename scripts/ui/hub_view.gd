@@ -37,6 +37,12 @@ var _cards: VBoxContainer
 var _bench_panel: Control
 var _tint := Color(0.35, 0.28, 0.6)
 var _time := 0.0
+var _stage_index := 0
+var _growth := 0.0
+var _target_growth := 0.0
+var _scan := 0.0
+var _project_code := ""
+var _observed_sites := {}
 
 const BENCH_FROM_BOTTOM := 176.0
 const STATUS_W := 330.0
@@ -218,8 +224,20 @@ func refresh(game, competition_summary: String, competition_text: String) -> voi
 	stage_label.text = tr("stage." + state.stage)
 	_tint = BattleView.STAGE_TINT.get(state.stage, Color(0.2, 0.5, 0.5))
 	var stages: Array = game.get_stages()
-	molecule_art.stage_index = maxi(stages.find(state.stage), 0)
+	var new_stage := maxi(stages.find(state.stage), 0)
+	var same_project: bool = _project_code == game.project_code
 	var mol: Molecule = game.molecule
+	var sites: Dictionary = mol.sites if mol != null else {}
+	_target_growth = clampf((new_stage + minf(1.0, float(state.research_progress) / maxf(1, game.get_progress_gate()))) / 5.0, 0.0, 1.0)
+	if not same_project:
+		_growth = _target_growth
+		_scan = 0.0
+	elif new_stage != _stage_index or sites != _observed_sites:
+		_scan = 1.0
+	_stage_index = new_stage
+	_project_code = game.project_code
+	_observed_sites = sites.duplicate()
+	molecule_art.stage_index = _stage_index
 	molecule_art.visible = mol == null
 	mol_view.visible = mol != null
 	_mol_line.visible = mol != null
@@ -294,25 +312,46 @@ func refresh(game, competition_summary: String, competition_text: String) -> voi
 func _process(delta: float) -> void:
 	if is_visible_in_tree():
 		_time += delta
+		_growth = move_toward(_growth, _target_growth, delta * 0.45)
+		_scan = maxf(0.0, _scan - delta * 0.7)
+		var base_unit := minf(mol_view.size.x / 8.0, mol_view.size.y / 4.9)
+		mol_view.unit = base_unit * lerpf(0.78, 1.04, _growth)
 		queue_redraw()
 
 
 func _draw() -> void:
 	if mol_view == null or not mol_view.visible:
 		return
+	# 观察室视窗随研发阶段打开不同环境，结构始终取自玩家当前分子。
+	var viewport_rect := Rect2(Vector2(STATUS_W + 24, 77),
+		Vector2(size.x - STATUS_W - CARDS_W - 48, size.y - BENCH_FROM_BOTTOM - 82))
+	if viewport_rect.has_area():
+		PaintedArt.stage_world(self, viewport_rect, _stage_index, 0.48)
+		UIKit.inset(self, viewport_rect, 16.0)
 	var bounds := mol_view.visual_bounds()
 	var center := mol_view.position + bounds.get_center()
 	var foot := Vector2(center.x, mol_view.position.y + bounds.end.y + 16.0)
 	var radius := bounds.size.x * 0.56
 	var light := _tint.lightened(0.35)
-	# 背后的观测环：缓慢转动的刻度，只有这一处在动
-	draw_circle(center, radius * 0.86, Color(0.02, 0.03, 0.06, 0.45))
-	draw_arc(center, radius * 0.86, 0, TAU, 96, Color(light, 0.3), 1.5, true)
-	draw_arc(center, radius * 0.72, 0, TAU, 96, Color(light, 0.12), 1.0, true)
+	# 用压扁的环贴合视窗和观察台，刻度不会穿过标题或台面文字。
+	var ring_height := minf(0.66, viewport_rect.size.y * 0.39 / maxf(1.0, radius * 1.08))
+	draw_set_transform(center, 0.0, Vector2(1.0, ring_height))
+	draw_circle(Vector2.ZERO, radius * 0.86, Color(0.02, 0.03, 0.06, 0.40))
+	draw_arc(Vector2.ZERO, radius * 0.86, 0, TAU, 96, Color(light, 0.35), 1.5, true)
+	draw_arc(Vector2.ZERO, radius * 0.72, 0, TAU, 96, Color(light, 0.17), 1.0, true)
+	for ring in _stage_index:
+		var start := -PI * 0.9 + ring * 0.18
+		draw_arc(Vector2.ZERO, radius * (0.91 + ring * 0.042), start, start + PI * 1.24,
+			48, Color(light, 0.46 - ring * 0.045), 2.0, true)
 	for i in 48:
 		var a := i * TAU / 48.0 + _time * 0.04
 		var inner := radius * (0.81 if i % 4 == 0 else 0.84)
-		draw_line(center + Vector2.from_angle(a) * inner, center + Vector2.from_angle(a) * radius * 0.86, Color(light, 0.34), 1.0, true)
+		draw_line(Vector2.from_angle(a) * inner, Vector2.from_angle(a) * radius * 0.86, Color(light, 0.38), 1.0, true)
+	draw_set_transform(Vector2.ZERO)
+	if _scan > 0.0:
+		var y := center.y + lerpf(-radius * 0.72, radius * 0.72, 1.0 - _scan) * ring_height
+		draw_line(Vector2(center.x - radius * 0.84, y), Vector2(center.x + radius * 0.84, y),
+			Color(UIKit.PAPER, sin(_scan * PI) * 0.7), 2.0, true)
 	# 光柱从观察台升起，把分子托在里面
 	var top_y := foot.y - radius * 1.35
 	var beam := PackedVector2Array([Vector2(foot.x - radius * 0.72, foot.y), Vector2(foot.x + radius * 0.72, foot.y),

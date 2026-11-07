@@ -17,19 +17,37 @@ var _event_id: String = ""
 const EVENT_ICONS := {"research": "node_research", "partner": "node_partner", "platform": "node_platform",
 	"fast_track": "node_fast_track", "milestone": "node_milestone", "final_review": "outcome_approved", "route": "logo"}
 
-var _header_icon: TextureRect = null
+const EVENT_SCENES := {
+	"data_quality": 0, "unexpected_signal": 0, "tox_result": 0,
+	"biomarker_found": 1, "research": 1, "conference": 1, "platform": 1,
+	"funding_strain": 2, "partner": 2, "partnership": 2, "talent_bid": 2,
+	"regulatory_hint": 3, "final_review": 3, "fast_track": 3,
+}
+const SCENE_INKS := [Color("f0947f"), Color("92d7b9"), Color("edc280"), Color("c5b1e9")]
+
+var _header_icon: TextureRect
+var _scene_header: HBoxContainer
+var _scene_text: VBoxContainer
+var _scene_picture: Control
+var _scene_index := -1
 
 
 func show_event(event: Dictionary, is_gate: bool, state: ProjectState) -> void:
 	_event_id = String(event.get("id", ""))
 	_ensure_header_icon()
+	_layout_header()
 	_header_icon.texture = UIKit.icon(String(EVENT_ICONS.get(_event_id, "node_event")))
 	_header_icon.modulate = Color(0.45, 0.85, 0.95) if is_gate else Color(0.95, 0.72, 0.30)
 	_title.text = tr(String(event.get("title_key", "event.default_title")))
-	_tag.text = tr(String(event.get("tag_key", "ui.gate_tag" if is_gate else "ui.event_tag")))
-	_tag.add_theme_color_override("font_color", Color(0.45, 0.85, 0.95) if is_gate else Color(0.95, 0.72, 0.30))
+	var tag_key := "ui.gate_tag" if is_gate else "ui.event_tag"
+	if _scene_index >= 0 and not is_gate:
+		tag_key = "event.scene.%d" % _scene_index
+	_tag.text = tr(String(event.get("tag_key", tag_key)))
+	var accent: Color = SCENE_INKS[_scene_index] if _scene_index >= 0 else _header_icon.modulate
+	_tag.add_theme_color_override("font_color", accent)
 	_desc.text = _format(String(event.get("desc_key", "")), event.get("desc_args", []))
 	for child in _choices_box.get_children():
+		_choices_box.remove_child(child)
 		child.queue_free()
 	var choices: Array = event.get("choices", [])
 	for i in choices.size():
@@ -52,6 +70,57 @@ func _ensure_header_icon() -> void:
 	_desc.custom_minimum_size = Vector2(0, 0)
 	_choices_box.add_theme_constant_override("separation", 8)
 	(_tag.get_parent() as VBoxContainer).add_theme_constant_override("separation", 8)
+
+
+func _layout_header() -> void:
+	var column := _choices_box.get_parent() as VBoxContainer
+	if _scene_header == null:
+		_scene_header = HBoxContainer.new()
+		_scene_header.add_theme_constant_override("separation", 18)
+		column.add_child(_scene_header)
+		column.move_child(_scene_header, 0)
+		_scene_picture = Control.new()
+		_scene_picture.custom_minimum_size = Vector2(230, 144)
+		_scene_picture.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		_scene_picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_scene_picture.draw.connect(_draw_scene)
+		_scene_header.add_child(_scene_picture)
+		_scene_text = VBoxContainer.new()
+		_scene_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_scene_text.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		_scene_text.add_theme_constant_override("separation", 5)
+		_scene_header.add_child(_scene_text)
+	var cell := int(EVENT_SCENES.get(_event_id, -1))
+	_scene_index = cell if UIKit.art("event-scenes") != null else -1
+	var illustrated := _scene_index >= 0
+	var alignment := HORIZONTAL_ALIGNMENT_LEFT if illustrated else HORIZONTAL_ALIGNMENT_CENTER
+	var target := _scene_text if illustrated else column
+	for label in [_tag, _title, _desc]:
+		if label.get_parent() != target:
+			label.reparent(target, false)
+		label.horizontal_alignment = alignment
+	if not illustrated:
+		column.move_child(_header_icon, 1)
+		column.move_child(_tag, 2)
+		column.move_child(_title, 3)
+		column.move_child(_desc, 5)
+	_header_icon.visible = not illustrated
+	_scene_header.visible = illustrated
+	(column.get_node("HSep") as Control).visible = not illustrated
+	($Center/Panel as Control).custom_minimum_size.x = 756 if illustrated else 640
+	_desc.custom_minimum_size.y = 0 if illustrated else 54
+	_scene_picture.queue_redraw()
+
+
+func _draw_scene() -> void:
+	if _scene_index < 0:
+		return
+	var area := Rect2(Vector2.ZERO, _scene_picture.size)
+	PaintedArt.cover(_scene_picture, "event-scenes", area,
+		PaintedArt.atlas_region("event-scenes", _scene_index, 2, 2).grow(-2))
+	UIKit.inset(_scene_picture, area, 9.0)
+	_scene_picture.draw_line(area.end - Vector2(area.size.x, 1), area.end - Vector2(0, 1),
+		SCENE_INKS[_scene_index], 2.0, true)
 
 
 func _format(key: String, args: Array) -> String:
@@ -184,7 +253,14 @@ func _chip(text: String, color: Color) -> Control:
 	return pill
 
 
-func _card_style(accent: Color, hover: bool, enabled: bool) -> PaintedStyle:
+func _card_style(accent: Color, hover: bool, enabled: bool) -> StyleBox:
+	if _scene_index >= 0:
+		var row := StyleBoxFlat.new()
+		row.bg_color = Color("181e2b").lerp(accent, 0.13 if hover else 0.04)
+		row.border_color = Color(accent, 0.85 if hover else 0.55)
+		row.border_width_left = 3
+		row.set_content_margin_all(5)
+		return row
 	var sb := UIKit.panel_style(Color(0.07, 0.09, 0.13, 0.95) if not hover else accent.lerp(Color(0.07, 0.09, 0.13), 0.82),
 		Color(accent, 0.9 if hover else (0.45 if enabled else 0.2)), 12)
 	sb.set_border_width_all(2 if hover else 1)
@@ -225,7 +301,7 @@ func _choice_color(choice: Dictionary) -> Color:
 	var fx: Dictionary = choice.get("effects", {})
 	if fx.is_empty() and String(choice.get("action", "")).is_empty():
 		return Color(0.55, 0.62, 0.72)
-	return UIKit.ACCENT_BLUE
+	return SCENE_INKS[_scene_index] if _scene_index >= 0 else UIKit.ACCENT_BLUE
 
 
 func _requires_text(requires: Dictionary) -> String:

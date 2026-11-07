@@ -18,16 +18,15 @@ var creature: CreatureView
 var bar: HealthBar
 var statuses: StatusRow
 var targetable := false
-var danger := false           # 本回合伤害很高：意图数字放大并闪烁
+var danger := false           # 本回合伤害很高：意图底板强调，生物蓄力
 const DANGER_DAMAGE := 15
-var _intent_box: HBoxContainer
+var _intent_box: PanelContainer
 var _intent_icons: HBoxContainer
 var _name: Label
-var _time := 0.0
 var _hover := false
 var _base_radius := 80.0
 var _boss := false
-var _intent_y := 4.0
+var _intent_width := 240.0
 
 
 func setup(enemy: Enemy, enemy_index: int) -> void:
@@ -35,15 +34,13 @@ func setup(enemy: Enemy, enemy_index: int) -> void:
 	custom_minimum_size = SIZE
 	size = SIZE
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	_intent_box = HBoxContainer.new()
-	_intent_box.alignment = BoxContainer.ALIGNMENT_CENTER
-	_intent_box.position = Vector2(25, 4)
-	_intent_box.size = Vector2(200, 40)
+	_intent_box = PanelContainer.new()
 	_intent_box.mouse_filter = Control.MOUSE_FILTER_STOP
+	_intent_box.add_theme_stylebox_override("panel", _intent_style(false))
 	_intent_icons = HBoxContainer.new()
 	_intent_icons.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_intent_box.add_child(_intent_icons)
-	_intent_icons.add_theme_constant_override("separation", 12)
+	_intent_icons.add_theme_constant_override("separation", 8)
 	add_child(_intent_box)
 	creature = CreatureView.new()
 	creature.setup(enemy.data, enemy.is_boss, enemy.is_elite)
@@ -98,6 +95,7 @@ func show_intent(enemy: Enemy, damage: int, exploit := {}) -> void:
 	var kind := String(move.get("intent", "attack"))
 	var hits := enemy.intent_hits()
 	danger = damage * hits >= DANGER_DAMAGE
+	_intent_box.add_theme_stylebox_override("panel", _intent_style(danger))
 	if kind.split("_").has("attack"):
 		_add_intent("intent_attack", str(damage) if hits == 1 else "%d×%d" % [damage, hits], INTENT_COLOR.attack)
 	for field in ["block", "ally_block"]:
@@ -115,18 +113,35 @@ func show_intent(enemy: Enemy, damage: int, exploit := {}) -> void:
 	# 这一击会专攻分子的哪个片段：提前一回合写出来，玩家可以先打出相关牌或准备修复
 	var names := str(exploit.get("names", ""))   # 已翻译、用顿号连接的片段名
 	if int(exploit.get("bonus", 0)) > 0 and kind.split("_").has("attack") and not names.is_empty():
-		var first := names.split("、")[0]
-		_add_intent("type_molecular", "→" + first + ("…" if names.contains("、") else ""), Color(1.0, 0.55, 0.45))
+		_add_intent("type_molecular", "", Color(1.0, 0.55, 0.45))
 		_intent_box.tooltip_text += "\n" + tr("intent.tip.exploit") % names
+	_intent_box.reset_size()
+
+
+func _intent_style(high_risk: bool) -> StyleBoxFlat:
+	var background := Color("2d151c") if high_risk else Color("121928")
+	var edge := Color("d97063") if high_risk else Color("556077")
+	var style := StyleBoxFlat.new()
+	style.bg_color = background
+	style.border_color = edge
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(5)
+	style.content_margin_left = 7
+	style.content_margin_right = 7
+	style.content_margin_top = 3
+	style.content_margin_bottom = 3
+	style.shadow_color = Color(0, 0, 0, 0.52)
+	style.shadow_size = 4
+	return style
 
 
 func _add_intent(icon_name: String, amount: String, color: Color) -> void:
 	var item := HBoxContainer.new()
 	item.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	item.add_theme_constant_override("separation", 3)
-	item.add_child(UIKit.icon_rect(icon_name, 26, color))
+	item.add_child(UIKit.icon_rect(icon_name, 20, color))
 	if not amount.is_empty():
-		var number := UIKit.label(amount, color.lightened(0.25), 26)
+		var number := UIKit.label(amount, UIKit.PAPER.lightened(0.55), 24)
 		number.theme_type_variation = &"NumberLabel"
 		number.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		number.add_theme_constant_override("outline_size", 3)
@@ -161,15 +176,15 @@ func refresh(enemy: Enemy) -> void:
 	statuses.set_statuses(enemy.statuses)
 
 
-func _process(delta: float) -> void:
-	_time += delta
+func _process(_delta: float) -> void:
 	if _intent_box and _intent_box.visible:
-		# 毒性 Boss 鼓胀时意图跟着上移，但不超出顶栏下沿
-		var lift := creature.size.y * creature.strain * 0.14 if creature else 0.0
-		_intent_box.position.y = maxf(_intent_y - lift, 58.0 - position.y)
-		var s := 1.0 + (0.025 * absf(sin(_time * 6.0)) if danger else 0.0)
-		_intent_box.pivot_offset = _intent_box.size * 0.5
-		_intent_box.scale = Vector2(s, s)
+		var body := creature.visible_body_rect()
+		# 预留鼓胀、摇摆的空间，底板与身体各自保持稳定。
+		var top := creature.position.y + body.position.y - body.size.y * creature.strain * 0.20
+		var scale_factor := minf(1.0, _intent_width / maxf(1.0, _intent_box.size.x))
+		_intent_box.scale = Vector2.ONE * scale_factor
+		var extent := _intent_box.size * scale_factor
+		_intent_box.position = Vector2((SIZE.x - extent.x) * 0.5, maxf(top - extent.y - 8, 55.0 - position.y))
 	if creature:
 		creature.windup = danger and _intent_box != null and _intent_box.visible
 	queue_redraw()
@@ -193,7 +208,7 @@ func set_stage_pose(body_size: Vector2, meta_width: float) -> void:
 	bar.position = Vector2((SIZE.x - meta_width) * 0.5, 42)
 	bar.size = Vector2(meta_width, 24)
 	statuses.position = Vector2((SIZE.x - meta_width) * 0.5 + 8, 67)
-	_intent_y = -body_size.y - 31
+	_intent_width = meta_width
 
 
 ## 登场演出时先藏起名字、血条和意图，只留下身体
