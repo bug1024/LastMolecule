@@ -316,7 +316,15 @@ func _role_color() -> Color:
 
 
 func _type_color() -> Color:
-	return TYPE_COLOR.get(card.type, Color(0.6, 0.6, 0.6)) if card else Color.GRAY
+	if card == null:
+		return Color.GRAY
+	# 片段牌用它在分子上那个片段的颜色，特性卡用金色：整手分子牌不再是一片紫
+	if card.id.begins_with("frag_"):
+		var frag := Molecule.fragment(card.id.trim_prefix("frag_"))
+		return Color.from_string(String(frag.get("color", "#9fb4c8")), Color(0.6, 0.7, 0.8))
+	if card.id.begins_with("sig_"):
+		return UIKit.GOLD
+	return TYPE_COLOR.get(card.type, Color(0.6, 0.6, 0.6))
 
 
 func _process(delta: float) -> void:
@@ -444,6 +452,22 @@ func _draw_art(art: Rect2) -> void:
 		_art_layer.draw_set_transform(Vector2(art.position.x * 2 + art.size.x, 0), 0, Vector2(-1, 1))
 	_art_layer.draw_texture_rect_region(tex, geometry.destination, geometry.source)
 	_art_layer.draw_set_transform(Vector2.ZERO)
+	if card.id.begins_with("frag_"):
+		_draw_fragment_portrait(art)
+
+
+## 片段牌的插画：在压暗的背景上托出这个片段本身的结构，带一圈它自己颜色的光
+func _draw_fragment_portrait(art: Rect2) -> void:
+	var frag_id := card.id.trim_prefix("frag_")
+	var col := _type_color()
+	_art_layer.draw_rect(art, Color(0.03, 0.04, 0.08, 0.55))
+	var c := art.get_center() + Vector2(0, -art.size.y * 0.06)
+	Shading.glow(_art_layer, c, art.size.y * 0.75, Color(col, 0.7))
+	# 片段图的尺寸按分子骨架单位给；放大到占满插画的大半高度
+	var unit := art.size.y * 0.42
+	var bounds := MoleculeSpecimen.bounds(frag_id, c, unit)
+	unit *= minf(art.size.y * 0.78 / maxf(bounds.size.y, 1.0), art.size.x * 0.6 / maxf(bounds.size.x, 1.0))
+	MoleculeSpecimen.draw_fragment(_art_layer, frag_id, c, unit)
 	if card.id == "exp_counter":
 		var a := art.position + art.size * Vector2(0.28, 0.68)
 		var b := art.position + art.size * Vector2(0.78, 0.28)
