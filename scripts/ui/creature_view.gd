@@ -21,6 +21,13 @@ var hp_ratio := 1.0                 # 当前生命比例（molecule 形态用来
 var _mol_atoms: Array[Vector2] = []  # molecule 形态：单位半径内的原子坐标（外圈在后）
 var _mol_bonds: Array[Vector2i] = []
 var _mol_colors: Array[int] = []
+var strain := 0.0        # 剂量限制性毒性：剂量 / 最高剂量。身体随之膨胀、开裂、发烫
+var windup := false      # 下一招很痛：身体后缩蓄力，底下透出危险光
+var _surge := 0.0        # 剂量刚提高：一次猛烈的膨胀
+var _shown_strain := 0.0
+var _windup := 0.0
+var _id := ""
+var _fx: Control         # 不受身份色着色的效果层（受击光、裂纹、毒滴）
 
 
 func setup(def: Dictionary, boss := false, elite := false) -> void:
@@ -29,6 +36,18 @@ func setup(def: Dictionary, boss := false, elite := false) -> void:
 	radius = 58.0 * float(def.get("size", 1.0))
 	menace = 2 if boss else (1 if elite else 0)
 	_seed = float(hash(String(def.get("id", ""))) % 1000) / 100.0
+	_id = String(def.get("id", ""))
+	if shape != "molecule":
+		var tint := ShaderMaterial.new()
+		tint.shader = load("res://assets/shaders/enemy_tint.gdshader")
+		tint.set_shader_parameter("target_hue", color.h)
+		tint.set_shader_parameter("strength", 0.82 if color.s > 0.25 else 0.35)
+		material = tint
+	_fx = Control.new()
+	_fx.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_fx.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_fx.draw.connect(_draw_fx)
+	add_child(_fx)
 	custom_minimum_size = Vector2(radius * 2.8, radius * 2.6)
 	if shape == "molecule":
 		_build_molecule()
@@ -49,23 +68,98 @@ func _process(delta: float) -> void:
 		_blink = 1.0
 		_next_blink = randf_range(2.0, 4.5)
 	_blink = maxf(0.0, _blink - delta * 7.0)
+	_surge = maxf(0.0, _surge - delta * 1.6)
+	_shown_strain = move_toward(_shown_strain, strain, delta * 0.8)
+	_windup = move_toward(_windup, 1.0 if windup else 0.0, delta * 2.5)
+	if material is ShaderMaterial:
+		(material as ShaderMaterial).set_shader_parameter("heat", clampf(_shown_strain * 0.45 + _surge * 0.5, 0.0, 1.0))
 	queue_redraw()
+	if _fx:
+		_fx.queue_redraw()
+
+
+## 剂量提高：猛地鼓胀一下，裂纹随之扩张
+func surge() -> void:
+	_surge = 1.0
 
 
 func _draw() -> void:
 	var alpha := 1.0 - dying
 	var cells := {"blob":0,"cell":1,"crystal":2,"cloud":3,"spiky":4,"molecule":5}
 	var pivot := Vector2(size.x * 0.5, size.y)
-	var breathing := 1.0 + sin(_time * 1.6 + _seed) * 0.008
+	var motion := _motion()
+	var breathing := 1.0 + sin(_time * float(motion.speed) + _seed) * float(motion.breath)
 	var lean := -0.028 if menace == 2 else 0.0
-	draw_set_transform(pivot,lean+sin(_time*1.2+_seed)*0.012+sin(_time*54)*flash*0.018,Vector2(breathing+flash*0.045,1.0-dying*0.3-flash*0.06))
+	# 蓄力：向后缩、压低；剂量毒性：整体膨胀，越高越抖
+	var swell := 1.0 + _shown_strain * 0.12 + _surge * 0.08
+	var squeeze := 1.0 - _windup * (0.035 + 0.01 * sin(_time * 9.0))
+	var jitter := Vector2(sin(_time * 37.0), cos(_time * 41.0)) * (_shown_strain * 2.4 + _surge * 4.0)
+	draw_set_transform(pivot + jitter + Vector2(_windup * 10.0, 0), lean + _windup * 0.05 + sin(_time*float(motion.sway_speed)+_seed)*float(motion.sway) + sin(_time*54)*flash*0.018,
+		Vector2((breathing+flash*0.045) * swell * (2.0 - squeeze), (1.0-dying*0.3-flash*0.06) * swell * squeeze))
 	var tint := Color(0.85,0.86,0.93).lerp(Color(1.18,1.10,1.0),flash*0.55)
 	tint.a = alpha
 	PaintedArt.sprite(self,"painted-enemies",int(cells.get(shape,0)),Rect2(-pivot,size),tint,true)
 	draw_set_transform(Vector2.ZERO)
+
+
+## 每种造型自己的待机节奏：团块慢慢涌动、细胞快速搏动、晶体几乎不动、毒云飘摇、通道类有节律地开合
+func _motion() -> Dictionary:
+	match shape:
+		"cell": return {"speed": 3.2, "breath": 0.022, "sway_speed": 1.6, "sway": 0.008}
+		"crystal": return {"speed": 0.9, "breath": 0.004, "sway_speed": 0.6, "sway": 0.004}
+		"cloud": return {"speed": 1.1, "breath": 0.03, "sway_speed": 0.7, "sway": 0.03}
+		"spiky": return {"speed": 2.4, "breath": 0.014, "sway_speed": 3.1, "sway": 0.01}
+	return {"speed": 1.4, "breath": 0.016, "sway_speed": 1.0, "sway": 0.014}
+
+
+## 不着身份色的效果层：受击光、蓄力光、剂量毒性的裂纹 / 暴露的核心 / 滴落的毒液
+func _draw_fx() -> void:
+	var body := visible_body_rect()
+	var c := body.get_center() + Vector2(0, body.size.y * 0.06)
+	var r := minf(body.size.x, body.size.y) * 0.5
+	var alpha := 1.0 - dying
+	if _windup > 0.01:
+		Shading.glow(_fx, Vector2(c.x, body.end.y - 6), r * 1.3, Color(1.0, 0.3, 0.2, 0.32 * _windup * alpha))
+	if _id == "dlt" or strain > 0.0:
+		_draw_toxicity(c, r, alpha)
 	if flash > 0:
-		Shading.glow(self,_hit_spot,85,Color(UIKit.GOLD,flash*0.65))
-		draw_arc(_hit_spot,28+flash*14,-1.1,1.2,20,Color(UIKit.PAPER,flash*0.8),2,true)
+		Shading.glow(_fx,_hit_spot,85,Color(UIKit.GOLD,flash*0.65))
+		_fx.draw_arc(_hit_spot,28+flash*14,-1.1,1.2,20,Color(UIKit.PAPER,flash*0.8),2,true)
+
+
+## 剂量限制性毒性：每加一档剂量多几道发烫的裂纹；生命过半后核心露出来；剂量高时毒液往下滴
+func _draw_toxicity(c: Vector2, r: float, alpha: float) -> void:
+	var s := _shown_strain
+	var throb := 0.6 + 0.4 * sin(_time * (2.0 + s * 6.0))
+	var hot := Color(1.0, 0.55, 0.2)
+	var cracks := int(round(2 + s * 10)) + (3 if hp_ratio < 0.5 else 0)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 731
+	for i in 15:
+		var a := rng.randf() * TAU
+		var len := r * rng.randf_range(0.45, 0.9)
+		var pts := PackedVector2Array([c + Vector2.from_angle(a) * r * 0.12])
+		for k in 4:
+			a += rng.randf_range(-0.45, 0.45)
+			pts.append(pts[pts.size() - 1] + Vector2.from_angle(a) * len / 4.0)
+		if i >= cracks:
+			continue
+		var glow := Color(hot, (0.35 + 0.5 * throb) * alpha * minf(1.0, 0.4 + s + _surge))
+		_fx.draw_polyline(pts, Color(hot.darkened(0.3), glow.a * 0.5), 6.0, true)
+		_fx.draw_polyline(pts, glow, 2.2, true)
+		_fx.draw_polyline(pts, Color(1.0, 0.92, 0.7, glow.a * 0.8), 0.8, true)
+	if hp_ratio < 0.5:
+		Shading.glow(_fx, c, r * (0.6 + 0.1 * throb), Color(1.0, 0.35, 0.15, 0.7 * alpha))
+		Shading.sphere(_fx, c, r * (0.17 + 0.03 * throb), Color(1.0, 0.8, 0.45, alpha), 1.0)
+		_fx.draw_arc(c, r * (0.24 + 0.04 * throb), 0, TAU, 40, Color(1.0, 0.9, 0.6, 0.7 * alpha), 2.0, true)
+	if s > 0.2:
+		for i in int(s * 6):
+			var t := fmod(_time * 0.7 + i * 0.37, 1.0)
+			var x := c.x + (fmod(i * 0.618, 1.0) - 0.5) * r * 1.3
+			var p := Vector2(x, c.y + r * 0.7 + t * r * 0.55)
+			_fx.draw_circle(p, 3.0 * (1.0 - t * 0.5), Color(0.75, 1.0, 0.35, (1.0 - t) * 0.85 * alpha))
+	if _surge > 0.0:
+		Shading.glow(_fx, c, r * (1.2 + (1.0 - _surge) * 0.6), Color(1.0, 0.3, 0.15, 0.5 * _surge * alpha))
 
 
 func _wobble_points(c: Vector2, r: float, amp: float, lobes: int, speed: float) -> PackedVector2Array:

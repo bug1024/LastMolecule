@@ -644,8 +644,64 @@ def make_combat_sfx():
     sfx("level_up", layer((up, 1.0, 0), (noise_sweep(1.0, 2000, 9000, 0.4), 0.2, 0.3)), 0.7)
 
 
+# ---------- 动态战斗音乐层 ----------
+# 和 battle / boss 主曲同速、同长度、同和弦，与主曲同时起播、各自循环，由游戏按战况调音量：
+#   drive  推进层：太鼓八分音、低频脉冲、每 4 小节一次上扫——紧迫起来时淡入
+#   danger 危险层：高音弦乐颤音（加三全音）、警报钟、心跳般的低频——生命垂危 / Boss 失控时淡入
+
+def _layer_drive(bpm, cycle, name):
+    beat = 60 / bpm
+    bar = beat * 4
+    mix = Mix(bar * 16)
+    for c in range(8):
+        root = cycle[c % 4][1]
+        start = c * bar * 2
+        for b in range(2):
+            bs = start + b * bar
+            for e in range(8):
+                mix.add(bs + e * beat / 2, TAIKO, 0.5 if e % 2 == 0 else 0.3, -0.25 if e % 4 < 2 else 0.25, 0.4)
+                mix.add(bs + e * beat / 2, bass(root - 12 if e % 2 == 0 else root, beat * 0.3, 1.0), 0.32, 0, 0.05)
+            for s16 in range(16):
+                mix.add(bs + s16 * beat / 4, SHAKER, 0.09 if s16 % 2 else 0.05, 0.5, 0.1)
+        if c % 2 == 1:
+            mix.add(start + bar, noise_sweep(bar, 400, 6000, bar * 0.6), 0.22, 0, 0.5)
+    write(mix.render(wet_gain=0.35, rt=1.2), os.path.join(ROOT, "music", name + "_drive.ogg"), peak=0.7)
+
+
+def _layer_danger(bpm, cycle, name):
+    beat = 60 / bpm
+    bar = beat * 4
+    mix = Mix(bar * 16)
+    for c in range(8):
+        notes, root = cycle[c % 4]
+        start = c * bar * 2
+        cluster = [notes[0] + 12, notes[0] + 18, notes[1] + 12]   # 三全音：不安
+        trem = pad(cluster, bar * 2, attack=0.3, release=0.5, bright=9.0, breathe=6.0)
+        mix.add(start, trem, 0.22, 0.2, 0.5)
+        for b in range(2):
+            bs = start + b * bar
+            mix.add(bs, punch(0.18, 90, 45, 0.06), 0.8, 0, 0.1)
+            mix.add(bs + beat * 0.4, punch(0.18, 90, 45, 0.06), 0.55, 0, 0.1)
+        mix.add(start + bar * 1.5, bell(notes[0] + 30, 0.6, 1.6, 1.41, 4.0), 0.09, -0.6, 0.7)
+    write(mix.render(wet_gain=0.5, rt=1.8), os.path.join(ROOT, "music", name + "_danger.ogg"), peak=0.6)
+
+
+BATTLE_CYCLE = [([64, 67, 71, 76], 40), ([60, 64, 67, 71], 36), ([57, 60, 64, 69], 33), ([59, 63, 66, 69], 35)]
+BOSS_CYCLE = [([62, 65, 69], 38), ([58, 62, 65], 34), ([60, 64, 67], 36), ([61, 64, 69], 33)]
+
+
+def music_layers():
+    _layer_drive(124, BATTLE_CYCLE, "battle")
+    _layer_danger(124, BATTLE_CYCLE, "battle")
+    _layer_drive(136, BOSS_CYCLE, "boss")
+    _layer_danger(136, BOSS_CYCLE, "boss")
+
+
 if __name__ == "__main__":
     import sys
+    if "--layers-only" in sys.argv:   # 只生成动态战斗层，不动已有音乐和音效
+        music_layers()
+        sys.exit(0)
     if "--only-end-turn" in sys.argv:   # 只生成结束回合音效
         sfx_end_turn()
         sys.exit(0)
@@ -661,6 +717,7 @@ if __name__ == "__main__":
     sting("terminated", _terminated)
     sting("campaign_approved", _campaign_approved, tail=27.0)
     sting("campaign_archive", _campaign_archive, tail=21.0)
+    music_layers()
     if "--music-only" not in sys.argv:   # 只改音乐时加 --music-only，音效保持不变
         make_sfx()
     sfx_end_turn()

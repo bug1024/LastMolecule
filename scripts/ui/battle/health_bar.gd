@@ -82,9 +82,9 @@ func _draw() -> void:
 			colors.append(fill.lerp(fill.lightened(0.28), 1.0 - t).darkened(t * 0.28))
 		draw_polygon(shape, colors)
 		draw_line(inner.position + Vector2(3, 1), inner.position + Vector2(maxf(3.0, fill_w - 3), 1), Color(1, 1, 1, 0.22), 1.0, true)
-	var font := get_theme_default_font()
+	var font := get_theme_font("font", &"NumberLabel")   # 血量数字用数字字体
 	var text := "%d/%d" % [value, max_value]
-	var fs := 15
+	var fs := 18
 	var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 	var pos := Vector2(rect.get_center().x - w * 0.5, rect.get_center().y + fs * 0.35)
 	draw_string_outline(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 4, Color(0.02, 0.03, 0.06, 0.95))

@@ -6,7 +6,7 @@
     22,
     26
    ],
-   "shape": "spiky",
+   "shape": "crystal",
    "color": "#b07cf0",
    "size": 0.8,
    "pattern": "random",
@@ -93,7 +93,7 @@
     54,
     58
    ],
-   "shape": "crystal",
+   "shape": "spiky",
    "color": "#ef5d6c",
    "size": 1.1,
    "pattern": "cycle",

@@ -123,6 +123,22 @@ func run() -> void:
 		while battle._busy:
 			await process_frame
 		await shot("battle-multi" if stage == "三期临床试验" else "battle-dose")
+	# 标杆 Boss：剂量限制性毒性随剂量膨胀开裂，过半血露出核心
+	for step in 2:
+		manager._dosed_this_turn = false
+		manager.do_action("dose")
+		while battle._busy:
+			await process_frame
+	await shot("dlt-dose2", 1.4)
+	for step in 2:
+		manager._dosed_this_turn = false
+		manager.do_action("dose")
+		while battle._busy:
+			await process_frame
+	manager.enemies[0].hp = int(manager.enemies[0].max_hp * 0.4)
+	battle._enemy_widgets[0].refresh(manager.enemies[0])
+	battle._refresh_all(true)
+	await shot("dlt-max", 1.4)
 	# 演出标杆：Boss 登场的黑影与亮相、常驻压力（敌人蓄力时更强）
 	game.state.stage = "三期临床试验"
 	game._start_battle("boss")

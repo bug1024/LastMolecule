@@ -624,6 +624,50 @@ func _boss_title_card(top: float, accent: Color) -> Control:
 	return card
 
 
+## 加一档剂量：分子和毒性 Boss 一起变强——Boss 猛地鼓胀、裂得更开
+func _dose_surge(dose: int) -> void:
+	var strain := float(dose) / maxf(1.0, _manager.dose_max)
+	for i in _enemy_widgets.size():
+		if i < _manager.enemies.size() and _manager.enemies[i].mechanic == "dose":
+			_enemy_widgets[i].creature.strain = strain
+			_enemy_widgets[i].creature.surge()
+	GameAudio.sfx("boss_stomp")
+	_shake(6.0 + strain * 8.0, 0.35)
+	if _mol.visible:
+		_mol.level_up()
+
+
+## 音乐跟着战况走，只在关键节点变化：Boss 本身就有推进感，过半血更急；敌人蓄大招时推进层涌上来；
+## 生命垂危或毒性 Boss 剂量拉满时危险层淡入；战斗结束全部退去
+func _update_music(_delta: float) -> void:
+	if _manager == null or _ended:
+		GameAudio.intensity(0.0, 0.0)
+		return
+	var drive := 0.0
+	var danger := 0.0
+	var boss_low := false
+	var heavy := false
+	var strain := 0.0
+	for i in _enemy_widgets.size():
+		if i >= _manager.enemies.size() or not _manager.enemies[i].is_alive():
+			continue
+		var e: Enemy = _manager.enemies[i]
+		heavy = heavy or _enemy_widgets[i].danger
+		strain = maxf(strain, _enemy_widgets[i].creature.strain)
+		if e.is_boss and e.hp * 2 < e.max_hp:
+			boss_low = true
+	if _is_boss:
+		drive = 0.55 + (0.45 if boss_low else 0.0)
+	if heavy:
+		drive = maxf(drive, 0.8)
+	var max_hp := _manager.player.max_hp if _manager.player else 100
+	if float(_shown_player_hp) / max_hp <= 0.3:
+		danger = 1.0
+	elif strain >= 0.75:
+		danger = 0.6
+	GameAudio.intensity(drive, danger)
+
+
 ## Boss 战全程的舞台压力：地面转危险色、四周压暗；敌人下一招很痛时明显更强，打赢立刻散去
 func _update_pressure(delta: float) -> void:
 	var target := 0.0
@@ -639,6 +683,7 @@ func _update_pressure(delta: float) -> void:
 		if _game != null:
 			_floor.pressure_color = _boss_accent()
 	_pressure = move_toward(_pressure, target, delta * 0.9)
+	_update_music(delta)
 	_floor.pressure = _pressure * (0.86 + 0.14 * sin(_time * 1.7))
 	_pressure_dim.color.a = maxf(0.2 * _pressure, _intro_dark)
 	_vignette_boss.modulate.a = _pressure * (0.3 + 0.07 * sin(_time * 1.7))
@@ -730,6 +775,8 @@ func _play(ev: Dictionary) -> void:
 		"death":
 			await _play_death(String(ev.side), int(ev.index))
 		"mechanic":
+			if String(ev.get("key", "")) == "mechanic.dose.up":
+				_dose_surge(int((ev.get("args", [0]) as Array)[0]))
 			_float_text(_fmt(ev), Vector2(size.x * 0.5, 150), Color(1.0, 0.82, 0.45), 20)
 			await _wait(0.55)
 		"exploit":
@@ -1742,6 +1789,9 @@ func _show_banner(text: String, sub: String, color: Color, hold: float, big: boo
 
 func _float_text(text: String, pos: Vector2, color: Color, font_size: int, delay := 0.0) -> void:
 	var label := UIKit.header(text, font_size, color)
+	if text.strip_edges().left(1) in ["-", "+"] or text.strip_edges().left(1).is_valid_int():
+		label.theme_type_variation = &"NumberLabel"   # 伤害 / 护盾数字用数字字体
+		label.add_theme_font_size_override("font_size", int(font_size * 1.2))
 	label.add_theme_constant_override("outline_size", 7)
 	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE

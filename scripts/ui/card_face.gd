@@ -122,8 +122,8 @@ func _label(font_size: int, align: HorizontalAlignment) -> Label:
 
 static func _bold_font() -> Font:
 	var theme := ThemeDB.get_project_theme()
-	if theme and theme.has_font("font", &"HeaderLabel"):
-		return theme.get_font("font", &"HeaderLabel")
+	if theme and theme.has_font("font", &"NumberLabel"):
+		return theme.get_font("font", &"NumberLabel")   # 数字单独一套窄体字
 	return ThemeDB.fallback_font
 
 
@@ -219,8 +219,8 @@ func _make_row(row: Dictionary) -> HBoxContainer:
 	if not number_text.is_empty():
 		var number := Label.new()
 		number.text = number_text
-		number.theme_type_variation = &"HeaderLabel"
-		number.add_theme_font_size_override("font_size", _px(number_size))
+		number.theme_type_variation = &"NumberLabel"
+		number.add_theme_font_size_override("font_size", _px(number_size + 4))
 		var change := int(row.get("change", 0))
 		var color: Color = Color("28634c") if change > 0 else (Color("a43f38") if change < 0 else UIKit.INK)
 		number.add_theme_color_override("font_color", color)
@@ -355,7 +355,7 @@ func _draw() -> void:
 	draw_line(body.position + Vector2(6 * k, k), Vector2(body.end.x - 6 * k, body.position.y + k), Color(1, 1, 1, 0.3), k, true)
 	# 左上角费用宝石
 	if not card.unplayable:
-		var font: Font = get_theme_font("font", &"HeaderLabel")
+		var font: Font = get_theme_font("font", &"NumberLabel")
 		var orb := Vector2(24, 23) * k
 		var gem := PackedVector2Array()
 		for j in 6:
@@ -363,7 +363,7 @@ func _draw() -> void:
 		draw_colored_polygon(gem, UIKit.DANGER.darkened(0.2) if card.damaged else Color("397b68"))   # 受损的片段卡：费用宝石变红
 		gem.append(gem[0])
 		draw_polyline(gem, UIKit.PAPER, 2 * k, true)
-		var fs := _px(26)
+		var fs := _px(30)
 		var text := str(card.cost)
 		var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 		var pos := orb + Vector2(-w * 0.5, fs * 0.36)

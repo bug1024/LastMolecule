@@ -126,7 +126,8 @@ func _add_intent(icon_name: String, amount: String, color: Color) -> void:
 	item.add_theme_constant_override("separation", 3)
 	item.add_child(UIKit.icon_rect(icon_name, 26, color))
 	if not amount.is_empty():
-		var number := UIKit.label(amount, color.lightened(0.25), 22)
+		var number := UIKit.label(amount, color.lightened(0.25), 26)
+		number.theme_type_variation = &"NumberLabel"
 		number.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		number.add_theme_constant_override("outline_size", 3)
 		number.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
@@ -163,10 +164,14 @@ func refresh(enemy: Enemy) -> void:
 func _process(delta: float) -> void:
 	_time += delta
 	if _intent_box and _intent_box.visible:
-		_intent_box.position.y = _intent_y
+		# 毒性 Boss 鼓胀时意图跟着上移，但不超出顶栏下沿
+		var lift := creature.size.y * creature.strain * 0.14 if creature else 0.0
+		_intent_box.position.y = maxf(_intent_y - lift, 58.0 - position.y)
 		var s := 1.0 + (0.025 * absf(sin(_time * 6.0)) if danger else 0.0)
 		_intent_box.pivot_offset = _intent_box.size * 0.5
 		_intent_box.scale = Vector2(s, s)
+	if creature:
+		creature.windup = danger and _intent_box != null and _intent_box.visible
 	queue_redraw()
 
 

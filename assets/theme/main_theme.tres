@@ -1,17 +1,31 @@
 [gd_resource type="Theme" load_steps=24 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/painted_style.gd" id="1_painted"]
+[ext_resource type="FontFile" path="res://assets/fonts/LMSans.ttf" id="2_sans"]
+[ext_resource type="FontFile" path="res://assets/fonts/LMDisplay.ttf" id="3_display"]
+[ext_resource type="FontFile" path="res://assets/fonts/BarlowCondensed-SemiBold.ttf" id="4_num"]
 
-[sub_resource type="SystemFont" id="Font"]
+[sub_resource type="SystemFont" id="SystemSans"]
 font_names = PackedStringArray("Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", "Heiti SC", "sans-serif")
 subpixel_positioning = 0
 
 [sub_resource type="SystemFont" id="DisplayFont"]
 font_names = PackedStringArray("Songti SC", "Noto Serif CJK SC", "Hiragino Mincho ProN", "Georgia", "serif")
 
+[sub_resource type="FontVariation" id="Font"]
+fallbacks = Array[Font]([SubResource("SystemSans")])
+base_font = ExtResource("2_sans")
+variation_opentype = {
+2003265652: 430
+}
+
 [sub_resource type="FontVariation" id="FontBold"]
-base_font = SubResource("DisplayFont")
-variation_embolden = 0.2
+fallbacks = Array[Font]([SubResource("Font")])
+base_font = ExtResource("3_display")
+
+[sub_resource type="FontVariation" id="NumberFont"]
+fallbacks = Array[Font]([SubResource("FontBold")])
+base_font = ExtResource("4_num")
 
 [sub_resource type="StyleBox" id="BtnNormal"]
 script = ExtResource("1_painted")
@@ -285,6 +299,9 @@ HeaderLabel/base_type = &"Label"
 HeaderLabel/colors/font_color = Color(0.93, 0.96, 0.98, 1)
 HeaderLabel/font_sizes/font_size = 24
 HeaderLabel/fonts/font = SubResource("FontBold")
+NumberLabel/base_type = &"Label"
+NumberLabel/colors/font_color = Color(0.93, 0.96, 0.98, 1)
+NumberLabel/fonts/font = SubResource("NumberFont")
 HSeparator/styles/separator = SubResource("Sep")
 Label/colors/font_color = Color(0.91, 0.86, 0.74, 1)
 Label/colors/font_outline_color = Color(0, 0, 0, 0.8)

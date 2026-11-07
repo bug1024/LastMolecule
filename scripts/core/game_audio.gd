@@ -8,6 +8,8 @@ extends Node
 const MUSIC_DIR := "res://assets/audio/music/"
 const SFX_DIR := "res://assets/audio/sfx/"
 const LOOPS := ["title", "lab", "battle"]
+const LAYERED := ["battle", "boss"]   # 有动态层的曲子：<曲名>_drive / <曲名>_danger，与主曲同长同步循环
+const SILENT_DB := -60.0
 const FADE := 0.8
 const SFX_VOICES := 8
 
@@ -19,6 +21,12 @@ var _sfx_next := 0
 var _current := ""
 var _cache := {}
 var _last_hover_ms := 0
+var _drive: AudioStreamPlayer
+var _danger: AudioStreamPlayer
+var _want_drive := 0.0
+var _want_danger := 0.0
+var _level_drive := 0.0
+var _level_danger := 0.0
 
 
 static func music(track: String) -> void:
@@ -32,6 +40,14 @@ static func sting(track: String) -> void:
 	var node := _instance()
 	if node:
 		node.play_sting(track)
+
+
+## 战况强度 0–1：drive 推进层（紧迫）、danger 危险层（垂危 / 失控）。由战斗界面在重要节点设定，平滑过渡
+static func intensity(drive: float, danger: float) -> void:
+	var node := _instance()
+	if node:
+		node._want_drive = clampf(drive, 0.0, 1.0)
+		node._want_danger = clampf(danger, 0.0, 1.0)
 
 
 static func sfx(id: String) -> void:
@@ -54,6 +70,8 @@ func _ready() -> void:
 	_music_a = _make_player("Music")
 	_music_b = _make_player("Music")
 	_sting = _make_player("Music")
+	_drive = _make_player("Music")
+	_danger = _make_player("Music")
 	for i in SFX_VOICES:
 		_sfx_players.append(_make_player("SFX"))
 	GameSettings.apply()
@@ -104,6 +122,33 @@ func play_music(track: String) -> void:
 	incoming.play()
 	var tween := create_tween()
 	tween.tween_property(incoming, "volume_db", 0.0, FADE)
+	_start_layers(track)
+
+
+## 动态层和主曲同一帧从头起播，长度相同，循环点一致
+func _start_layers(track: String) -> void:
+	_want_drive = 0.0
+	_want_danger = 0.0
+	for pair in [[_drive, "_drive"], [_danger, "_danger"]]:
+		var player: AudioStreamPlayer = pair[0]
+		player.stop()
+		var layer := _load(MUSIC_DIR + track + String(pair[1]) + ".ogg", true) if LAYERED.has(track) else null
+		player.stream = layer
+		if layer != null:
+			player.volume_db = SILENT_DB
+			player.play()
+
+
+func _process(delta: float) -> void:
+	if _drive == null:
+		return
+	# 进来快、退得慢：紧张感涌上来要及时，消退要留余韵
+	_level_drive = move_toward(_level_drive, _want_drive, delta * (0.8 if _want_drive > _level_drive else 0.25))
+	_level_danger = move_toward(_level_danger, _want_danger, delta * (0.9 if _want_danger > _level_danger else 0.3))
+	if _drive.playing:
+		_drive.volume_db = linear_to_db(maxf(_level_drive, 0.001))
+	if _danger.playing:
+		_danger.volume_db = linear_to_db(maxf(_level_danger, 0.001))
 
 
 func play_sting(track: String) -> void:
