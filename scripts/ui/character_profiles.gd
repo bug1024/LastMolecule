@@ -55,7 +55,7 @@ static func molecule() -> Dictionary:
 
 ## 敌人按身份分性格，未列出的按造型推断
 const PERSONALITY := {
-	"activity_cliff": "pocket", "off_target": "pocket",
+	"activity_cliff": "pocket", "off_target": "agile",
 	"resistant_clone": "shell", "progression": "shell", "dlt": "shell",
 	"placebo": "pulse", "enroll_drag": "pulse", "center_pd": "pulse", "center_drop": "pulse",
 	"pk_variance": "pulse", "metabolite": "pulse",
@@ -66,6 +66,39 @@ const PERSONALITY := {
 	"tox_storm": "cloud", "cytokine_storm": "cloud", "center_ae": "cloud",
 }
 const BY_SHAPE := {"cell": "pulse", "blob": "ooze", "crystal": "rigid", "cloud": "cloud", "spiky": "pump", "molecule": "pump"}
+
+## 死亡演出：和生物学特征对应。Boss 另有与自身机制相关的死法
+const DEATH_STYLE := {
+	"pocket": "collapse", "shell": "shatter", "pulse": "dissolve", "pump": "collapse", "rigid": "shatter",
+	"spark": "burst", "ooze": "melt", "cloud": "disperse", "agile": "shatter",
+}
+const BOSS_DEATH := {"dlt": "rupture", "activity_cliff": "seal"}
+## Boss 登场方式：沉重的踏步而来、从地面升起、膨胀成形、聚拢成形、闪现
+const ENTRANCE := {
+	"shell": "stomp", "pump": "stomp", "pocket": "rise", "pulse": "swell", "ooze": "swell",
+	"cloud": "gather", "rigid": "snap", "spark": "snap", "agile": "snap",
+}
+## 每个敌人的「特殊动作」：意图是这些招式时提前露出征兆（异化、口袋发亮、外壳鼓胀）
+const SPECIAL_MOVES := {
+	"off_target": ["bind"], "placebo": ["noise_effect"], "resistant_clone": ["overgrow"],
+	"enroll_drag": ["screen_fail"], "center_pd": [], "metabolite": [],
+}
+## 征兆画在插画的哪里（插画内的相对坐标）：脱靶蛋白的结合口袋是分叉处和金色结合位；感染细胞的异化点在管壁上
+const SPECIAL_SPOTS := {
+	"off_target": [Vector2(0.5, 0.3), Vector2(0.14, 0.13), Vector2(0.63, 0.1), Vector2(0.93, 0.2), Vector2(0.12, 0.43)],
+	"placebo": [Vector2(0.7, 0.32)],
+}
+
+
+static func death_style(id: String, kind: String, boss: bool) -> String:
+	if boss and BOSS_DEATH.has(id):
+		return String(BOSS_DEATH[id])
+	return String(DEATH_STYLE.get(kind, "dissolve"))
+
+
+static func is_special(id: String, move: Dictionary) -> bool:
+	var kind := String(move.get("intent", ""))
+	return (SPECIAL_MOVES.get(id, []) as Array).has(String(move.get("id", ""))) or kind == "attack_debuff"
 
 
 static func personality(id: String, shape: String) -> String:
@@ -143,6 +176,23 @@ static func enemy(kind: String) -> Dictionary:
 				"defend": [{"t": 0.3, "open": -0.8, "sx": 0.93, "k": 250, "z": 0.8}],
 				"status": [{"t": 0.3, "open": 0.6, "k": 400, "z": 0.3}],
 				"death": [{"t": 0.5, "open": -1.0, "angle": 0.1, "sy": 0.75, "k": 70, "z": 0.8}],
+			}
+		"agile":    # 脱靶蛋白：敏捷而不稳定，不停地快速调整姿态、朝目标试探；出手是带旋转的快速突刺
+			return {
+				"idle": {"angle": [0.02, 0.9, 0.85], "x": [0.012, 0.7, 0.8], "y": [0.01, 1.1, 0.7],
+					"adjust": {"angle": 0.07, "x": 0.04, "y": 0.015}, "adjust_every": [0.35, 0.9]},
+				"idle_spring": [380.0, 0.45],
+				"anticipation_attack": [{"t": 0.12, "x": 0.06, "angle": -0.14, "sx": 0.94, "sy": 1.04, "k": 600, "z": 0.5}],
+				"attack": [
+					{"t": 0.08, "reach": 1.0, "angle": 0.16, "sx": 1.06, "sy": 0.96, "k": 1500, "z": 0.55, "cue": "impact"},
+					{"t": 0.08, "reach": 0.85, "angle": -0.08, "k": 700, "z": 0.4},
+				],
+				"recovery": [{"t": 0.22, "k": 360, "z": 0.45}],
+				"hit": [{"t": 0.12, "x": 0.06, "angle": 0.18, "k": 500, "z": 0.3}],
+				"hit_kick": {"x": 0.7, "angle": 2.2},
+				"defend": [{"t": 0.22, "angle": 0.06, "sx": 0.94, "k": 600, "z": 0.5}],
+				"status": [{"t": 0.22, "angle": -0.05, "k": 900, "z": 0.15}],
+				"death": [{"t": 0.45, "y": 0.04, "angle": 0.9, "sx": 0.8, "sy": 0.8, "k": 120, "z": 0.5}],
 			}
 		"rigid":    # 晶体类：几乎静止，偶尔突然抽动换个角度；出手又快又直
 			return {

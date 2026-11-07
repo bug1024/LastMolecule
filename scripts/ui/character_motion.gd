@@ -28,6 +28,7 @@ var trail := Vector2.ZERO        # 丝带：比末端更软的跟随
 var heavy := false               # 本次受击是否重击
 var tint := Color(1, 1, 1, 0)    # 状态影响的着色（a 为强度，自行衰减）
 var pace := 1.0                  # 动作播放速度（演出压缩时 > 1）；待机不受影响
+var tempo := 1.0                 # 待机节奏（剂量越高、越接近临界越急促）；动作不受影响
 var _hold := 0.0                 # 顿帧：命中瞬间冻结姿态的剩余秒数
 
 var _reach := Vector2.ZERO       # 本次攻击要到达的偏移（单位）
@@ -210,7 +211,7 @@ func step(delta: float) -> void:
 		return
 	if state != State.IDLE:
 		delta *= pace
-	time += delta
+	time += delta * (tempo if state == State.IDLE else 1.0)
 	amount = 0.35 if GameSettings.reduce_motion else 1.0
 	_advance(delta)
 	var resting := state == State.IDLE

@@ -71,6 +71,15 @@ var motion: CharacterMotion
 var poison := 0.0        # 中毒程度 0..1：颜色发绿、形体出现不规则鼓动
 var _shown_poison := 0.0
 var _fx: Control         # 不受身份色着色的效果层（受击光、裂纹、毒滴）
+var guarded := false     # 正有护盾：外壳类闭合起来
+var special := false     # 下一招是特殊动作：提前露出征兆（局部异化、结合口袋发亮）
+var death_style := "dissolve"
+var boss := false
+var _guard := 0.0
+var _contract := 0.0     # 外壳受击时的一次收缩
+var _special := 0.0
+var _critical := 0.0     # Boss 临界状态（生命 ≤ 25%）
+var _shards: Array = []  # 碎裂死亡时每个网格块的飞散方向
 
 
 func setup(def: Dictionary, boss := false, elite := false) -> void:
@@ -82,6 +91,8 @@ func setup(def: Dictionary, boss := false, elite := false) -> void:
 	_seed = float(hash(String(def.get("id", ""))) % 1000) / 100.0
 	_id = String(def.get("id", ""))
 	personality = CharacterProfiles.personality(_id, shape)
+	self.boss = boss
+	death_style = CharacterProfiles.death_style(_id, personality, boss)
 	motion = CharacterMotion.new(CharacterProfiles.enemy(personality), hash(_id) % 100000 + 1)
 	for sheet in GEOMETRIC_PORTRAITS:
 		var entries: Dictionary = GEOMETRIC_PORTRAITS[sheet]
@@ -121,7 +132,9 @@ func hit(point := Vector2(-1,-1), strength := 1.0) -> void:
 	var body := visible_body_rect()
 	_hit_spot = point if point.x >= 0 else body.position + body.size * Vector2(0.28,0.52)
 	if motion:
-		motion.hit(strength, Vector2(1, 0))
+		motion.hit(strength * (0.5 if _guard > 0.5 else 1.0), Vector2(1, 0))   # 闭合的外壳挨打几乎不动
+	if personality == "shell":
+		_contract = 1.0   # 外壳受击时收缩一下
 
 
 func _process(delta: float) -> void:
@@ -136,8 +149,14 @@ func _process(delta: float) -> void:
 	_shown_strain = move_toward(_shown_strain, strain, delta * 0.8)
 	_windup = move_toward(_windup, 1.0 if windup else 0.0, delta * 2.5)
 	_shown_poison = move_toward(_shown_poison, poison, delta * 0.8)
+	_guard = move_toward(_guard, 1.0 if guarded and dying <= 0.0 else 0.0, delta * (4.0 if guarded else 1.2))
+	_contract = maxf(0.0, _contract - delta * 3.0)
+	_special = move_toward(_special, 1.0 if special and dying <= 0.0 else 0.0, delta * 2.0)
+	_critical = move_toward(_critical, 1.0 if boss and hp_ratio <= 0.25 and hp_ratio > 0.0 else 0.0, delta * 1.5)
 	if motion:
 		motion.unit = maxf(visible_body_rect().size.y, 1.0)
+		# 剂量越高、越接近临界，待机越急促
+		motion.tempo = 1.0 + _shown_strain * 0.9 + _critical * 0.5
 		motion.step(delta)
 	if not _geometric and material is ShaderMaterial:
 		(material as ShaderMaterial).set_shader_parameter("heat", clampf(_shown_strain * 0.45 + _surge * 0.5, 0.0, 1.0))
@@ -194,8 +213,46 @@ func _draw_mesh(body: Rect2, tint: Color) -> void:
 		for col in GRID:
 			var i := row * (GRID + 1) + col
 			indices.append_array([i, i + 1, i + GRID + 2, i, i + GRID + 2, i + GRID + 1])
+	if dying > 0.0 and death_style in ["shatter", "rupture"]:
+		_draw_shards(body, points, uvs, colors, texture)
+		return
 	RenderingServer.canvas_item_add_triangle_array(get_canvas_item(), indices, points, colors, uvs,
 		PackedInt32Array(), PackedFloat32Array(), texture.get_rid())
+
+
+## 碎裂：每个网格块各自飞散、翻转，从外圈先散；裂开的边透出亮光
+func _draw_shards(body: Rect2, points: PackedVector2Array, uvs: PackedVector2Array, colors: PackedColorArray, texture: Texture2D) -> void:
+	if _shards.is_empty():
+		var rng := RandomNumberGenerator.new()
+		rng.seed = hash(_id)
+		for k in GRID * GRID:
+			_shards.append(Vector3(rng.randf_range(-1, 1), rng.randf_range(-1.2, 0.3), rng.randf_range(-2, 2)))
+	var center := body.get_center()
+	var k := 0
+	for row in GRID:
+		for col in GRID:
+			var i := row * (GRID + 1) + col
+			var quad := PackedInt32Array([i, i + 1, i + GRID + 2, i + GRID + 1])
+			var mid := Vector2.ZERO
+			for q in quad:
+				mid += points[q]
+			mid /= 4.0
+			var spread: Vector3 = _shards[k]
+			var outward := (mid - center) / maxf(body.size.x, 1.0)
+			var travel := maxf(0.0, dying * 1.3 - 0.3 + outward.length() * 0.4)
+			var offset := (outward * 2.0 + Vector2(spread.x, spread.y)) * body.size.x * 0.35 * travel + Vector2(0, body.size.y * 0.35 * travel * travel)
+			var spin := spread.z * travel
+			var pts := PackedVector2Array()
+			var cols := PackedColorArray()
+			var tex := PackedVector2Array()
+			for q in quad:
+				pts.append(mid + (points[q] - mid).rotated(spin) * (1.0 - travel * 0.3) + offset)
+				tex.append(uvs[q])
+				var c := colors[q]
+				c.a *= clampf(1.4 - travel, 0.0, 1.0)
+				cols.append(c)
+			draw_primitive(pts, cols, tex, texture)
+			k += 1
 
 
 ## 局部形变（以身体尺寸为单位）。u 从左到右，v 从上到下；脚底一行固定在地面上（毒云除外）
@@ -246,6 +303,26 @@ func _deform(u: float, v: float) -> Vector2:
 		"cloud":
 			disp = Vector2(CharacterMotion.noise(v * 4.0 + t * 1.2, _seed) * 0.03 + (u - 0.5) * o * 0.05,
 				CharacterMotion.noise(u * 3.5 + t * 0.9, _seed + 3.0) * 0.025 + (v - 0.5) * o * 0.03) * (0.5 + 0.5 * amp)
+	if personality == "shell":
+		# 外壳闭合：两片壳向中间合拢、顶部压低；受击时同样收一下
+		var close := maxf(_guard, _contract * 0.7)
+		disp += Vector2(-(u - 0.5) * 0.13 * close, 0.06 * close * (1.0 - v))
+	if _special > 0.0 and CharacterProfiles.SPECIAL_SPOTS.has(_id) and personality == "pulse":
+		# 局部异化：管壁上一处鼓起，节律变快
+		var spot: Vector2 = CharacterProfiles.SPECIAL_SPOTS[_id][0]
+		var d := Vector2(u, v) - spot
+		disp += d.normalized() * _special * (0.06 + 0.02 * sin(t * 9.0)) * exp(-d.length_squared() / 0.03)
+	if dying > 0.0:
+		match death_style:
+			"dissolve":   # 失去张力：结构松垮下垂，边缘先散
+				disp += Vector2((u - 0.5) * dying * 0.25, dying * dying * 0.35 * (1.0 - v)) \
+					+ Vector2(CharacterMotion.noise(v * 6.0 + t * 3.0, _seed), CharacterMotion.noise(u * 6.0 + t * 2.0, _seed)) * dying * 0.05
+			"melt":
+				disp += Vector2((u - 0.5) * dying * 0.5 * v, dying * 0.55 * (1.0 - v))
+			"disperse":
+				disp += Vector2(u - 0.5, v - 0.5) * dying * 0.6 + Vector2(CharacterMotion.noise(v * 5.0 + t, _seed), 0) * dying * 0.1
+			"seal":   # 口袋彻底合拢、封死
+				disp += Vector2(-(u - 0.5) * dying * 0.3, dying * 0.25 * (1.0 - v) * (1.0 - v))
 	if _shown_poison > 0.0 and personality != "pulse":
 		disp += Vector2(CharacterMotion.noise(t * 2.3 + v * 5.0, _seed), CharacterMotion.noise(t * 2.0 + u * 5.0, _seed + 1.0)) * 0.012 * _shown_poison * pin
 	return disp
@@ -268,6 +345,9 @@ func _body_transform() -> Transform2D:
 	var jitter := Vector2(sin(_time * 37.0), cos(_time * 41.0)) * (_shown_strain * 2.4 + _surge * 4.0)
 	var sq := motion.squash() if motion else Vector2.ONE
 	var angle := lean + _windup * 0.05 + (motion.angle() if motion else 0.0) + sin(_time * 54.0) * flash * 0.012
+	if personality == "agile":   # 脱靶蛋白：特殊动作前朝目标探身，抖得更厉害
+		angle -= _special * (0.07 + 0.03 * sin(_time * 23.0))
+	jitter += Vector2(sin(_time * 31.0), cos(_time * 27.0)) * _critical * 2.5   # 临界：整个身体在发颤
 	var deformation := Vector2((sq.x - dying * 0.32) * swell * (2.0 - squeeze), (sq.y - dying * 0.3) * swell * squeeze)
 	var shift := motion.offset() if motion else Vector2.ZERO
 	return Transform2D(angle, deformation, 0.0, pivot + jitter + Vector2(_windup * 10.0, 0) + shift)
@@ -286,9 +366,91 @@ func _draw_fx() -> void:
 		var chest := body.position + body.size * Vector2(0.69, 0.57)
 		var pose := _body_transform()
 		_draw_toxicity(pose * (chest - pivot), r * 0.47 * pose.x.length(), alpha)
+	var pose := _body_transform()
+	var pivot2 := Vector2(size.x * 0.5, size.y)
+	if _special > 0.01 and CharacterProfiles.SPECIAL_SPOTS.has(_id):
+		_draw_special(body, pose, pivot2, alpha)
+	if _critical > 0.01 and dying <= 0.0:
+		_draw_critical(pose * (c - pivot2), r, alpha)
+	if _windup > 0.01 and strain > 0.0:   # 剂量毒性蓄力：体内的危险脉冲从胸口一圈圈扩出去
+		var chest := pose * (body.position + body.size * Vector2(0.69, 0.57) - pivot2)
+		for k in 2:
+			var beat := fmod(_time * (1.4 + strain) + k * 0.5, 1.0)
+			_fx.draw_arc(chest, r * (0.2 + 0.6 * beat), 0, TAU, 36, Color(1.0, 0.45, 0.2, (1.0 - beat) * 0.7 * _windup * alpha), 3.0, true)
+	if dying > 0.0:
+		_draw_death_fx(body, pose, pivot2, c, r)
 	if flash > 0:
 		Shading.glow(_fx,_hit_spot,85,Color(UIKit.GOLD,flash*0.65))
 		_fx.draw_arc(_hit_spot,28+flash*14,-1.1,1.2,20,Color(UIKit.PAPER,flash*0.8),2,true)
+
+
+## 特殊动作的征兆：脱靶蛋白的结合口袋和结合位亮起；感染细胞的异化点长出暗紫的病灶
+func _draw_special(body: Rect2, pose: Transform2D, pivot: Vector2, alpha: float) -> void:
+	var spots: Array = CharacterProfiles.SPECIAL_SPOTS[_id]
+	var throb := 0.6 + 0.4 * sin(_time * 8.0)
+	var r := minf(body.size.x, body.size.y)
+	for i in spots.size():
+		var p := pose * (body.position + body.size * (spots[i] as Vector2) - pivot)
+		if personality == "pulse":
+			var blot := PackedVector2Array()
+			for k in 14:
+				var a := k * TAU / 14.0
+				blot.append(p + Vector2.from_angle(a) * r * 0.13 * _special * (1.0 + 0.3 * sin(a * 3.0 + _time * 4.0)))
+			Shading.glow(_fx, p, r * 0.22 * _special, Color(0.75, 0.3, 0.9, 0.5 * throb * alpha))
+			_fx.draw_colored_polygon(blot, Color(0.18, 0.08, 0.24, 0.85 * _special * alpha))
+			blot.append(blot[0])
+			_fx.draw_polyline(blot, Color(0.95, 0.55, 1.0, 0.9 * _special * alpha), 2.0, true)
+			for k in 3:   # 向外蔓延的异化纹
+				var a := k * 2.1 + 0.5
+				_fx.draw_line(p, p + Vector2.from_angle(a) * r * 0.28 * _special, Color(0.85, 0.45, 1.0, 0.6 * _special * alpha), 1.5, true)
+		else:
+			# 结合口袋（分叉处）：两圈向内收的亮环；金色结合位：小而亮的光点
+			if i == 0:
+				for k in 2:
+					var shrink := fmod(_time * 1.6 + k * 0.5, 1.0)
+					_fx.draw_arc(p, r * (0.2 - 0.12 * shrink), 0, TAU, 28, Color(1.0, 0.88, 0.5, (0.3 + 0.7 * shrink) * _special * alpha), 2.4, true)
+			else:
+				Shading.glow(_fx, p, r * 0.07 * (0.8 + 0.4 * throb), Color(1.0, 0.92, 0.6, 0.8 * _special * alpha))
+
+
+## Boss 临界：身体里几道发亮的裂纹一起搏动，读起来是「快撑不住了」
+func _draw_critical(c: Vector2, r: float, alpha: float) -> void:
+	var throb := 0.55 + 0.45 * sin(_time * 7.0)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 404
+	Shading.glow(_fx, c, r * 0.5, Color(1.0, 0.35, 0.2, 0.35 * throb * _critical * alpha))
+	for i in 6:
+		var a := rng.randf() * TAU
+		var pts := PackedVector2Array([c + Vector2.from_angle(a) * r * 0.1])
+		for k in 3:
+			a += rng.randf_range(-0.5, 0.5)
+			pts.append(pts[-1] + Vector2.from_angle(a) * r * 0.16)
+		_fx.draw_polyline(pts, Color(1.0, 0.6, 0.3, (0.4 + 0.5 * throb) * _critical * alpha), 2.2, true)
+
+
+## 死亡的效果层：溃散时碎屑飘散，封闭时一道光从合缝里漏出，过量破裂时橙色的光从裂缝喷出
+func _draw_death_fx(body: Rect2, pose: Transform2D, pivot: Vector2, c: Vector2, r: float) -> void:
+	var center := pose * (c - pivot)
+	var fade_out := 1.0 - dying
+	match death_style:
+		"dissolve", "melt", "disperse":
+			var rng := RandomNumberGenerator.new()
+			rng.seed = hash(_id) + 5
+			for i in 16:
+				var start := body.position + body.size * Vector2(rng.randf(), rng.randf_range(0.1, 0.9))
+				var drift := Vector2(rng.randf_range(-0.6, 0.6), rng.randf_range(-1.0, -0.2)) * r * dying
+				var p := pose * (start - pivot) + drift
+				var bit := rng.randf_range(3.0, 7.0) * (1.0 - dying * 0.5)
+				_fx.draw_colored_polygon(PackedVector2Array([p + Vector2(0, -bit), p + Vector2(bit, 0), p + Vector2(0, bit * 0.7), p + Vector2(-bit * 0.8, 0)]),
+					Color(color.lightened(0.3), fade_out * 0.8))
+		"seal":
+			var seam := pose * (body.position + body.size * Vector2(0.3, 0.45) - pivot)
+			Shading.glow(_fx, seam, r * 0.9, Color(1.0, 0.92, 0.7, sin(dying * PI) * 0.6))
+			_fx.draw_line(seam - Vector2(r * 0.7, 0), seam + Vector2(r * 0.7, 0), Color(1.0, 0.95, 0.8, sin(dying * PI)), 3.0, true)
+		"rupture":
+			Shading.glow(_fx, center, r * (1.0 + dying), Color(1.0, 0.5, 0.15, (1.0 - dying) * 0.7))
+		"burst":
+			Shading.glow(_fx, center, r * (0.8 + dying * 1.5), Color(1.0, 0.95, 0.75, (1.0 - dying) * 0.8))
 
 
 ## 剂量限制性毒性：每加一档剂量多几道发烫的裂纹；生命过半后核心露出来；剂量高时毒液往下滴

@@ -89,12 +89,14 @@ func show_intent(enemy: Enemy, damage: int, exploit := {}) -> void:
 		child.queue_free()
 	if not enemy.is_alive() or enemy.intent.is_empty():
 		_intent_box.visible = false
+		creature.special = false
 		return
 	_intent_box.visible = true
 	var move := enemy.intent
 	var kind := String(move.get("intent", "attack"))
 	var hits := enemy.intent_hits()
 	danger = damage * hits >= DANGER_DAMAGE
+	creature.special = CharacterProfiles.is_special(enemy.id, move)   # 特殊动作：提前露出征兆
 	_intent_box.add_theme_stylebox_override("panel", _intent_style(danger))
 	if kind.split("_").has("attack"):
 		_add_intent("intent_attack", str(damage) if hits == 1 else "%d×%d" % [damage, hits], INTENT_COLOR.attack)
@@ -173,6 +175,7 @@ func _intent_tooltip(enemy: Enemy, damage: int) -> String:
 func refresh(enemy: Enemy) -> void:
 	bar.set_values(enemy.hp, enemy.max_hp, enemy.block)
 	creature.hp_ratio = float(enemy.hp) / maxf(1.0, enemy.max_hp)
+	creature.guarded = enemy.block > 0   # 外壳类：有护盾（抗性启动）时闭合
 	statuses.set_statuses(enemy.statuses)
 
 

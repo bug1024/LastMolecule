@@ -77,6 +77,7 @@ func _run() -> void:
 	_test_character_motion()
 	_test_battle_director()
 	await _test_music_system()
+	_test_enemy_personas()
 	_test_molecule()
 	_test_molecule_in_run()
 	_test_disease_campaign()
@@ -1720,6 +1721,69 @@ func _test_music_system() -> void:
 	audio.play_music("")
 	if created:
 		audio.queue_free()
+
+
+## 敌人性格：三类普通敌人运动可区分、特殊动作有征兆、外壳会闭合、死法与生物学特征对应；Boss 登场方式与临界状态
+func _test_enemy_personas() -> void:
+	_expect(CharacterProfiles.personality("off_target", "crystal") == "agile", "The off-target protein moves as an agile, unstable body")
+	var settle := func(c: CreatureView, frames: int) -> void:
+		for i in frames:
+			c._process(1.0 / 60.0)
+	var make := func(id: String, shape: String, boss := false) -> CreatureView:
+		var c := CreatureView.new()
+		c.setup({"id": id, "shape": shape, "size": 1.0}, boss)
+		c.size = Vector2(220, 200)
+		return c
+	# 不看名字：待机节奏用角度变化速度、位移幅度、局部形变区分
+	var rhythm := func(c: CreatureView) -> Vector3:
+		var turn := 0.0
+		var last := c.motion.angle()
+		var bulge := 0.0
+		for i in 240:
+			c._process(1.0 / 60.0)
+			turn += absf(c.motion.angle() - last)
+			last = c.motion.angle()
+			bulge = maxf(bulge, c._deform(0.5, 0.3).length())
+		return Vector3(turn, bulge, 0)
+	var shell: CreatureView = make.call("resistant_clone", "cell")
+	var cell: CreatureView = make.call("placebo", "blob")
+	var agile: CreatureView = make.call("off_target", "crystal")
+	var rs: Vector3 = rhythm.call(shell)
+	var rc: Vector3 = rhythm.call(cell)
+	var ra: Vector3 = rhythm.call(agile)
+	_expect(ra.x > rs.x * 4.0 and ra.x > rc.x, "The off-target protein keeps adjusting its posture far more than the others")
+	_expect(rc.y > rs.y and rc.y > ra.y, "The infected cell pulses with the strongest local swelling")
+	_expect(CharacterProfiles.is_special("off_target", {"id": "bind", "intent": "attack"}) and not CharacterProfiles.is_special("off_target", {"id": "drift", "intent": "buff"})
+		and CharacterProfiles.is_special("placebo", {"id": "noise_effect", "intent": "attack"}), "Special moves are recognised per enemy")
+	cell.special = true
+	settle.call(cell, 60)
+	var spot: Vector2 = CharacterProfiles.SPECIAL_SPOTS["placebo"][0]
+	_expect(cell._special > 0.9 and cell._deform(spot.x + 0.08, spot.y).length() > 0.03, "Before its special attack the infected cell grows a local mutation")
+	var open_shape := shell._deform(0.1, 0.4)
+	shell.guarded = true
+	settle.call(shell, 30)
+	_expect(shell._guard > 0.9 and shell._deform(0.1, 0.4).x > open_shape.x + 0.02, "The resistant clone's shell closes while its resistance is up")
+	shell.guarded = false
+	settle.call(shell, 120)
+	shell.hit(Vector2(-1, -1), 1.0)
+	_expect(shell._contract > 0.9, "A hit makes the shell contract")
+	_expect(cell.death_style == "dissolve" and shell.death_style == "shatter" and agile.death_style == "shatter", "Normal enemies die by losing tension or shattering")
+	var dlt: CreatureView = make.call("dlt", "spiky", true)
+	var pocket: CreatureView = make.call("activity_cliff", "crystal", true)
+	_expect(dlt.death_style == "rupture" and pocket.death_style == "seal", "Boss deaths follow their biology: overdose rupture, pocket sealing")
+	_expect(CharacterProfiles.ENTRANCE.get(dlt.personality, "") == "stomp" and CharacterProfiles.ENTRANCE.get(pocket.personality, "") == "rise",
+		"Bosses enter in character")
+	dlt.strain = 1.0
+	dlt.hp_ratio = 0.2
+	settle.call(dlt, 120)
+	_expect(dlt.motion.tempo > 1.8 and dlt._critical > 0.9, "High dose and critical health quicken the boss's rhythm and show a critical state")
+	var missing: Array[String] = []
+	for kind in ["pocket", "shell", "pulse", "pump", "rigid", "spark", "ooze", "cloud", "agile"]:
+		if not CharacterProfiles.DEATH_STYLE.has(kind) or not CharacterProfiles.ENTRANCE.has(kind):
+			missing.append(kind)
+	_expect(missing.is_empty(), "Every personality has a death and an entrance: " + ", ".join(missing))
+	for c in [shell, cell, agile, dlt, pocket]:
+		c.free()
 
 
 ## The visual refactor must preserve picking and every legal fragment at all display sizes.
