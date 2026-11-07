@@ -27,6 +27,7 @@ var _react_t := 0.0
 var _glow_burst := 0.0  # 进化时的闪光
 var _jolt := {}         # 位点 → [偏移, 速度]：受击时片段被震开再弹回
 var _offset := Vector2.ZERO   # 本帧整体位移（抖动 / 浮动 / 跳跃）
+var preview_frag := ""  # 鼠标悬停在片段上时：先把它试装到选中的位点上看看
 var _snap := {}         # 位点 → 吸附反馈强度（1 → 0）
 var _links: Array = []  # 组合触发时点亮的化学键：{a, b, t, color}
 
@@ -252,6 +253,8 @@ func _draw() -> void:
 		var c := _pos(site)
 		var frag_id := String(molecule.sites.get(id, "")) if molecule != null else ""
 		var is_sel := interactive and id == selected
+		if is_sel and not preview_frag.is_empty():
+			frag_id = preview_frag
 		if is_sel:
 			var pulse := 0.5 + 0.5 * sin(_time * 5.0)
 			Shading.glow(self, c, r + 16 + pulse * 4, Color(UIKit.ACCENT, 0.4))
@@ -288,8 +291,8 @@ func _draw() -> void:
 		MoleculeSpecimen.draw_fragment(self, frag_id, c, k * (1.0 + 0.22 * snap_t * snap_t))
 		if not String(frag.get("alert", "")).is_empty():
 			_draw_alert(c + Vector2(r * 0.85, -r * 0.85), 0.6 if compact else (1.0 if interactive else 0.75))
-		if not interactive:
-			continue
+		if not interactive or not (is_sel or id == _hover):
+			continue   # 名字只写在正在看的位置上，其余交给形状
 		var frag_name := tr("frag." + frag_id)
 		var fs := 12
 		var label_y := -MoleculeSpecimen.bounds(frag_id, c, k).size.y * 0.5 - 7.0
@@ -330,6 +333,7 @@ func _draw_pocket(font: Font) -> void:
 			continue
 		var c := _pos(site)
 		var y := r + 13.0
+		var looking := String(site.id) == selected or String(site.id) == _hover
 		for fit in fits:
 			var want: bool = fit.has("want")
 			var hit: bool = bool(fit.hit)
@@ -341,6 +345,8 @@ func _draw_pocket(font: Font) -> void:
 				for d in 12:
 					var a0 := d * TAU / 12.0
 					draw_arc(c, rr, a0, a0 + TAU / 24.0, 4, Color(col, 0.55), 1.5, true)
+			if not looking:
+				continue
 			var label := tr("pocket.%s.%s" % ["want" if want else "avoid", String(fit.get("want", fit.get("avoid", "")))])
 			var fs := 11
 			var w := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x

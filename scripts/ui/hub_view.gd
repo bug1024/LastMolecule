@@ -1,8 +1,7 @@
 class_name HubView
 extends Control
-## 研发总览的「实验室场景」：取代原来的三栏面板，减少企业软件感。
-##   背景：实验室后墙（货架、瓶罐）、按阶段着色的灯光、实验台；
-##   主体：烧瓶研发团队站在实验台上，候选分子悬浮在分析仪上方（MoleculeArt）；
+## 研发总览的观察室：世界背景由 MoleculeBackground 的 lab 模式画，这里画分子脚下的观察台。
+##   主体：候选分子悬浮在观察台的光柱里，是整屏最大的东西；
 ##   左上：RPG 式状态栏（生命条 + 资金 / 年份 / 疗效 / 前期研究）；
 ##   右上：AI / 研发能力 / 竞争格局三张可展开卡片，默认只显示一行摘要；
 ##   实验台正面：团队铭牌、消息条、「进入研发地图 / 查看牌库」按钮。
@@ -38,7 +37,6 @@ var _cards: VBoxContainer
 var _bench_panel: Control
 var _tint := Color(0.35, 0.28, 0.6)
 var _time := 0.0
-var _props: Array = []   # 后墙货架上的瓶罐 [x 比例, 货架层, 宽, 高, 颜色]
 
 const BENCH_FROM_BOTTOM := 176.0
 const STATUS_W := 330.0
@@ -48,15 +46,6 @@ const CARDS_W := 300.0
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_PASS
 	clip_contents = true
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 7
-	var palette := [Color(0.45, 0.75, 1.0), Color(0.35, 0.95, 0.6), Color(0.95, 0.72, 0.35), Color(0.6, 0.48, 0.95), Color(0.93, 0.45, 0.45)]
-	for shelf in 2:
-		var x := 0.04
-		while x < 0.96:
-			var w := rng.randf_range(0.012, 0.024)
-			_props.append([x, shelf, w, rng.randf_range(18, 44), palette[rng.randi_range(0, palette.size() - 1)]])
-			x += w + rng.randf_range(0.008, 0.05)
 	_build()
 	resized.connect(_layout)
 
@@ -185,12 +174,12 @@ func _layout() -> void:
 	var mol := Vector2(minf(300, w * 0.26), minf(240, bench_y - 70))
 	molecule_art.size = mol
 	molecule_art.position = Vector2(w * 0.56 - mol.x * 0.5, bench_y - 58 - mol.y)
-	mol_view.size = Vector2(minf(440, w * 0.38), minf(196, bench_y - 134))
-	mol_view.position = Vector2(w * 0.56 - mol_view.size.x * 0.5, bench_y - 76 - mol_view.size.y)
+	mol_view.size = Vector2(minf(570, w - STATUS_W - CARDS_W - 60), bench_y - 62)
+	mol_view.position = Vector2((STATUS_W + w - CARDS_W) * 0.5 - mol_view.size.x * 0.5, 68)
 	_mol_line.position = Vector2(STATUS_W + 20, 50)
 	_mol_line.size = Vector2(w - STATUS_W - CARDS_W - 40, 22)
 	_exam_line.size = Vector2(460, 22)
-	_exam_line.position = Vector2(w * 0.56 - 230, bench_y - 62)   # 写在分子下方的投影台上
+	_exam_line.position = Vector2((STATUS_W + w - CARDS_W) * 0.5 - 230, bench_y - 1)   # 写在观察台下方
 	_bench_panel.position = Vector2(0, bench_y + 14)
 	_bench_panel.size = Vector2(w, h - bench_y - 14)
 	var plate: Control = _bench_panel.get_node("Plate")
@@ -309,13 +298,38 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
-	# 世界由整屏背景统一画（这里再画一块会和外圈形成矩形接缝）；这里只给分子一块落在地面上的影子
-	if mol_view != null and mol_view.visible:
-		var foot := mol_view.position + mol_view.size * Vector2(0.5, 1.0) + Vector2(10, 14)
-		for i in 5:
-			draw_set_transform(foot, 0.0, Vector2(1.0, 0.16))
-			draw_circle(Vector2.ZERO, 150.0 - i * 24.0, Color(0.02, 0.025, 0.06, 0.12))
-		draw_set_transform(Vector2.ZERO)
+	if mol_view == null or not mol_view.visible:
+		return
+	var bounds := mol_view.visual_bounds()
+	var center := mol_view.position + bounds.get_center()
+	var foot := Vector2(center.x, mol_view.position.y + bounds.end.y + 16.0)
+	var radius := bounds.size.x * 0.56
+	var light := _tint.lightened(0.35)
+	# 背后的观测环：缓慢转动的刻度，只有这一处在动
+	draw_circle(center, radius * 0.86, Color(0.02, 0.03, 0.06, 0.45))
+	draw_arc(center, radius * 0.86, 0, TAU, 96, Color(light, 0.3), 1.5, true)
+	draw_arc(center, radius * 0.72, 0, TAU, 96, Color(light, 0.12), 1.0, true)
+	for i in 48:
+		var a := i * TAU / 48.0 + _time * 0.04
+		var inner := radius * (0.81 if i % 4 == 0 else 0.84)
+		draw_line(center + Vector2.from_angle(a) * inner, center + Vector2.from_angle(a) * radius * 0.86, Color(light, 0.34), 1.0, true)
+	# 光柱从观察台升起，把分子托在里面
+	var top_y := foot.y - radius * 1.35
+	var beam := PackedVector2Array([Vector2(foot.x - radius * 0.72, foot.y), Vector2(foot.x + radius * 0.72, foot.y),
+		Vector2(foot.x + radius * 0.92, top_y), Vector2(foot.x - radius * 0.92, top_y)])
+	draw_polygon(beam, PackedColorArray([Color(light, 0.2), Color(light, 0.2), Color(light, 0.0), Color(light, 0.0)]))
+	# 观察台：几层压扁的圆盘，上沿受光，下方落影
+	var squash := 0.13
+	draw_set_transform(foot + Vector2(0, 15), 0.0, Vector2(1.0, squash))
+	draw_circle(Vector2.ZERO, radius * 0.96, Color(0.012, 0.015, 0.035, 0.75))
+	draw_set_transform(foot + Vector2(0, 8), 0.0, Vector2(1.0, squash))
+	draw_circle(Vector2.ZERO, radius * 0.86, Color(0.09, 0.105, 0.17))
+	draw_set_transform(foot, 0.0, Vector2(1.0, squash))
+	draw_circle(Vector2.ZERO, radius * 0.86, Color(0.15, 0.17, 0.26))
+	draw_arc(Vector2.ZERO, radius * 0.86, 0, TAU, 96, Color(light, 0.75), 6.0, true)
+	draw_circle(Vector2.ZERO, radius * 0.62, Color(light, 0.14))
+	draw_arc(Vector2.ZERO, radius * 0.62, 0, TAU, 96, Color(light, 0.35), 4.0, true)
+	draw_set_transform(Vector2.ZERO)
 
 
 func _glass_panel() -> PanelContainer:

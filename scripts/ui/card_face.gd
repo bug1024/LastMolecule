@@ -360,7 +360,7 @@ func _draw() -> void:
 		var gem := PackedVector2Array()
 		for j in 6:
 			gem.append(orb + Vector2.from_angle(PI / 6 + j * TAU / 6) * 19 * k)
-		draw_colored_polygon(gem, Color("397b68"))
+		draw_colored_polygon(gem, UIKit.DANGER.darkened(0.2) if card.damaged else Color("397b68"))   # 受损的片段卡：费用宝石变红
 		gem.append(gem[0])
 		draw_polyline(gem, UIKit.PAPER, 2 * k, true)
 		var fs := _px(26)

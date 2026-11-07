@@ -125,6 +125,8 @@ func _ready() -> void:
 		_map.generate(state.stage, rng)
 		if bool(_type_cfg.get("molecule", false)):
 			molecule = Molecule.create()
+			for card_id in Molecule.config().get("starter_trim", []):   # 起始牌让位给片段卡
+				deck.erase(card_id)
 		_next_opening_step()
 	_battle_manager = BattleManager.new()
 	_battle_manager.rng = rng
@@ -536,6 +538,29 @@ func build_deck() -> Array:
 		if data.is_empty():
 			continue
 		cards.append(_make_card(data, upgraded.has(card_id)))
+	return cards + molecule_cards()
+
+
+## 分子带来的牌：每个片段一张片段卡，加上组合成立的特性卡。随分子结构变化，不能删除或升级
+func molecule_cards() -> Array:
+	var cards: Array = []
+	if molecule == null:
+		return cards
+	for entry in molecule.fragment_cards():
+		var data := molecule.site_card(String(entry.site))   # 含相邻片段带来的联动效果
+		if data.is_empty():
+			continue
+		var card := _make_card(data)
+		card.site = String(entry.site)
+		card.starter = true   # 套路判断只看玩家自己构筑的牌
+		card.type_name = tr("mol.fragment_tag_synergy" if data.has("synergy_with") else "mol.fragment_tag")
+		cards.append(card)
+	for card_id in molecule.signature_cards():
+		var data := get_card_by_id(String(card_id))
+		if not data.is_empty():
+			var card := _make_card(data)
+			card.type_name = tr("mol.signature_tag")   # 卡面类型栏写「分子特性」
+			cards.append(card)
 	return cards
 
 
@@ -671,12 +696,6 @@ func _start_battle(kind: String) -> void:
 	var lines: Array = (mol.get("lines", []) as Array).duplicate()
 	var exam_ctx := {}
 	if molecule != null:
-		for card_id in molecule.signature_cards():   # 分子特性卡：组合成立时每场战斗都在牌组里
-			var data := get_card_by_id(String(card_id))
-			if not data.is_empty():
-				var card := _make_card(data)
-				card.type_name = tr("mol.signature_tag")   # 卡面类型栏写「分子特性」
-				deck_cards.append(card)
 		if kind == "boss":
 			exam_ctx = _exam_battle_ctx(lines)
 	if int(mol.get("clinical_cost", 0)) > 0:   # 溶解度差：临床策略卡（给药）更贵

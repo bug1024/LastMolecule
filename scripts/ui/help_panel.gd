@@ -3,8 +3,8 @@ extends ModalPanel
 ## 玩法说明：像一本小手册——左侧是带图标的章节目录，右侧是当前章节的「书页」（大标题 + 正文）。
 ## 章节：快速上手、目标、研发地图、阶段试验、卡牌与 AI、立项决策、术语；正文是翻译表里的 BBCode（help.<id>）。
 
-const PAGES := ["quick", "goal", "map", "battles", "cards", "decisions", "glossary"]
-const ICONS := {"quick": "ui_play", "goal": "outcome_approved", "map": "node_milestone", "battles": "node_boss",
+const PAGES := ["quick", "goal", "map", "battles", "molecule", "cards", "decisions", "glossary"]
+const ICONS := {"molecule": "type_molecular", "quick": "ui_play", "goal": "outcome_approved", "map": "node_milestone", "battles": "node_boss",
 	"cards": "ui_deck", "decisions": "node_event", "glossary": "ui_help"}
 
 var _nav: VBoxContainer

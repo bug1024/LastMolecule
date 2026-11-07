@@ -671,6 +671,8 @@ func _play(ev: Dictionary) -> void:
 		"card":
 			var played: ResearchCard = ev.card
 			GameAudio.sfx("zap" if played.is_ai() else ("slash" if played.kind == "attack" else "card_play"))
+			if not played.site.is_empty() and _mol.visible:   # 片段卡：分子上那个片段出手
+				_mol.flash_sites([played.site], Color(0.55, 1.0, 0.8))
 			await _animate_card_out(played, int(ev.get("target", -1)))
 		"deviation":
 			GameAudio.sfx("deviation")
@@ -736,6 +738,14 @@ func _play(ev: Dictionary) -> void:
 			GameAudio.sfx("deviation")
 			_float_text(tr("battle.fx.exploit." + String(ev.tag)), _mol.position + Vector2(_mol.size.x * 0.5, -6), Color(1.0, 0.45, 0.4), 20)
 			await _wait(0.35)
+		"fragment_repaired":
+			_mol.flash_sites(ev.sites, Color(0.55, 1.0, 0.7))
+			_float_text(tr("battle.fx.fragment_repaired"), _mol.position + Vector2(_mol.size.x * 0.5, 22), Color(0.6, 1.0, 0.75), 18)
+			await _wait(0.2)
+		"fragment_damaged":
+			_mol.flash_sites(ev.sites, UIKit.DANGER)
+			_float_text(tr("battle.fx.fragment_damaged"), _mol.position + Vector2(_mol.size.x * 0.5, 22), Color(1.0, 0.55, 0.45), 18)
+			await _wait(0.25)
 		"mol":
 			_mol.flash(String(ev.prop))
 			if not bool(ev.get("start", false)):   # 开场时所有生效的片段一起亮，不逐个飘字
@@ -1542,7 +1552,7 @@ func _refresh_statuses() -> void:
 func _refresh_intents() -> void:
 	for ew in _enemy_widgets:
 		var e: Enemy = _manager.enemies[ew.index]
-		ew.show_intent(e, _manager.intent_damage(e))
+		ew.show_intent(e, _manager.intent_damage(e), _manager.exploit_info(e))
 
 
 func _refresh_energy() -> void:

@@ -333,7 +333,9 @@ func _test_project_types() -> void:
 	RunSave.new_project_type = "selective"
 	var sel := _new_game()
 	_expect(sel.project_type == "selective" and RunSave.new_project_type.is_empty(), "The chosen program type is applied once")
-	_expect(sel.deck.count("mol_target") == 2 and sel.deck.size() == 10, "Selective programs swap in an extra Target Lock")
+	_expect(sel.deck.count("mol_target") == 2 - (Molecule.config().starter_trim as Array).count("mol_target")
+		and sel.deck.size() == 10 - (Molecule.config().starter_trim as Array).size(),
+		"Selective programs swap in an extra Target Lock (and make room for fragment cards)")
 	_expect(sel.state.safety_risk == 15 and sel.get_final_safety_limit() == 65, "Selective programs start safer but need a cleaner final review")
 	_expect(int(sel.get_battle_rules().get("offtarget_limit", 0)) == 2, "Selective rules apply in Discovery")
 	_expect(String(sel.to_save().project_type) == "selective" and sel.get_project_name().contains("LM-002"),
@@ -748,8 +750,35 @@ func _test_upgrade_preview() -> void:
 	for c in options:
 		if c.id == "mol_hit":
 			hit = c
-	_expect(hit != null and hit.copies == 4 and hit.upgrade_preview != null and hit.upgrade_preview.upgraded,
+	_expect(hit != null and hit.copies == game.deck.count("mol_hit") and hit.upgrade_preview != null and hit.upgrade_preview.upgraded,
 		"Upgrade options count copies and carry an upgraded preview")
+	# 片段决定卡组：每个片段都有卡；装好的分子给每个位点一张，删除 / 升级只针对玩家自己的牌
+	for frag in Molecule.config().fragments:
+		_expect(not Molecule.fragment_card(String(frag.id)).is_empty(), "Fragment has a card: " + String(frag.id))
+	if game.molecule == null:
+		game.molecule = Molecule.create()
+	game.molecule.apply_preset("balanced")
+	var bound: Array = game.molecule_cards().filter(func(c: ResearchCard) -> bool: return not c.site.is_empty())
+	_expect(bound.size() == game.molecule.sites.size() and game.build_deck().size() == game.deck.size() + game.molecule_cards().size(),
+		"Each placed fragment adds its card to the battle deck")
+	_expect(game._unique_deck_cards(false).all(func(c: ResearchCard) -> bool: return c.site.is_empty()), "Fragment cards cannot be removed or upgraded")
+	# 相邻联动：苯环旁边的环位放氟原子，苯环牌多出护盾
+	var syn := Molecule.create()
+	syn.sites = {"L1": "phenyl", "R1": "fluoro"}
+	var lone := Molecule.create()
+	lone.sites = {"L1": "phenyl"}
+	_expect(syn.site_card("L1").get("synergy_with", "") == "fluoro" and not lone.site_card("L1").has("synergy_with")
+		and (syn.site_card("L1").effects as Array).size() == (lone.site_card("L1").effects as Array).size() + 1,
+		"A fragment card gains its synergy effect only next to the fragment it likes")
+	var bm := BattleManager.new()
+	bm.hand = bound.duplicate()
+	var before: int = bound[0].cost
+	bm._damage_fragments([bound[0].site])
+	bm._damage_fragments([bound[0].site])
+	_expect(bound[0].damaged and bound[0].cost == before + 1, "An exploited fragment's card costs 1 more, once")
+	bm._repair_fragment()
+	_expect(not bound[0].damaged and bound[0].cost == before, "Playing an Experiment card repairs a damaged fragment card")
+	bm.free()
 	var diff := ResearchCard.upgrade_diff(hit, hit.upgrade_preview)
 	_expect(diff.size() >= 1 and diff[0].contains("→"), "Upgrade diff lists before → after numbers")
 	var rows: Array = hit.upgrade_preview.effect_rows({"compare_to": hit})

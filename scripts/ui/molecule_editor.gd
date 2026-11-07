@@ -1,7 +1,8 @@
 class_name MoleculeEditor
 extends ModalPanel
-## 分子设计 / 修饰界面。左边是分子结构图（点位点选中）和片段库（点片段放进选中的位点），
-## 右边是实时的属性条（每项写清楚现在会带来什么效果）、触发的组合、毒性警示、快速方案与确认按钮。
+## 分子设计 / 修饰界面。操作只有一件事：点分子上的位置，再点下面的片段。
+## 片段库只列能放进这个位置的；鼠标停在片段上，分子和右边的属性都会先试装给你看。
+## 右边只说现在的结果，阈值规则放在悬停提示里。
 ## initial：开局设计，不能取消；modify：里程碑修饰，显示这次改动的代价（局部 / 核心），可以取消。
 
 signal submitted(placement: Dictionary)
@@ -26,20 +27,25 @@ var _preview: Callable        # 修饰模式：func(placement) -> {kind, efficac
 var _baseline := {}           # 修饰模式：改动前的属性，用来对比
 var _prop_delta := {}         # 这次操作让每项属性变了多少（只在刷新后闪一下）
 var _toasts: HBoxContainer
+var _step: Label              # 告诉玩家这一步该做什么
+var _trial: Molecule = null   # 悬停试装：只用来显示，不影响工作副本
+var _stage := "候选化合物发现"
+var _card_box: VBoxContainer  # 片段决定卡组：右下角展示这个位置给你的那张牌
 
 
 func _init() -> void:
 	super._init()
 	title_key = "mol.title"
-	subtitle_key = "mol.subtitle"
 	icon_name = "type_molecular"
 	accent = Color(0.7, 0.55, 1.0)
 	panel_width = 1140
 
 
 ## 打开编辑器；molecule 是游戏里的分子（不会被直接修改）
-func edit(molecule: Molecule, edit_mode: String, preview: Callable = Callable()) -> void:
+func edit(molecule: Molecule, edit_mode: String, preview: Callable = Callable(), stage := "候选化合物发现") -> void:
 	mode = edit_mode
+	_stage = stage
+	_trial = null
 	_preview = preview
 	_work = Molecule.from_dict(molecule.to_dict())
 	_baseline = _work.properties() if edit_mode == "modify" else {}
@@ -52,7 +58,8 @@ func edit(molecule: Molecule, edit_mode: String, preview: Callable = Callable())
 	_target.visible = not molecule.disease.is_empty()
 	if _target.visible:
 		var vid := Molecule.variant_id(molecule.disease, molecule.variant)
-		_target.text = tr("mol.pocket_title") % tr("variant." + vid) + "　" + tr("variant.%s.desc" % vid)
+		_target.text = tr("mol.pocket_title") % tr("variant." + vid)
+		_target.tooltip_text = tr("variant.%s.desc" % vid)
 	_cancel.visible = mode == "modify"
 	_confirm.text = tr("mol.confirm" if mode == "initial" else "mol.confirm_modify")
 	_title_text(tr("mol.title" if mode == "initial" else "mol.modify_title"))
@@ -89,11 +96,12 @@ func _build(box: VBoxContainer) -> void:
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	left.add_theme_constant_override("separation", 8)
 	row.add_child(left)
-	_target = UIKit.label("", Color(0.82, 0.72, 1.0), 13, true)
+	_target = UIKit.label("", Color(0.82, 0.72, 1.0), 14)
+	_target.mouse_filter = Control.MOUSE_FILTER_STOP
 	left.add_child(_target)
 	_view = MoleculeView.new()
 	_view.interactive = true
-	_view.custom_minimum_size = Vector2(0, 262)
+	_view.custom_minimum_size = Vector2(0, 300)
 	_view.site_clicked.connect(_on_site)
 	left.add_child(_view)
 	# 播报排在分子下方的空处，绝不盖住正在响应的结构
@@ -105,10 +113,10 @@ func _build(box: VBoxContainer) -> void:
 	_toasts.offset_top = -30
 	_toasts.offset_bottom = -2
 	_view.add_child(_toasts)
-	left.add_child(UIKit.label(tr("mol.hint"), UIKit.TEXT_DIM, 13, true))
-	left.add_child(UIKit.header(tr("mol.inventory"), 15, accent.lightened(0.2)))
+	_step = UIKit.header("", 16, accent.lightened(0.25))
+	left.add_child(_step)
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(0, 150)
+	scroll.custom_minimum_size = Vector2(0, 156)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	left.add_child(scroll)
 	_inventory = HFlowContainer.new()
@@ -156,6 +164,9 @@ func _build(box: VBoxContainer) -> void:
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	right.add_child(spacer)
+	_card_box = VBoxContainer.new()
+	_card_box.add_theme_constant_override("separation", 4)
+	right.add_child(_card_box)
 	var buttons := HBoxContainer.new()
 	buttons.add_theme_constant_override("separation", 10)
 	_cancel = UIKit.button(tr("mol.cancel"), "", "normal", Vector2(110, 46))
@@ -279,10 +290,27 @@ func _toast(text: String, color: Color) -> void:
 
 
 func _refresh_all() -> void:
+	_trial = null
+	_view.preview_frag = ""
 	_view.queue_redraw()
+	_fill_step()
 	_fill_inventory()
 	_fill_props()
 	_fill_extras()
+	_show_card(String(_work.sites.get(_view.selected, "")), false)
+
+
+## 这一步要做什么：一句话，随选中的位置变化
+func _fill_step() -> void:
+	var site := _view.selected
+	if site.is_empty():
+		_step.text = tr("mol.step.select")
+		return
+	var site_name := tr("site." + Molecule.site_type(site)).split(" ")[0]
+	if _work.sites.has(site):
+		_step.text = tr("mol.step.replace") % [site_name, tr("frag." + String(_work.sites[site]))]
+	else:
+		_step.text = tr("mol.step.pick") % site_name
 
 
 func _fill_inventory() -> void:
@@ -290,65 +318,158 @@ func _fill_inventory() -> void:
 		child.queue_free()
 	var counts := {}
 	for id in _work.inventory:
-		counts[id] = int(counts.get(id, 0)) + 1
+		if Molecule.can_place(String(id), _view.selected):   # 放不进去的不列出来，不用玩家自己筛
+			counts[id] = int(counts.get(id, 0)) + 1
 	var ids: Array = counts.keys()
 	ids.sort()
 	for id in ids:
 		_inventory.add_child(_fragment_chip(String(id), int(counts[id])))
+	if ids.is_empty():
+		_inventory.add_child(UIKit.label(tr("mol.inventory_empty"), UIKit.TEXT_DIM, 14))
 
 
-## 片段小卡：颜色点 + 名称（×数量）+ 能放的位点 + 收益 / 代价
+## 鼠标停在片段上：分子和属性先按试装后的样子显示
+func _hover_chip(id: String, on: bool) -> void:
+	_trial = null
+	_view.preview_frag = ""
+	if on and not _view.selected.is_empty():
+		var trial := Molecule.from_dict(_work.to_dict())
+		var placement := trial.sites.duplicate()
+		placement[_view.selected] = id
+		if trial.apply_layout(placement):
+			_trial = trial
+			_view.preview_frag = id
+	_fill_props()
+	_fill_extras()
+	_show_card(id if _trial != null else String(_work.sites.get(_view.selected, "")), _trial != null)
+
+
+## 右下角：这个位置现在给的牌，或悬停片段装上后会变成的牌
+func _show_card(frag_id: String, trying: bool) -> void:
+	for child in _card_box.get_children():
+		child.queue_free()
+	var data := _site_card(frag_id)
+	if data.is_empty():
+		return
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	var card := ResearchCard.from_dict(data)
+	card.type_name = tr("mol.fragment_tag_synergy" if data.has("synergy_with") else "mol.fragment_tag")
+	var face := CardFace.create(card, 0.6)
+	face.detail_enabled = false
+	row.add_child(face)
+	var caption_text := tr("mol.card_try" if trying else "mol.card_now")
+	if data.has("synergy_with"):
+		caption_text += "\n" + tr("mol.synergy_with") % tr("frag." + String(data.synergy_with))
+	var caption := UIKit.label(caption_text, UIKit.GOLD if trying else UIKit.TEXT_DIM, 13, true)
+	caption.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	caption.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(caption)
+	_card_box.add_child(row)
+
+
+## 片段放进选中位置后的牌（算上和相邻片段的联动）
+func _site_card(frag_id: String) -> Dictionary:
+	if frag_id.is_empty() or _view.selected.is_empty():
+		return {}
+	var m := Molecule.from_dict(_work.to_dict())
+	m.sites[_view.selected] = frag_id   # 只为算牌面，不检查库存
+	return m.site_card(_view.selected)
+
+
+## 片段卡的一行摘要：「1 费 · 11 伤害 · -2 自伤」
+static func card_summary(data: Dictionary) -> String:
+	if data.is_empty():
+		return ""
+	var card := ResearchCard.from_dict(data)
+	var parts: Array[String] = [TranslationServer.translate("mol.card_cost") % card.cost]
+	for row in card.effect_rows():
+		parts.append("%s %s" % [row.number, row.text])
+	return " · ".join(parts)
+
+
+## 片段小卡：结构图 + 名称 + 收益 / 代价；这个位置的口袋喜欢或讨厌它时直接标出来
 func _fragment_chip(id: String, count: int) -> Control:
 	var frag := Molecule.fragment(id)
 	var col := Color.from_string(String(frag.get("color", "#9fb4c8")), Color.GRAY)
-	var fits := not _view.selected.is_empty() and Molecule.can_place(id, _view.selected)
 	var btn := Button.new()
-	btn.custom_minimum_size = Vector2(212, 58)
+	btn.custom_minimum_size = Vector2(212, 48)
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	var sb := UIKit.panel_style(Color(col, 0.12) if fits else Color(0.07, 0.09, 0.12, 0.8), Color(col, 0.7) if fits else Color(0.3, 0.34, 0.4, 0.5), 10)
+	var sb := UIKit.panel_style(Color(0.07, 0.09, 0.12, 0.85), Color(col, 0.55), 10)
 	for state_name in ["normal", "focus"]:
 		btn.add_theme_stylebox_override(state_name, sb)
 	var hover := sb.duplicate() as PaintedStyle
-	hover.bg_color = Color(col, 0.25)
+	hover.bg_color = Color(col.darkened(0.45), 0.95)
+	hover.border_color = col
 	btn.add_theme_stylebox_override("hover", hover)
 	btn.add_theme_stylebox_override("pressed", hover)
 	btn.pressed.connect(_place.bind(id, btn))
+	btn.mouse_entered.connect(_hover_chip.bind(id, true))
+	btn.mouse_exited.connect(_hover_chip.bind(id, false))
+	var row := HBoxContainer.new()
+	row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	row.offset_left = 6
+	row.add_theme_constant_override("separation", 6)
+	btn.add_child(row)
+	var art := Control.new()
+	art.custom_minimum_size = Vector2(38, 0)
+	art.draw.connect(func() -> void: MoleculeSpecimen.draw_fragment(art, id, art.size * 0.5, 19.0))
+	row.add_child(art)
 	var col_box := VBoxContainer.new()
-	col_box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	col_box.offset_left = 10
-	col_box.offset_top = 5
+	col_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	col_box.add_theme_constant_override("separation", 0)
-	col_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	btn.add_child(col_box)
+	row.add_child(col_box)
 	var name_row := HBoxContainer.new()
-	name_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var dot := ColorRect.new()
-	dot.color = col
-	dot.custom_minimum_size = Vector2(8, 8)
-	dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	name_row.add_child(dot)
-	name_row.add_child(UIKit.header(" " + tr("frag." + id) + ("  ×%d" % count if count > 1 else ""), 14, Color.WHITE if fits else UIKit.TEXT_DIM))
+	name_row.add_theme_constant_override("separation", 5)
+	name_row.add_child(UIKit.header(tr("frag." + id) + ("  ×%d" % count if count > 1 else ""), 14, Color.WHITE))
 	if not String(frag.get("alert", "")).is_empty():
-		name_row.add_child(UIKit.label(" ⚠", UIKit.GOLD, 13))
+		name_row.add_child(UIKit.label("⚠", UIKit.GOLD, 13))
+	var fit := _pocket_note(frag)
+	if not fit.is_empty():
+		name_row.add_child(UIKit.label(String(fit.text), fit.color, 12))
 	col_box.add_child(name_row)
-	col_box.add_child(UIKit.label(Molecule.fx_text(frag.get("fx", {})), Color(0.8, 0.86, 0.92) if fits else Color(0.55, 0.6, 0.66), 12))
-	var site_names: Array = (frag.get("sites", []) as Array).map(func(t: String) -> String: return tr("site." + t).split(" ")[0])
-	col_box.add_child(UIKit.label(" / ".join(site_names), Color(0.55, 0.62, 0.7), 11))
-	for node in col_box.find_children("*", "Control", true, false):
+	# 第二行写它给的牌——这才是装上它的意义；属性变化悬停时在右边属性条上试给你看
+	var site_data := _site_card(id)
+	if site_data.has("synergy_with"):
+		name_row.add_child(UIKit.label("✦ " + tr("mol.synergy"), UIKit.GOLD, 12))
+	col_box.add_child(UIKit.label(card_summary(site_data), Color(1.0, 0.86, 0.62), 12))
+	btn.tooltip_text = Molecule.fx_text(frag.get("fx", {}))
+	for node in btn.find_children("*", "Control", true, false):
 		(node as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
-	btn.disabled = not fits
 	return btn
+
+
+## 片段放进当前位置后和靶点口袋的关系：✓ 要芳环 / ✗ 忌大基团；没关系就不写
+func _pocket_note(frag: Dictionary) -> Dictionary:
+	var tags: Array = frag.get("tags", [])
+	for spot in _work.pocket():
+		if String(spot.get("site", "")) != _view.selected:
+			continue
+		if spot.has("want") and tags.has(String(spot.want)):
+			return {"text": "✓ " + tr("pocket.want." + String(spot.want)), "color": UIKit.ACCENT}
+		if spot.has("avoid") and tags.has(String(spot.avoid)):
+			return {"text": "✗ " + tr("pocket.avoid." + String(spot.avoid)), "color": UIKit.DANGER.lightened(0.2)}
+	return {}
+
+
+## 当前显示的分子：悬停试装时是试装品，否则是工作副本
+func _shown() -> Molecule:
+	return _trial if _trial != null else _work
 
 
 func _fill_props() -> void:
 	for child in _props.get_children():
 		child.queue_free()
-	var props := _work.properties()
+	var shown := _shown()
+	var props := shown.properties()
+	var now := _work.properties()
 	var hi := int(Molecule.config().get("range", [0, 6])[1])
+	var effect_lines: Array = shown.effects(_stage).lines
 	for p in Molecule.PROPS:
 		var v := int(props[p])
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
+		row.tooltip_text = tr("prop.%s.tip" % p)
 		var name_label := UIKit.label(tr("prop." + p), UIKit.TEXT, 14)
 		name_label.custom_minimum_size = Vector2(56, 0)
 		row.add_child(name_label)
@@ -356,10 +477,11 @@ func _fill_props() -> void:
 		pips.custom_minimum_size = Vector2(hi * 18, 16)
 		var good := v >= 4
 		var bad := v <= 1
-		var change := int(_prop_delta.get(p, 0))
+		var trying := _trial != null
+		var change := v - int(now[p]) if trying else int(_prop_delta.get(p, 0))
 		var was := v - change
 		var base := int(_baseline.get(p, -1))
-		var pulse := [1.0 if change != 0 else 0.0]
+		var pulse := [(0.55 if trying else 1.0) if change != 0 else 0.0]
 		pips.draw.connect(func() -> void:
 			var t: float = pulse[0]
 			for i in hi:
@@ -375,7 +497,7 @@ func _fill_props() -> void:
 				pips.draw_rect(r, c)
 			if base >= 0 and base != v:   # 修饰前的位置
 				pips.draw_line(Vector2(base * 18 - 2, 0), Vector2(base * 18 - 2, 16), UIKit.GOLD, 2.0))
-		if change != 0:
+		if change != 0 and not trying:
 			var pulse_tween := pips.create_tween()
 			pulse_tween.tween_method(func(t: float) -> void:
 				pulse[0] = t
@@ -387,38 +509,57 @@ func _fill_props() -> void:
 		if change != 0:
 			var delta := UIKit.header("%+d" % change, 16, UIKit.ACCENT if change > 0 else UIKit.DANGER.lightened(0.2))
 			row.add_child(delta)
-			var delta_tween := delta.create_tween()
-			delta_tween.tween_interval(0.8)
-			delta_tween.tween_property(delta, "modulate:a", 0.0, 0.4)
+			if not trying:
+				var delta_tween := delta.create_tween()
+				delta_tween.tween_interval(0.8)
+				delta_tween.tween_property(delta, "modulate:a", 0.0, 0.4)
 		_props.add_child(row)
-		var tip := UIKit.label(tr("prop.%s.tip" % p), UIKit.ACCENT if good else (UIKit.DANGER.lightened(0.25) if bad else UIKit.TEXT_DIM), 12, true)
-		_props.add_child(tip)
+		# 只写现在真正生效的效果；所有阈值放在这一行的悬停提示里
+		for line in effect_lines:
+			if String(line.get("prop", "")) != p:
+				continue
+			var args: Array = line.get("args", [])
+			var text := tr(String(line.key)) % args if not args.is_empty() else tr(String(line.key))
+			var harmful := String(line.key) in ["mol.fx.weak", "mol.fx.offtarget", "mol.fx.poison_down", "mol.fx.clinical_cost", "mol.fx.unstable_strength"]
+			_props.add_child(UIKit.label(text, UIKit.DANGER.lightened(0.25) if harmful else UIKit.ACCENT, 12, true))
 
 
 func _fill_extras() -> void:
+	var shown := _shown()
 	var counts := {}
-	for c in _work.active_combos():
+	for c in shown.active_combos():
 		counts[String(c.id)] = int(counts.get(String(c.id), 0)) + 1
-	var combos: Array = counts.keys().map(func(id: String) -> String:
-		return "· " + tr("combo." + id) + ("  ×%d" % counts[id] if counts[id] > 1 else ""))
-	_combos.text = tr("mol.combos") + "：" + ("\n" + "\n".join(combos) if not combos.is_empty() else tr("mol.combos_none"))
+	var full: Array = counts.keys().map(func(id: String) -> String: return tr("combo." + id))
+	var short: Array = full.map(func(text: String) -> String: return text.get_slice("：", 0).get_slice(":", 0))
+	_combos.visible = not short.is_empty()
+	_combos.text = tr("mol.combos") + "：" + "、".join(short)
+	_combos.tooltip_text = "\n".join(full)
 	for child in _alerts.get_children():
 		child.queue_free()
-	if _work.alerts.is_empty():
-		_alerts.add_child(UIKit.label("✓ " + tr("mol.alerts_none"), UIKit.ACCENT, 13))
-	for id in _work.alerts:
-		var state := String(_work.alerts[id])
+	for id in shown.alerts:
+		var state := String(shown.alerts[id])
 		var color: Color = {"cleared": UIKit.ACCENT, "confirmed": UIKit.DANGER}.get(state, UIKit.GOLD)
 		_alerts.add_child(UIKit.label("⚠ %s（%s）" % [tr("alert." + String(id)), tr("alert.state." + state)], color, 13, true))
-	# 各阶段 Boss 的分子考验：设计时就能看到这个分子会在哪一关吃亏
+	# 阶段考验：过的只打勾，没过的才写差多少——玩家要看的就是这一条
 	for child in _exams.get_children():
 		child.queue_free()
-	_exams.add_child(UIKit.label(tr("mol.exam.title"), accent.lightened(0.2), 13))
+	var marks: Array[String] = []
+	var failures: Array[String] = []
+	var details: Array[String] = []
 	for stage in Molecule.config().get("exams", {}):
-		var exam := _work.exam_result(String(stage))
+		var exam := shown.exam_result(String(stage))
 		var ok := bool(exam.passed)
-		_exams.add_child(UIKit.label("%s %s　%s" % ["✓" if ok else "✗", tr("stage_short." + String(stage)), Molecule.exam_label(exam)],
-			UIKit.ACCENT if ok else UIKit.DANGER.lightened(0.25), 12))
+		var short_stage := tr("stage_short." + String(stage))
+		marks.append(("✓ " if ok else "✗ ") + short_stage)
+		details.append("%s %s　%s" % ["✓" if ok else "✗", short_stage, Molecule.exam_label(exam)])
+		if not ok:
+			failures.append("✗ %s　%s" % [short_stage, Molecule.exam_label(exam)])
+	var summary := UIKit.label(tr("mol.exam.title") + "　" + "　".join(marks), accent.lightened(0.2), 13)
+	summary.mouse_filter = Control.MOUSE_FILTER_PASS
+	summary.tooltip_text = "\n".join(details)
+	_exams.add_child(summary)
+	for line in failures:
+		_exams.add_child(UIKit.label(line, UIKit.DANGER.lightened(0.25), 12))
 	_confirm.disabled = false
 	_cost.add_theme_color_override("font_color", UIKit.GOLD)
 	if mode == "modify" and _preview.is_valid():
@@ -433,6 +574,6 @@ func _fill_extras() -> void:
 			"local":
 				_cost.text = tr("mol.cost.local")
 			_:
-				_cost.text = tr("mol.cost.none")
+				_cost.text = ""
 	else:
 		_cost.text = ""

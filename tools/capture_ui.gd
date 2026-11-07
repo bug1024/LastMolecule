@@ -6,7 +6,7 @@ func _initialize() -> void:
 	call_deferred("run")
 func shot(name: String, delay := 0.5) -> void:
 	await create_timer(delay).timeout
-	await RenderingServer.frame_post_draw
+	RenderingServer.force_draw(true)   # 窗口被遮挡时 Godot 不绘制，等下一帧会一直等不到
 	root.get_texture().get_image().save_png(output.path_join(name + ".png"))
 func run() -> void:
 	for arg in OS.get_cmdline_user_args():
@@ -136,6 +136,8 @@ func run() -> void:
 	main._settings.visible = false
 	main._help.open()
 	await shot("help")
+	main._help._show("molecule")
+	await shot("help-molecule", 0.2)
 	main._help.close()
 	main._pause_menu.open()
 	await shot("pause")
@@ -185,6 +187,9 @@ func run() -> void:
 	editor._work.apply_layout({"L1": "phenyl", "R1": "pyridine", "R2": "nitro"})
 	editor._after_change(before)
 	await shot("editor-alert", 0.28)
+	editor._on_site("T1")
+	editor._hover_chip("morpholine", true)
+	await shot("editor-hover", 0.1)
 	editor.visible = false
 	var summary: Dictionary = game.company.settle_run(game.state.data, "approved", game.state.funding)
 	main._ending.show_ending("approved", "ending.approved.flavor", summary, game.state)

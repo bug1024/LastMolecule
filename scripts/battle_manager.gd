@@ -191,6 +191,8 @@ func play_card(card: ResearchCard, target_index := -1) -> bool:
 		if _active and not (precise and bool(rules.get("precise_free", false))):
 			rule_attacks += 1
 			_check_rule_offtarget()
+	if card.type == "experiment":
+		_repair_fragment()
 	_on_type_played(card)
 	if card.kind == "power":
 		pass   # 能力牌打出后本场生效，不再回到牌堆
@@ -338,7 +340,8 @@ func exploit_info(enemy: Enemy) -> Dictionary:
 		return {}
 	var tag := String(ex.get("tag", ""))
 	var sites: Array = exposure.get(tag, {}).get("sites", [])
-	return {"tag": tag, "sites": sites, "per": int(ex.get("damage", 0)), "bonus": int(ex.get("damage", 0)) * sites.size()}
+	return {"tag": tag, "sites": sites, "names": exposure.get(tag, {}).get("names", []),
+		"per": int(ex.get("damage", 0)), "bonus": int(ex.get("damage", 0)) * sites.size()}
 
 
 ## 玩家对某个敌人造成的实际伤害（卡面数值预览）
@@ -454,6 +457,7 @@ func _execute(e: Enemy, index: int) -> void:
 		var bonus := int(exploit.get("bonus", 0))
 		if bonus > 0:   # 专攻分子结构弱点：界面让被攻击的片段闪红
 			_emit({"t": "exploit", "index": index, "tag": exploit.tag, "sites": exploit.sites})
+			_damage_fragments(exploit.sites)
 		for h in e.intent_hits():
 			if not player.is_alive():
 				break
@@ -476,6 +480,28 @@ func _execute(e: Enemy, index: int) -> void:
 		for k in int(add.get("value", 1)):
 			draw_pile.insert(rng.randi_range(0, draw_pile.size()), card_factory.call(String(add.id)))
 		_emit({"t": "add_card", "id": String(add.id), "count": int(add.get("value", 1)), "pile": "draw"})
+
+
+## 被专攻的片段受损：它的片段卡本场费用 +1（每张只受损一次）
+func _damage_fragments(site_ids: Array) -> void:
+	var hit: Array = []
+	for card in hand + draw_pile + discard_pile:
+		if not card.site.is_empty() and site_ids.has(card.site) and not card.damaged:
+			card.damaged = true
+			card.cost += 1
+			hit.append(card.site)
+	if not hit.is_empty():
+		_emit({"t": "fragment_damaged", "sites": hit})
+
+
+## 实验验证找到问题、修好结构：每打一张实验验证牌，修复一张受损的片段卡
+func _repair_fragment() -> void:
+	for card in hand + draw_pile + discard_pile:
+		if card.damaged:
+			card.damaged = false
+			card.cost = maxi(0, card.cost - 1)
+			_emit({"t": "fragment_repaired", "sites": [card.site]})
+			return
 
 
 # ---------- 效果结算 ----------

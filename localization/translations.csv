@@ -1086,3 +1086,19 @@ battle.risk_short,再次攻击将反噬,Next attack backfires
 mol.toast.combo,组合触发 · %s,Combo · %s
 mol.toast.alert,⚠ 结构警示 · %s,⚠ Structural alert · %s
 mol.prop_from,原 %d,was %d
+mol.step.select,点分子上的一个位置,"Click a position on the molecule"
+mol.step.pick,给「%s」选一个片段,"Pick a fragment for this %s"
+mol.step.replace,「%s」现在是%s。选一个替换，或再点一次这个位置取下,"This %s holds %s. Pick a replacement, or click the position again to remove it"
+mol.inventory_empty,没有能放进这个位置的片段了,"No fragments fit this position"
+mol.fragment_tag,分子片段,Fragment
+battle.fx.fragment_damaged,片段受损 · 本场费用 +1,Fragment damaged · cost +1
+mol.card_now,这个位置给你的牌,Card from this position
+mol.card_try,装上后变成这张牌,Card you get with it
+mol.card_cost,%d 费,%d cost
+mol.fragment_tag_synergy,分子片段 · 联动,"Fragment · Synergy"
+mol.synergy,联动,"synergy"
+mol.synergy_with,和相邻的%s联动：效果增强,"Synergy with the adjacent %s: stronger"
+battle.fx.fragment_repaired,片段修复 · 费用恢复,"Fragment repaired"
+intent.tip.exploit,专攻片段：%s（被打中后它的牌本场费用 +1，打出实验验证牌可修复）,"Targets fragment: %s (its card costs +1 this battle; play an Experiment card to repair)"
+help.tab.molecule,分子与片段,"Molecule & Fragments"
+help.molecule,"[b][color=#4fc896]分子就是你的核心卡组[/color][/b]\n分子上有 7 个位置，每装一个片段，每场战斗就得到一张它的[b]片段牌[/b]（卡面写着「分子片段」）。苯环出伤害、吗啉抽牌、叔丁基挡伤害……装什么，就怎么打。\n\n[b]相邻联动[/b]\n片段牌旁边的位置装着它喜欢的片段时，牌会变强（卡面写「联动」）。设计时片段卡上出现 ✦ 联动 就说明放对了位置。\n\n[b]修饰分子 = 换牌[/b]\n换掉一个片段，它的牌就离开牌组，新片段的牌加入。片段牌不能在研发中删除或升级——想换，就去修饰分子。同一种片段装两个，就有两张。\n\n[b]片段受损[/b]\n有些敌人专攻分子的结构弱点，头顶意图会提前写出要打哪个片段。被打中后，那张片段牌本场费用 +1（费用宝石变红）；每打一张实验验证牌修复一张。战斗结束自动复原。\n\n[b]属性还在[/b]\n片段也改变活性、选择性、稳定性、溶解度，决定开局加成和每个阶段 Boss 的考验。","[b][color=#4fc896]Your molecule is your core deck[/color][/b]\nThe molecule has 7 positions. Each placed fragment gives you its [b]fragment card[/b] in every battle. Phenyl hits, morpholine draws, t-butyl blocks — what you build is how you fight.\n\n[b]Adjacent synergy[/b]\nA fragment card gets stronger when the position next to it holds a fragment it likes (the card says Synergy). In the designer, ✦ synergy on a fragment means it fits that spot.\n\n[b]Modifying = changing cards[/b]\nSwap a fragment and its card leaves the deck; the new one joins. Fragment cards cannot be removed or upgraded during R&D. Two of the same fragment give two cards.\n\n[b]Damaged fragments[/b]\nSome enemies target structural weak spots; their intent shows which fragment. A hit fragment card costs +1 this battle (red cost gem); each Experiment card you play repairs one. Everything resets after battle.\n\n[b]Properties still matter[/b]\nFragments also change potency, selectivity, stability and solubility, which set opening bonuses and each stage boss exam."

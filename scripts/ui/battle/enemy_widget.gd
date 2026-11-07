@@ -86,7 +86,7 @@ func setup(enemy: Enemy, enemy_index: int) -> void:
 			pressed.emit(index))
 
 
-func show_intent(enemy: Enemy, damage: int) -> void:
+func show_intent(enemy: Enemy, damage: int, exploit := {}) -> void:
 	for child in _intent_icons.get_children():
 		_intent_icons.remove_child(child)
 		child.queue_free()
@@ -112,6 +112,12 @@ func show_intent(enemy: Enemy, damage: int) -> void:
 	if _intent_icons.get_child_count() == 0:
 		_add_intent("intent_" + kind, "", INTENT_COLOR.get(kind, Color.WHITE))
 	_intent_box.tooltip_text = _intent_tooltip(enemy, damage)
+	# 这一击会专攻分子的哪个片段：提前一回合写出来，玩家可以先打出相关牌或准备修复
+	var names := str(exploit.get("names", ""))   # 已翻译、用顿号连接的片段名
+	if int(exploit.get("bonus", 0)) > 0 and kind.split("_").has("attack") and not names.is_empty():
+		var first := names.split("、")[0]
+		_add_intent("type_molecular", "→" + first + ("…" if names.contains("、") else ""), Color(1.0, 0.55, 0.45))
+		_intent_box.tooltip_text += "\n" + tr("intent.tip.exploit") % names
 
 
 func _add_intent(icon_name: String, amount: String, color: Color) -> void:

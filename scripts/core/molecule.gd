@@ -348,6 +348,65 @@ func _shielded(site_id: String) -> bool:
 
 
 ## 当前组合带来的分子特性卡 id（同一组合触发多次也只给一张）
+## 片段卡：按位点顺序，每个装上的片段一张 [{card, site}]
+func fragment_cards() -> Array:
+	var out: Array = []
+	for site in config().get("sites", []):
+		var frag := String(sites.get(String(site.id), ""))
+		if not frag.is_empty():
+			out.append({"card": "frag_" + frag, "site": String(site.id)})
+	return out
+
+
+static var _cards_by_id := {}
+
+
+## 片段对应的卡牌数据（编辑器预览用；游戏里走 game.get_card_by_id）
+static func fragment_card(frag_id: String) -> Dictionary:
+	if _cards_by_id.is_empty():
+		for data in JsonData.load_dict("res://data/cards.json").get("cards", []):
+			_cards_by_id[String(data.get("id", ""))] = data
+	return _cards_by_id.get("frag_" + frag_id, {})
+
+
+## 相邻的位点（按 adjacent 表）
+static func neighbors(site_id: String) -> Array:
+	var out: Array = []
+	for pair in config().get("adjacent", []):
+		if String(pair[0]) == site_id:
+			out.append(String(pair[1]))
+		elif String(pair[1]) == site_id:
+			out.append(String(pair[0]))
+	return out
+
+
+## 某个位点上的片段卡：相邻位置装着它想要的标签时触发联动，追加 synergy.effects，并记下是和谁联动
+func site_card(site_id: String) -> Dictionary:
+	var frag := String(sites.get(site_id, ""))
+	var base := fragment_card(frag) if not frag.is_empty() else {}
+	if base.is_empty():
+		return {}
+	var data: Dictionary = base.duplicate(true)
+	var syn: Dictionary = base.get("synergy", {})
+	if syn.is_empty():
+		return data
+	for other in neighbors(site_id):
+		var other_frag := String(sites.get(other, ""))
+		if (fragment(other_frag).get("tags", []) as Array).has(String(syn.get("tag", ""))):
+			for bonus in syn.effects:   # 同类效果直接叠数值（3 伤害 + 2 伤害 = 5 伤害），牌面不出现重复的行
+				var merged := false
+				for effect in data.effects:
+					if String(effect.op) == String(bonus.op) and String(effect.get("id", "")) == String(bonus.get("id", "")) and not effect.has("times"):
+						effect["value"] = int(effect.get("value", 0)) + int(bonus.get("value", 0))
+						merged = true
+						break
+				if not merged:
+					(data.effects as Array).append((bonus as Dictionary).duplicate(true))
+			data["synergy_with"] = other_frag
+			break
+	return data
+
+
 func signature_cards() -> Array:
 	var ids: Array = []
 	for combo in active_combos():

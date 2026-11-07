@@ -107,6 +107,7 @@ func _ready() -> void:
 
 ## 研发总览：实验室场景放在管线进度条下方，占满剩余空间
 func _build_hub() -> void:
+	($Background as MoleculeBackground).lab = true
 	_hub = HubView.new()
 	_hub.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	$Layout/VBox.add_child(_hub)
@@ -203,6 +204,9 @@ func _on_state_synced(state) -> void:
 	_pipeline.set_stages(stages, maxi(stages.find(state.stage), 0))
 	var company: Company = _game_logic.company
 	_company_label.text = tr("ui.hub_company") % [company.runs + 1, company.process_level()]
+	var room := $Background as MoleculeBackground
+	room.glow_color = BattleView.STAGE_TINT.get(_game_logic.get_state().stage, room.glow_color)   # 观察室的灯光随研发阶段变化
+	room.queue_redraw()
 	_hub.refresh(_game_logic, _map_screen.competition_summary(), _map_screen.competition_text())
 
 
@@ -331,7 +335,7 @@ func _on_molecule_design(mode: String) -> void:
 	_show_or_queue(func() -> void:
 		GameAudio.sfx("open")
 		_mol_editor.lineage_sites = _game_logic.lineage_sites() if mode == "initial" else {}
-		_mol_editor.edit(_game_logic.molecule, mode, _game_logic.preview_modify))
+		_mol_editor.edit(_game_logic.molecule, mode, _game_logic.preview_modify, _game_logic.get_state().stage))
 
 
 func _on_card_pick_offered(cards: Array, purpose: String) -> void:
