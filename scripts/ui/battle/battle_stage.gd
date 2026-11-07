@@ -34,6 +34,11 @@ func _draw() -> void:
 	if impact_light > 0:
 		Shading.glow(self, Vector2(impact.x, ground), 160, Color(UIKit.GOLD, impact_light * 0.45))
 	# Stable quiet UI reading plane, independent of the world illustration.
+	# 没有硬分界线：地面渐渐沉进暗处，手牌像放在场景前景的阴影里
 	var dock_y := ground + 83
-	draw_rect(Rect2(0, dock_y, w, maxf(0,size.y-dock_y)), Color(0.06, 0.08, 0.14, 0.94))
-	draw_line(Vector2(0,dock_y),Vector2(w,dock_y),Color(UIKit.PAPER,0.12),1,true)
+	var fade := 70.0
+	var dark := Color(0.05, 0.065, 0.115, 0.95)
+	var top := dock_y - fade
+	draw_polygon(PackedVector2Array([Vector2(0, top), Vector2(w, top), Vector2(w, dock_y), Vector2(0, dock_y)]),
+		PackedColorArray([Color(dark, 0.0), Color(dark, 0.0), dark, dark]))
+	draw_rect(Rect2(0, dock_y, w, maxf(0, size.y - dock_y)), dark)

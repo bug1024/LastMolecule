@@ -88,6 +88,7 @@ func _build() -> void:
 	_art_layer.draw.connect(func() -> void:
 		var area := Rect2(Vector2.ZERO, _art_layer.size)
 		_draw_art(area)
+		_draw_art_inset(area)
 		_draw_art_tags(area, _role_color()))
 	add_child(_art_layer)
 	_name_label = _label(18, HORIZONTAL_ALIGNMENT_CENTER)
@@ -347,10 +348,9 @@ func _draw() -> void:
 	var header := Rect2(NAME_RECT.position * k, NAME_RECT.size * k)
 	draw_style_box(_box(role_color.lerp(UIKit.PAPER, 0.70), Color(role_color, 0.6), 2, 1), header)
 	var body := Rect2(BODY_RECT.position * k, BODY_RECT.size * k)
-	draw_rect(body, UIKit.PAPER)
-	draw_line(body.position, Vector2(body.end.x, body.position.y), Color(UIKit.INK, 0.28), k, true)
-	var code := card.id.to_upper().left(16)
-	draw_string(get_theme_default_font(), Vector2(12, BASE.y - 5) * k, code, HORIZONTAL_ALIGNMENT_LEFT, -1, _px(8), Color(UIKit.INK, 0.45))
+	# 正文区就是卡面本身的纸，不再盖一块平涂的色块；只留一道刻线分隔
+	draw_line(body.position + Vector2(6 * k, 0), Vector2(body.end.x - 6 * k, body.position.y), Color(UIKit.INK, 0.3), k, true)
+	draw_line(body.position + Vector2(6 * k, k), Vector2(body.end.x - 6 * k, body.position.y + k), Color(1, 1, 1, 0.3), k, true)
 	# 左上角费用宝石
 	if not card.unplayable:
 		var font: Font = get_theme_font("font", &"HeaderLabel")
@@ -436,6 +436,11 @@ func _draw_art(art: Rect2) -> void:
 		_art_layer.draw_line(a, b, Color(0.04, 0.08, 0.12, 0.9), 7.0, true)
 		_art_layer.draw_line(a, b, UIKit.DANGER.lightened(0.3), 3.0, true)
 		_art_layer.draw_colored_polygon(PackedVector2Array([b + Vector2(5, -2), b + Vector2(-9, -2), b + Vector2(-2, 9)]), UIKit.DANGER.lightened(0.3))
+
+
+## 插画嵌在卡面里，不是贴在上面
+func _draw_art_inset(art: Rect2) -> void:
+	UIKit.inset(_art_layer, art, 7.0 * face_scale)
 
 
 func _art_cell() -> int:

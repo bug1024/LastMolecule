@@ -288,7 +288,7 @@ func _layout() -> void:
 	_ai_chip.position = Vector2(w-210,8)
 	_energy_orb.position = Vector2(w * 0.035, _space.hand_top + 38)
 	_end_button.position = Vector2(w - _end_button.size.x - w * 0.035,_space.hand_top + 56)
-	_dose_button.position = Vector2(20,h - 133)
+	_dose_button.position = Vector2(20, _energy_orb.position.y - 52)   # 能量面板正上方，不被遮挡也不压手牌
 	_draw_button.position = Vector2(24,h - 63)
 	_discard_button.position = Vector2(w - maxf(110,_discard_button.get_combined_minimum_size().x) - 24,h - 63)
 	_rule_label.position = Vector2(32,65)
@@ -320,7 +320,6 @@ func _draw_energy() -> void:
 	var full := _manager != null and _manager.energy > 0
 	var accent := UIKit.GOLD if full else UIKit.TEXT_DIM
 	BattleHud.quiet_style(Color(0.06,0.08,0.14,0.85),Color(UIKit.GOLD,0.3)).draw(_energy_orb.get_canvas_item(),Rect2(Vector2.ZERO,_energy_orb.size))
-	_energy_orb.draw_line(Vector2(18,3),Vector2(72,3),Color(accent,0.45),1.0)
 	_energy_orb.draw_string(get_theme_default_font(), Vector2(16, 20), tr("battle.energy_title"), HORIZONTAL_ALIGNMENT_LEFT, 70, 12, accent)
 	if _manager != null:
 		for i in mini(_manager.max_energy, 6):

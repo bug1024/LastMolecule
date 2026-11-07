@@ -176,6 +176,18 @@ static func meter_style(bg: Color, border: Color, radius := 3) -> PaintedStyle:
 	return skin
 
 
+## 嵌入感：内侧墨线 + 顶部和左侧落下的阴影（光从左上来，窗口边缘挡住了光）。area 是窗口自身的范围
+static func inset(ci: CanvasItem, area: Rect2, depth: float) -> void:
+	var shade := Color(0.03, 0.03, 0.07, 0.55)
+	ci.draw_polygon(PackedVector2Array([area.position, Vector2(area.end.x, area.position.y),
+		Vector2(area.end.x, area.position.y + depth), area.position + Vector2(0, depth)]),
+		PackedColorArray([shade, shade, Color(shade, 0.0), Color(shade, 0.0)]))
+	ci.draw_polygon(PackedVector2Array([area.position, area.position + Vector2(depth, 0),
+		Vector2(area.position.x + depth, area.end.y), Vector2(area.position.x, area.end.y)]),
+		PackedColorArray([shade, Color(shade, 0.0), Color(shade, 0.0), shade]))
+	ci.draw_rect(area.grow(-0.5), Color(0.04, 0.04, 0.09, 0.85), false, maxf(1.0, depth * 0.17), true)
+
+
 ## Actor identity is a stable reading plate, independent of the moving body.
 static func identity_plate(label_node: Label) -> void:
 	var plate := Panel.new()

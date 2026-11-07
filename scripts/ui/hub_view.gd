@@ -309,7 +309,13 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
-	PaintedArt.world(self, Rect2(Vector2.ZERO, size), 0.30)
+	# 世界由整屏背景统一画（这里再画一块会和外圈形成矩形接缝）；这里只给分子一块落在地面上的影子
+	if mol_view != null and mol_view.visible:
+		var foot := mol_view.position + mol_view.size * Vector2(0.5, 1.0) + Vector2(10, 14)
+		for i in 5:
+			draw_set_transform(foot, 0.0, Vector2(1.0, 0.16))
+			draw_circle(Vector2.ZERO, 150.0 - i * 24.0, Color(0.02, 0.025, 0.06, 0.12))
+		draw_set_transform(Vector2.ZERO)
 
 
 func _glass_panel() -> PanelContainer:

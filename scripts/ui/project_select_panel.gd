@@ -75,13 +75,21 @@ func _refresh() -> void:
 	_select("final" if unlocked and not company.is_campaign_done() and _rows.has("final") else ProjectTypes.default_id())
 
 
+## 列表行：自带内边距，板子本身不再额外留白，否则四行加起来会把弹窗撑到屏幕边
+func _row_style(bg: Color, border: Color, radius: int) -> PaintedStyle:
+	var sb := UIKit.panel_style(bg, border, radius)
+	sb.content_margin_top = 3
+	sb.content_margin_bottom = 3
+	return sb
+
+
 func _type_row(t: Dictionary, recommended: bool, locked: bool, company: Company) -> PanelContainer:
 	var id := String(t.get("id", ""))
 	var panel := PanelContainer.new()
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	if locked:
 		panel.modulate = Color(1, 1, 1, 0.55)
-		panel.add_theme_stylebox_override("panel", UIKit.panel_style(Color(0.06, 0.07, 0.09, 0.9), Color(0.2, 0.22, 0.26), 12))
+		panel.add_theme_stylebox_override("panel", _row_style(Color(0.06, 0.07, 0.09, 0.9), Color(0.2, 0.22, 0.26), 12))
 	else:
 		panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		panel.gui_input.connect(func(event: InputEvent) -> void:
@@ -127,7 +135,7 @@ func _select(id: String) -> void:
 	_picked = id
 	for type_id in _rows:
 		var on: bool = type_id == id
-		var sb := UIKit.panel_style(Color(0.09, 0.16, 0.14, 0.95) if on else Color(0.07, 0.09, 0.12, 0.9),
+		var sb := _row_style(Color(0.09, 0.16, 0.14, 0.95) if on else Color(0.07, 0.09, 0.12, 0.9),
 			UIKit.ACCENT if on else Color(0.22, 0.29, 0.37), 12)
 		sb.set_border_width_all(3 if on else 1)
 		(_rows[type_id] as PanelContainer).add_theme_stylebox_override("panel", sb)

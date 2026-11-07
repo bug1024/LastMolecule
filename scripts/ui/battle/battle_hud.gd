@@ -143,16 +143,17 @@ class EndTurnButton extends Button:
 		var w := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 		draw_string(font, Vector2((size.x - 28 - w) * 0.5, size.y * 0.5 + 6), label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, ink)
 		var cap := Rect2(Vector2(size.x - 34, size.y * 0.5 - 11), Vector2(20, 22))
-		draw_rect(cap, Color(0.06, 0.08, 0.13, 0.6))
-		draw_rect(cap, Color(ink, 0.6), false, 1.0)
+		draw_rect(cap, Color(0.04, 0.06, 0.09, 0.75))
+		UIKit.inset(self, cap, 4.0)   # 键帽刻在板子上
 		draw_string(get_theme_default_font(), cap.position + Vector2(5, 16), "E", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, ink)
 		if on and prompt:
 			var a := 0.4 + 0.3 * sin(_time * 3.0)
 			draw_line(Vector2(25, size.y - 9), Vector2(size.x - 25, size.y - 9), Color(UIKit.GOLD, a), 2, true)
 
 
-static func quiet_style(bg: Color, edge: Color) -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
+## 战斗两侧的低调控件：和其它面板同一种实体板，只是颜色更沉
+static func quiet_style(bg: Color, edge: Color) -> PaintedStyle:
+	var style := PaintedStyle.new()
 	style.bg_color = bg
 	style.border_color = edge
 	style.set_border_width_all(1)

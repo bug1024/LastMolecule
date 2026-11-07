@@ -36,4 +36,4 @@ func _draw() -> void:
 		var cover := maxf(size.x / texture.get_width(), size.y / texture.get_height())
 		var extent := texture.get_size() * cover
 		draw_texture_rect(texture, Rect2((size - extent) * 0.5, extent), false)
-	draw_rect(area, Color(0.07, 0.09, 0.15, 0.14 if battle else 0.65))
+	draw_rect(area, Color(0.07, 0.09, 0.15, 0.34))

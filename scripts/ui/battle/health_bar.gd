@@ -29,6 +29,32 @@ func set_values(hp: int, max_hp: int, block_value: int, instant := false) -> voi
 	queue_redraw()
 
 
+## 刻进材质的凹槽：墨色底，上沿内侧压暗、下沿外侧有一道受光的亮边，没有外框
+func _draw_groove(rect: Rect2) -> void:
+	var lip := _bar_shape(rect.grow(1.0), rect.size.x + 2.0)
+	draw_colored_polygon(lip, Color(0.035, 0.04, 0.085, 0.95))
+	var inside := _bar_shape(rect, rect.size.x)
+	var colors := PackedColorArray()
+	for p in inside:
+		var t := (p.y - rect.position.y) / maxf(rect.size.y, 1.0)
+		colors.append(Color(0.03, 0.035, 0.07).lerp(Color(0.1, 0.11, 0.17), t))
+	draw_polygon(inside, colors)
+	var c := rect.size.y * 0.3
+	draw_line(Vector2(rect.position.x + c, rect.end.y + 1.5), Vector2(rect.end.x - c, rect.end.y + 1.5), Color(1.0, 0.92, 0.75, 0.22), 1.0, true)
+
+
+## 两端缺角的条形；宽度变化时右端缺角跟着走
+static func _bar_shape(rect: Rect2, width: float) -> PackedVector2Array:
+	if width < 1.0:
+		return PackedVector2Array()
+	var c := minf(rect.size.y * 0.3, width * 0.45)
+	var x := rect.position.x
+	var y := rect.position.y
+	var h := rect.size.y
+	return PackedVector2Array([Vector2(x + c, y), Vector2(x + width - c, y), Vector2(x + width, y + c), Vector2(x + width, y + h - c),
+		Vector2(x + width - c, y + h), Vector2(x + c, y + h), Vector2(x, y + h - c), Vector2(x, y + c)])
+
+
 func _process(delta: float) -> void:
 	_shown = move_toward(_shown, value, delta * maxf(30.0, absf(_shown - value) * 6.0))
 	if _trail > _shown:
@@ -41,21 +67,28 @@ func _process(delta: float) -> void:
 
 func _draw() -> void:
 	var rect := Rect2(Vector2(16, 3), Vector2(size.x - 18, size.y - 6))
-	draw_rect(rect, Color(0.05, 0.06, 0.08, 0.9))
-	var trail_w := rect.size.x * clampf(_trail / max_value, 0.0, 1.0)
-	draw_rect(Rect2(rect.position, Vector2(trail_w, rect.size.y)), Color(1, 0.95, 0.8, 0.8))
-	var fill_w := rect.size.x * clampf(_shown / max_value, 0.0, 1.0)
-	var fill := Color(0.22, 0.64, 0.48) if is_player else UIKit.DANGER
-	draw_rect(Rect2(rect.position, Vector2(fill_w, rect.size.y)), fill)
-	draw_rect(Rect2(rect.position, Vector2(fill_w, rect.size.y * 0.4)), Color(1, 1, 1, 0.15))
-	PaintedArt.frame(self, rect, Color(0, 0, 0, 0), UIKit.GOLD.darkened(0.15), 1.2)
+	_draw_groove(rect)
+	var inner := rect.grow(-2.0)
+	var trail_w := inner.size.x * clampf(_trail / max_value, 0.0, 1.0)
+	draw_colored_polygon(_bar_shape(inner, trail_w), Color(1, 0.95, 0.8, 0.8))
+	var fill_w := inner.size.x * clampf(_shown / max_value, 0.0, 1.0)
+	var fill := Color(0.2, 0.6, 0.46) if is_player else Color(0.72, 0.27, 0.22)
+	var shape := _bar_shape(inner, fill_w)
+	if shape.size() >= 3:
+		# 液面：上亮下暗，和面板同一束光
+		var colors := PackedColorArray()
+		for p in shape:
+			var t := (p.y - inner.position.y) / maxf(inner.size.y, 1.0)
+			colors.append(fill.lerp(fill.lightened(0.28), 1.0 - t).darkened(t * 0.28))
+		draw_polygon(shape, colors)
+		draw_line(inner.position + Vector2(3, 1), inner.position + Vector2(maxf(3.0, fill_w - 3), 1), Color(1, 1, 1, 0.22), 1.0, true)
 	var font := get_theme_default_font()
 	var text := "%d/%d" % [value, max_value]
 	var fs := 15
 	var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 	var pos := Vector2(rect.get_center().x - w * 0.5, rect.get_center().y + fs * 0.35)
-	draw_string_outline(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 2, Color(0, 0, 0, 0.9))
-	draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, UIKit.PAPER)
+	draw_string_outline(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 4, Color(0.02, 0.03, 0.06, 0.95))
+	draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(0.98, 0.96, 0.9))
 	if is_player:
 		var heart := UIKit.icon("ui_heart")
 		if heart:

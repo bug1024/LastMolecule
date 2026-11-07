@@ -138,7 +138,9 @@ func _curve(from: Vector2, to: Vector2, color: Color, width: float, dashed: bool
 
 ## 背景：淡淡的六边形网格，按阶段着色
 func _draw_grid() -> void:
-	PaintedArt.world(self, Rect2(Vector2.ZERO, size), 0.78)
+	var area := Rect2(Vector2.ZERO, size)
+	PaintedArt.world(self, area, 0.78)
+	UIKit.inset(self, area, 12.0)   # 地图是嵌进面板的一扇窗，不是盖在面板上的方块
 
 
 func _notification(what: int) -> void:

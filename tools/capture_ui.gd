@@ -161,7 +161,6 @@ func run() -> void:
 	await process_frame
 	await process_frame
 	PaintedStyle._texture = null
-	PaintedStyle._regions.clear()
 	PaintedArt._sprite_regions.clear()
 	MoleculeSpecimen._regions.clear()
 	UIKit._art.clear()
