@@ -4,16 +4,41 @@ extends Control
 ## 受击、蓄力和剂量变化通过共用的姿态变形和局部特效表现。
 
 const LEGACY_CELLS := {"blob": 0, "cell": 1, "crystal": 2, "cloud": 3, "spiky": 4, "molecule": 5}
-const PORTRAIT_SHEETS := {
-	"enemies-a": ["off_target", "poor_solubility", "metabolite", "herg", "hepatotox", "animal_bias", "free_radical", "genotox"],
-	"enemies-b": ["tox_storm", "infusion_reaction", "pk_variance", "cytokine_storm", "dlt", "placebo", "enroll_drag", "resistant_clone"],
-	"enemies-c": ["progression", "endpoint_miss", "protocol_dev", "safety_signal", "center_pd", "center_ae", "center_drop"],
-}
-const GEOMETRIC_SHEET := "geometric-foes"
-# Trim follows the opaque silhouettes; stray low-alpha pixels are outside the staging bounds.
-const GEOMETRIC_REGIONS := {
-	"activity_cliff": Rect2(22, 118, 964, 634),
-	"resistant_clone": Rect2(1042, 171, 708, 578),
+# Source boxes follow the visible alpha bounds inside each production sheet.
+const GEOMETRIC_PORTRAITS := {
+	"geometric-foes": {
+		"activity_cliff": Rect2(22, 118, 964, 634),
+		"resistant_clone": Rect2(1042, 171, 708, 578),
+	},
+	"geometric-foes-a": {
+		"off_target": Rect2(40, 20, 372, 402),
+		"poor_solubility": Rect2(466, 130, 406, 270),
+		"metabolite": Rect2(916, 46, 379, 360),
+		"herg": Rect2(1355, 13, 404, 412),
+		"hepatotox": Rect2(14, 483, 414, 361),
+		"animal_bias": Rect2(460, 466, 408, 391),
+		"free_radical": Rect2(902, 461, 410, 402),
+		"genotox": Rect2(1432, 456, 234, 416),
+	},
+	"geometric-foes-b": {
+		"tox_storm": Rect2(26, 54, 393, 364),
+		"infusion_reaction": Rect2(462, 114, 408, 247),
+		"pk_variance": Rect2(913, 89, 388, 290),
+		"cytokine_storm": Rect2(1335, 38, 425, 390),
+		"dlt": Rect2(4, 466, 431, 393),
+		"placebo": Rect2(488, 553, 359, 223),
+		"enroll_drag": Rect2(901, 539, 414, 237),
+		"progression": Rect2(1334, 466, 439, 384),
+	},
+	"geometric-foes-c": {
+		"endpoint_miss": Rect2(49, 128, 376, 238),
+		"protocol_dev": Rect2(465, 77, 400, 323),
+		"safety_signal": Rect2(902, 106, 414, 240),
+		"center_pd": Rect2(1350, 54, 409, 350),
+		"center_ae": Rect2(46, 466, 354, 386),
+		"center_drop": Rect2(483, 480, 361, 377),
+		"last_molecule": Rect2(900, 457, 421, 398),
+	},
 }
 
 var shape := "blob"
@@ -52,27 +77,28 @@ func setup(def: Dictionary, boss := false, elite := false) -> void:
 	menace = 2 if boss else (1 if elite else 0)
 	_seed = float(hash(String(def.get("id", ""))) % 1000) / 100.0
 	_id = String(def.get("id", ""))
-	_source = PaintedArt.sprite_source(_portrait, int(LEGACY_CELLS.get(shape, 0)))
-	if GEOMETRIC_REGIONS.has(_id) and UIKit.art(GEOMETRIC_SHEET) != null:
-		_portrait = GEOMETRIC_SHEET
-		_source = GEOMETRIC_REGIONS[_id]
-		_geometric = true
-	if not _geometric:
-		for sheet in PORTRAIT_SHEETS:
-			var cell: int = PORTRAIT_SHEETS[sheet].find(_id)
-			if cell < 0:
-				continue
-			var source := PaintedArt.sprite_source(sheet, cell, 4, 2)
-			if source.has_area():
-				_portrait = sheet
-				_source = source
+	for sheet in GEOMETRIC_PORTRAITS:
+		var entries: Dictionary = GEOMETRIC_PORTRAITS[sheet]
+		if entries.has(_id) and UIKit.art(sheet) != null:
+			_portrait = sheet
+			_source = entries[_id]
+			_geometric = true
 			break
+	if not _geometric:
+		_source = PaintedArt.sprite_source(_portrait, int(LEGACY_CELLS.get(shape, 0)))
 	if shape != "molecule" and not _geometric:
 		var tint := ShaderMaterial.new()
 		tint.shader = load("res://assets/shaders/enemy_tint.gdshader")
 		tint.set_shader_parameter("target_hue", color.h)
-		tint.set_shader_parameter("strength", 0.22 if _portrait != "painted-enemies" else (0.82 if color.s > 0.25 else 0.35))
+		tint.set_shader_parameter("strength", 0.82 if color.s > 0.25 else 0.35)
 		material = tint
+	elif _portrait in ["geometric-foes-a", "geometric-foes-c"]:
+		var edge := ShaderMaterial.new()
+		edge.shader = preload("res://assets/shaders/painted_edge.gdshader")
+		if _portrait == "geometric-foes-c":
+			edge.set_shader_parameter("fringe", Vector2(0.90, 0.96))
+			texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		material = edge
 	_fx = Control.new()
 	_fx.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_fx.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -101,7 +127,7 @@ func _process(delta: float) -> void:
 	_surge = maxf(0.0, _surge - delta * 1.6)
 	_shown_strain = move_toward(_shown_strain, strain, delta * 0.8)
 	_windup = move_toward(_windup, 1.0 if windup else 0.0, delta * 2.5)
-	if material is ShaderMaterial:
+	if not _geometric and material is ShaderMaterial:
 		(material as ShaderMaterial).set_shader_parameter("heat", clampf(_shown_strain * 0.45 + _surge * 0.5, 0.0, 1.0))
 	queue_redraw()
 	if _fx:

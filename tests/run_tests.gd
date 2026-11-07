@@ -55,8 +55,9 @@ func _run() -> void:
 	_test_battle_flow()
 	_test_player_levels()
 	_test_ai_next_tier()
-	_test_card_face_readable()
+	await _test_card_face_readable()
 	_test_card_art_bounds()
+	_test_geometric_art_coverage()
 	_test_battle_layout()
 	_test_project_types()
 	_test_backfire_preview()
@@ -679,22 +680,44 @@ func _test_build_cards() -> void:
 	g.free()
 
 
-## 战斗手牌尺寸（0.9 倍）下，所有卡、中英文，牌面文字都不小于 12px，名称不超出名称条
+## Dense cards must fit at the real hand scale, even after same-frame target/hover refreshes.
 func _test_card_face_readable() -> void:
 	var small: Array[String] = []
-	var ai := {"multiplier": 0.5, "need_data": 12, "next_multiplier": 1.0, "deviation": 30}
+	var overflow: Array[String] = []
+	var ai := {"multiplier": 1.75, "need_data": 12, "next_multiplier": 1.0, "deviation": 30}
+	var definitions: Array = JsonData.load_dict("res://data/cards.json").cards
 	for locale in ["zh_CN", "en"]:
 		TranslationServer.set_locale(locale)
-		for data in JsonData.load_dict("res://data/cards.json").cards:
-			var card := ResearchCard.from_dict(data)
-			var face := CardFace.create(card, 0.9, {}, ai)
-			var labels: Array = face.find_children("*", "Label", true, false)
-			for label in labels:
-				if (label as Label).get_theme_font_size("font_size") < 12:
-					small.append("%s/%s" % [locale, card.id])
-			face.free()
+		var sample := Control.new()
+		root.add_child(sample)
+		for data in definitions:
+			for upgrade in [false, true]:
+				var card := ResearchCard.from_dict(data, upgrade)
+				var face := CardFace.create(card, 0.82, {"ai_multiplier": 1.75}, ai)
+				sample.add_child(face)
+				face.refresh({"ai_multiplier": 1.75}, ai)
+		await process_frame
+		for face: CardFace in sample.get_children():
+			var card := face.card
+			var name := "%s/%s%s" % [locale, card.id, "+" if card.upgraded else ""]
+			for node in face.find_children("*", "Label", true, false):
+				if (node as Label).get_theme_font_size("font_size") < 12:
+					small.append(name)
+			var body := face._rows
+			var body_rect := Rect2(Vector2.ZERO, body.size)
+			var expected := card.effect_rows().size() + face._notes(ai).size()
+			if body.get_child_count() != expected:
+				overflow.append(name + " duplicate rows")
+			for row: Control in body.get_children():
+				if not body_rect.encloses(row.get_rect()):
+					overflow.append(name + " body")
+				for item: Control in row.get_children():
+					if not Rect2(Vector2.ZERO, row.size).encloses(item.get_rect()):
+						overflow.append(name + " row")
+		sample.free()
 	TranslationServer.set_locale("zh_CN")
 	_expect(small.is_empty(), "Card face text stays >= 12px at hand scale: %s" % ", ".join(small))
+	_expect(overflow.is_empty(), "Effects stay on the card after repeated refresh: " + ", ".join(overflow))
 
 
 ## Atlas crops must stay in their source cell and positive destination, including mirrored AI cards.
@@ -717,6 +740,34 @@ func _test_card_art_bounds() -> void:
 			face.free()
 	_expect(issues.is_empty(), "Card crops remain inside their atlas cell and clipping viewport at hand, pick and detail scales: " + ", ".join(issues))
 	_expect(flips > 0, "Art bounds regression includes mirrored card illustrations")
+
+
+func _test_geometric_art_coverage() -> void:
+	var painted_enemies := {}
+	var painted_cards := {}
+	var problems: Array[String] = []
+	for sheet in CreatureView.GEOMETRIC_PORTRAITS:
+		var texture := UIKit.art(sheet)
+		for id in CreatureView.GEOMETRIC_PORTRAITS[sheet]:
+			var crop: Rect2 = CreatureView.GEOMETRIC_PORTRAITS[sheet][id]
+			if not texture or not crop.has_area() or not Rect2(Vector2.ZERO, texture.get_size()).encloses(crop):
+				problems.append(id + " enemy crop")
+			painted_enemies[id] = true
+	for definition in JsonData.load_dict(BattleManager.ENEMIES_PATH).enemies:
+		if not painted_enemies.has(definition.id):
+			problems.append(definition.id + " enemy fallback")
+	for sheet in CardFace.CARD_SHEETS:
+		var texture := UIKit.art(sheet)
+		var ids: Array = CardFace.CARD_SHEETS[sheet]
+		for i in ids.size():
+			var crop := CardFace.illustrated_tile(sheet, i)
+			if not texture or not crop.has_area() or not Rect2(Vector2.ZERO, texture.get_size()).encloses(crop):
+				problems.append(String(ids[i]) + " card crop")
+			painted_cards[ids[i]] = true
+	for definition in JsonData.load_dict("res://data/cards.json").cards:
+		if not String(definition.id).begins_with("frag_") and not painted_cards.has(definition.id):
+			problems.append(definition.id + " card fallback")
+	_expect(problems.is_empty(), "All shipped enemies and illustrated cards have a valid geometric portrait: " + ", ".join(problems))
 
 
 func _test_ai_next_tier() -> void:

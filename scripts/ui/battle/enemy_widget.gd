@@ -201,6 +201,7 @@ func _draw() -> void:
 
 ## A single boss can own the stage; groups retain separate target silhouettes.
 func set_stage_pose(body_size: Vector2, meta_width: float) -> void:
+	creature.custom_minimum_size = Vector2.ZERO
 	creature.size = body_size
 	creature.position = Vector2(SIZE.x * 0.5 - body_size.x * 0.5, -body_size.y)
 	_name.position = Vector2((SIZE.x - meta_width) * 0.5, 14)

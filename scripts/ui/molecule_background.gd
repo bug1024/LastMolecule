@@ -16,14 +16,19 @@ func _ready() -> void:
 	resized.connect(queue_redraw)
 	if battle:
 		var scene := TextureRect.new()
-		scene.texture = UIKit.art("painted-world")
+		var arena := UIKit.art("geometric-arena")
+		if arena:
+			scene.texture = arena
+			scene.modulate = Color(0.66, 0.71, 0.83)
+		else:
+			scene.texture = UIKit.art("painted-world")
+			var shader := ShaderMaterial.new()
+			shader.shader = preload("res://assets/shaders/battle_depth.gdshader")
+			scene.material = shader
 		scene.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		scene.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 		scene.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		scene.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var shader := ShaderMaterial.new()
-		shader.shader = load("res://assets/shaders/battle_depth.gdshader")
-		scene.material = shader
 		add_child(scene)
 
 

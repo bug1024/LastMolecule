@@ -308,13 +308,12 @@ func _layout() -> void:
 		var slot: Dictionary = _space.slots[i]
 		var ew := _enemy_widgets[i]
 		var body: Vector2 = slot.body
+		# The intent needs a separate lane even when a new portrait is tall.
+		body.y = minf(body.y, float(_space.ground) - 105.0)
 		if _manager != null:
 			var enemy := _manager.enemies[i]
 			if enemy.mechanic == "dose":
 				body.y = minf(body.y, (float(_space.ground) - 111.0) / 1.2)
-			elif enemy.id == "activity_cliff":
-				# Reserve the intent row above the visible shell at smaller window heights.
-				body.y = minf(body.y, float(_space.ground) - 105.0)
 			elif enemy.id == "resistant_clone":
 				body *= 0.82
 		ew.set_stage_pose(body, minf(240, body.x + 8))

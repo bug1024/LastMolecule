@@ -1,11 +1,11 @@
 class_name CardFace
 extends Control
-## 深色实验记录卡：保留标本插画、费用印章与角色配色，匹配实验室主题。阅读顺序：
+## 骨白牌面、几何厚涂插画与实时效果行。阅读顺序：
 ##   ① 左上费用宝石 + 名称条（按角色上色：攻击红 / 防护蓝 / 技能绿 / 能力金 / 状态灰；名称过长自动缩字或换行）
 ##   ② 效果区：「图标 + 大号数字 + 两三个字」一行一条，实时数值变高显示绿色、变低显示红色
 ##   ③ 关键词与限制（消耗 / 无法打出 / AI 失误率）紧跟效果
 ##   ④ 插画区只放辅助信息：类型小标签、角色图标、稀有度宝石、AI 倍率
-## 所有文字在战斗手牌（0.9 倍）下也不小于 12px。右键（或长按）打开 CardDetail 看完整说明。
+## 正常战斗手牌使用至少 12px 字号。右键（或长按）打开 CardDetail 看完整说明。
 ## 尺寸由 face_scale 决定（基准 180×250）。
 
 const BASE := Vector2(180, 250)
@@ -46,7 +46,7 @@ var dimmed := false
 var detail_enabled := true   # 右键 / 长按打开大图说明
 var _art_layer: Control
 var _name_label: Label
-var _rows: VBoxContainer
+var _rows: Control
 var _type_text := ""
 var pick_style := false   # 奖励挑选用：选中时显示绿色描边与「✓ 已选」徽章（战斗手牌不用）
 var _pick_mark: Control
@@ -94,11 +94,10 @@ func _build() -> void:
 	_name_label = _label(18, HORIZONTAL_ALIGNMENT_CENTER)
 	_name_label.position = Vector2(NAME_RECT.position.x + 38, NAME_RECT.position.y) * face_scale
 	_name_label.size = Vector2(NAME_RECT.size.x - 42, NAME_RECT.size.y) * face_scale
-	_rows = VBoxContainer.new()
+	_rows = Control.new()
 	_rows.position = BODY_RECT.position * face_scale
 	_rows.size = BODY_RECT.size * face_scale
-	_rows.add_theme_constant_override("separation", int(4 * face_scale))
-	_rows.alignment = BoxContainer.ALIGNMENT_CENTER
+	_rows.clip_contents = true
 	_rows.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_rows)
 	_pick_mark = Control.new()
@@ -131,13 +130,12 @@ func _px(base_size: float) -> int:
 	return maxi(1, int(round(base_size * face_scale)))
 
 
-## 在 max_w（像素）内放得下的最大字号（基准单位，从 from 往下试到 MIN_FONT）；放不下返回 -1
-func _fit(text: String, max_w: float, from: int, font: Font = null) -> int:
-	var f := font if font else get_theme_default_font()
-	for fs in range(from, MIN_FONT - 1, -1):
-		if f.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, _px(fs)).x <= max_w:
+## Fit both dimensions against the actual font in use, in rendered pixels.
+func _fit(text: String, font: Font, width: float, height: float, preferred: int, floor_size: int) -> int:
+	for fs in range(preferred, floor_size - 1, -1):
+		if font.get_height(fs) <= height and font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x <= width:
 			return fs
-	return -1
+	return floor_size
 
 
 ## mods 见 ResearchCard.effect_rows；ai_info 为 {multiplier, deviation, need_data...}（AI 卡显示倍率与失误率）
@@ -149,27 +147,21 @@ func refresh(mods := {}, ai_info := {}) -> void:
 	_set_name(tr(card.name) + ("+" if card.upgraded else ""))
 	_name_label.add_theme_color_override("font_color", Color("28634c") if card.upgraded else UIKit.INK)
 	_type_text = tr(card.type_name if not card.type_name.is_empty() else "card.type." + card.type)
-	for child in _rows.get_children():
-		child.queue_free()
-	for row in card.effect_rows(mods):
-		_rows.add_child(_make_row(row))
-	var notes := _notes(ai_info)
-	if not notes.is_empty():
-		_rows.add_child(_make_note(notes))
+	_layout_effects(card.effect_rows(mods), _notes(ai_info))
 	_ai_multiplier = float(ai_info.get("multiplier", 1.0)) if card.can_deviate() and not ai_info.is_empty() else -1.0
 	tooltip_text = ""
 	queue_redraw()
 	_art_layer.queue_redraw()
 
 
-## 名称：一行放得下就缩字，放不下就两行
 func _set_name(text: String) -> void:
 	_name_label.text = text
-	var fs := _fit(text, _name_label.size.x - 4 * face_scale, 18)
-	_name_label.autowrap_mode = TextServer.AUTOWRAP_OFF if fs > 0 else TextServer.AUTOWRAP_WORD_SMART
-	_name_label.clip_text = false
-	_name_label.add_theme_font_size_override("font_size", _px(fs if fs > 0 else MIN_FONT))
-	_name_label.add_theme_constant_override("line_spacing", int(-3 * face_scale))
+	_name_label.clip_text = true
+	_name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	var fs := _fit(text, _name_label.get_theme_default_font(), _name_label.size.x - _px(4),
+		_name_label.size.y, _px(18), _px(MIN_FONT))
+	_name_label.add_theme_font_size_override("font_size", fs)
+	_name_label.size = Vector2(NAME_RECT.size.x - 42, NAME_RECT.size.y) * face_scale
 
 
 ## 效果下方的限制说明：关键词（消耗 / 无法打出…）+ AI 失误率
@@ -194,71 +186,95 @@ static func ai_foot(ai_info: Dictionary) -> String:
 	return TranslationServer.translate("cardtext.ai_next") % [mult, need, String.num(float(ai_info.get("next_multiplier", 1.0)), 2)]
 
 
-func _make_row(row: Dictionary) -> HBoxContainer:
-	var box := HBoxContainer.new()
-	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_theme_constant_override("separation", int(5 * face_scale))
-	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_child(UIKit.icon_rect(String(row.icon), 26 * face_scale, Color(row.color).darkened(0.25)))
-	var number_text := String(row.number)
-	var text := Label.new()
-	text.text = String(row.text)
-	# 先用大号数字排；文字缩到最小字号还放不下，就把数字缩小一档，再不行文字在词间换行
-	var number_size := 28
-	var fs := -1
-	var avail := 0.0
-	for ns in [28, 22]:
-		number_size = ns
-		var used := 26.0 + 5.0
-		if not number_text.is_empty():
-			used += _bold_font().get_string_size(number_text, HORIZONTAL_ALIGNMENT_LEFT, -1, ns).x + 5.0
-		avail = (BODY_RECT.size.x - 10 - used) * face_scale
-		fs = _fit(text.text, avail, 17)
-		if fs > 0:
-			break
-	if not number_text.is_empty():
-		var number := Label.new()
-		number.text = number_text
-		number.theme_type_variation = &"NumberLabel"
-		number.add_theme_font_size_override("font_size", _px(number_size + 4))
-		var change := int(row.get("change", 0))
-		var color: Color = Color("28634c") if change > 0 else (Color("a43f38") if change < 0 else UIKit.INK)
-		number.add_theme_color_override("font_color", color)
-		number.add_theme_color_override("font_outline_color", UIKit.TEXT)
-		number.add_theme_constant_override("outline_size", 0)
-		number.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		box.add_child(number)
-	text.add_theme_font_size_override("font_size", _px(fs if fs > 0 else MIN_FONT))
-	if fs < 0:
-		text.autowrap_mode = TextServer.AUTOWRAP_WORD   # 只在词间换行，不把单词拆开
-		text.custom_minimum_size.x = avail
-		text.add_theme_constant_override("line_spacing", int(-3 * face_scale))
-	text.add_theme_color_override("font_color", UIKit.INK)
-	text.add_theme_color_override("font_outline_color", UIKit.TEXT)
-	text.add_theme_constant_override("outline_size", 0)
-	text.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_child(text)
-	return box
-
-
-func _make_note(notes: Array) -> Control:
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 0)
-	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+func _layout_effects(effects: Array, notes: Array) -> void:
+	for child in _rows.get_children():
+		# A hover or target change can refresh several times before the next frame.
+		_rows.remove_child(child)
+		child.queue_free()
+	var gap := _px(3)
+	var count := effects.size() + notes.size()
+	var note_height := _px(22)
+	var effect_budget := _rows.size.y - notes.size() * note_height - maxi(0, count - 1) * gap
+	var row_height := minf(_px(37), floorf(effect_budget / maxi(1, effects.size())))
+	var stack_height := effects.size() * row_height + notes.size() * note_height + maxi(0, count - 1) * gap
+	var y := floorf((_rows.size.y - stack_height) * 0.5)
+	for row in effects:
+		var line := _make_row(row, Vector2(_rows.size.x, row_height))
+		line.position.y = y
+		_rows.add_child(line)
+		y += row_height + gap
 	for note in notes:
-		var l := Label.new()
-		l.text = String(note.text)
-		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		l.custom_minimum_size.x = (BODY_RECT.size.x - 4) * face_scale
-		l.add_theme_font_size_override("font_size", _px(MIN_FONT))
-		l.add_theme_constant_override("line_spacing", int(-3 * face_scale))
-		l.add_theme_color_override("font_color", Color(note.color).darkened(0.45))
-		l.add_theme_color_override("font_outline_color", UIKit.TEXT)
-		l.add_theme_constant_override("outline_size", 0)
-		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		box.add_child(l)
-	return box
+		var note_width := _rows.size.x - _px(6)
+		var font := get_theme_default_font()
+		var fs := _fit(String(note.text), font, note_width, note_height, _px(15), _px(MIN_FONT))
+		var label := _effect_label(String(note.text), Color(note.color).darkened(0.55), font, fs)
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_rows.add_child(label)
+		label.set_deferred("size", Vector2(note_width, note_height))
+		label.position = Vector2(_px(3), y)
+		y += note_height + gap
+
+
+func _effect_label(text: String, ink: Color, font: Font, font_size: int) -> Label:
+	var label := Label.new()
+	label.add_theme_font_override("font", font)
+	label.add_theme_font_size_override("font_size", font_size)
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.clip_text = true
+	label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	label.add_theme_color_override("font_color", ink)
+	label.add_theme_constant_override("outline_size", 0)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.text = text
+	return label
+
+
+func _make_row(row: Dictionary, bounds: Vector2) -> Control:
+	var line := Control.new()
+	line.size = bounds
+	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var gap := _px(4)
+	var inset := _px(6)
+	var icon_size := minf(_px(24), bounds.y - _px(4))
+	var number_text := String(row.number)
+	var caption := String(row.text)
+	var number_font := _bold_font()
+	var text_font := get_theme_default_font()
+	var width := bounds.x - inset * 2 - icon_size - gap
+	var caption_min := minf(width, ceilf(text_font.get_string_size(caption,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, _px(MIN_FONT)).x))
+	var number_width := 0.0
+	var number_size := _px(30)
+	if not number_text.is_empty():
+		var number_budget := maxf(width * 0.34, width - caption_min - gap)
+		number_size = _fit(number_text, number_font, number_budget, bounds.y, _px(30), _px(MIN_FONT))
+		number_width = ceilf(number_font.get_string_size(number_text, HORIZONTAL_ALIGNMENT_LEFT, -1, number_size).x) + 1
+		width -= number_width + gap
+	var caption_size := _fit(caption, text_font, width, bounds.y, _px(17), _px(MIN_FONT))
+	var caption_width := minf(width, ceilf(text_font.get_string_size(caption,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, caption_size).x) + 1)
+	var occupied := icon_size + gap + caption_width
+	if not number_text.is_empty():
+		occupied += number_width + gap
+	var x := floorf((bounds.x - occupied) * 0.5)
+	var icon := UIKit.icon_rect(String(row.icon), icon_size, Color(row.color).darkened(0.42))
+	icon.size = Vector2.ONE * icon_size
+	icon.position = Vector2(x, (bounds.y - icon_size) * 0.5)
+	line.add_child(icon)
+	x += icon_size + gap
+	if not number_text.is_empty():
+		var change := int(row.get("change", 0))
+		var ink := Color("28634c") if change > 0 else (Color("a43f38") if change < 0 else UIKit.INK)
+		var number := _effect_label(number_text, ink, number_font, number_size)
+		number.position.x = x
+		line.add_child(number)
+		number.set_deferred("size", Vector2(number_width, bounds.y))
+		x += number_width + gap
+	var text := _effect_label(caption, UIKit.INK, text_font, caption_size)
+	text.position.x = x
+	line.add_child(text)
+	text.set_deferred("size", Vector2(caption_width, bounds.y))
+	return line
 
 
 ## 右键 / 长按：打开大图说明（战斗里左键已被出牌占用，所以只靠右键）
@@ -444,14 +460,14 @@ static func art_region(card_id: String, cell: int, area: Rect2, texture_size: Ve
 
 
 const CARD_SHEETS := {
-	"cards-a": [
+	"geometric-cards-a": [
 		"mol_hit", "mol_target", "mol_analog", "mol_scaffold", "mol_selectivity",
 		"mol_broad", "mol_prodrug", "mol_multivalent", "mol_sar", "mol_covalent",
 		"exp_assay", "exp_tox_screen", "exp_organoid", "exp_controls", "exp_hts",
 		"exp_glp", "exp_biomarker", "exp_counter", "exp_stable_platform", "exp_safety_net",
 		"exp_replicate", "clin_dosing", "clin_protocol", "clin_site", "clin_monitor",
 	],
-	"cards-b": [
+	"geometric-cards-b": [
 		"clin_combo", "clin_endpoint", "clin_network", "ai_screen", "ai_tox_predict",
 		"ai_design", "ai_governance", "ai_intel", "ai_structure", "ai_generate",
 		"ai_stratify", "ai_agent", "ai_lead_opt", "ai_mlops", "proc_sop",
@@ -461,21 +477,34 @@ const CARD_SHEETS := {
 }
 
 
+# The hand-painted sheet seams are measured, not inferred from nominal grid dimensions.
+const CARD_SHEET_ROWS := {
+	"geometric-cards-a": [0, 216, 433, 641, 851, 1086],
+	"geometric-cards-b": [0, 204, 409, 614, 819, 1086],
+}
+
+
+static func illustrated_tile(sheet: String, cell: int) -> Rect2:
+	var tile := PaintedArt.atlas_region(sheet, cell, 5, 5)
+	if not tile.has_area():
+		return tile
+	var rows: Array = CARD_SHEET_ROWS[sheet]
+	var row := cell / 5
+	tile.position.y = rows[row]
+	tile.size.y = rows[row + 1] - rows[row]
+	return tile.grow(-6)
+
+
 func _draw_art(art: Rect2) -> void:
+	if card.id.begins_with("frag_"):
+		_draw_fragment_portrait(art)
+		return
 	for sheet in CARD_SHEETS:
 		var cell: int = CARD_SHEETS[sheet].find(card.id)
 		if cell < 0:
 			continue
-		var tile := PaintedArt.atlas_region(sheet, cell, 5, 5)
-		if tile.has_area():
-			# The second atlas has uneven painted row boundaries.
-			if sheet == "cards-b":
-				var cuts := [0.0, 209.0, 422.0, 686.0, 913.0, 1122.0]
-				var row := cell / 5
-				tile.position.y = cuts[row]
-				tile.size.y = cuts[row + 1] - cuts[row]
-			if PaintedArt.cover(_art_layer, sheet, art, tile.grow(-7)):
-				return
+		if PaintedArt.cover(_art_layer, sheet, art, illustrated_tile(sheet, cell)):
+			return
 	var tex := UIKit.art("painted-cards")
 	if tex == null:
 		return
@@ -484,17 +513,18 @@ func _draw_art(art: Rect2) -> void:
 		_art_layer.draw_set_transform(Vector2(art.position.x * 2 + art.size.x, 0), 0, Vector2(-1, 1))
 	_art_layer.draw_texture_rect_region(tex, geometry.destination, geometry.source)
 	_art_layer.draw_set_transform(Vector2.ZERO)
-	if card.id.begins_with("frag_"):
-		_draw_fragment_portrait(art)
 
 
-## 片段牌的插画：在压暗的背景上托出这个片段本身的结构，带一圈它自己颜色的光
+## Fragment portraits share the arena's painted planes and the live molecule's materials.
 func _draw_fragment_portrait(art: Rect2) -> void:
 	var frag_id := card.id.trim_prefix("frag_")
-	var col := _type_color()
-	_art_layer.draw_rect(art, Color(0.03, 0.04, 0.08, 0.55))
+	var ground := UIKit.art("geometric-ground")
+	_art_layer.draw_rect(art, Color("263148"))
+	if ground:
+		var backdrop := Rect2(Vector2(ground.get_width() * 0.21, ground.get_height() * 0.61),
+			ground.get_size() * Vector2(0.55, 0.33))
+		PaintedArt.cover(_art_layer, "geometric-ground", art, backdrop, Color(0.62, 0.70, 0.84))
 	var c := art.get_center() + Vector2(0, -art.size.y * 0.06)
-	Shading.glow(_art_layer, c, art.size.y * 0.75, Color(col, 0.7))
 	# 片段图的尺寸按分子骨架单位给；放大到占满插画的大半高度
 	var unit := art.size.y * 0.42
 	var bounds := MoleculeSpecimen.bounds(frag_id, c, unit)

@@ -82,3 +82,11 @@ The supplied image is STYLE REFERENCE ONLY. Create production GAME ART matching 
 生成使用的共用描述为 “Stylized 2D hand-painted geometric fantasy game sprite, irregular matte gouache broad painted facets, three large organized values, sparse dry brush flecks following the planes, sharp selected edges and soft broken shadow edges, no uniform black outline. Single screen upper-left key with warm bone-white facets and deep cool ink blue shadows. Substance is living crystalline membrane. True clean RGBA with transparent holes.” 排除光滑 3D、写实组织、湿反光、均匀三角面、文字、地面投影和烘焙特效。地面单独以参考板脚下的膜地貌为构图参照，排除任何角色与界面。
 
 分子核心使用连续纹理条随姿态弯曲。七个位点读当前结构，冲刺瞄准当前右侧末端片段的外缘。编辑器与片段卡共用新图集。口袋蓄力时上层折膜向内收，敌人边界按可见主体校准，排除透明底边的残留像素。
+
+## 战斗页几何厚涂扩展
+
+内置 ImageGen 沿用 LM-018 参考板生成 `assets/art/geometric-foes-a.png`、`geometric-foes-b.png`、`geometric-foes-c.png`，各为 4 × 2 透明图集。按现有敌人 ID 描绘结构轮廓，指定朝左、暖骨白上光、蓝墨暗部和克制笔触。病毒载量反弹（`progression`）以低伏的叠甲和三枚膨胀后囊替代写实组织；最终敌人是有开环、分支与撕裂膜带的深玉色分子。C 图集另以 B 图集作透明边缘参考重绘边界，渲染时按透明度保留主体覆盖。
+
+`assets/art/geometric-cards-a.png` 和 `geometric-cards-b.png` 为 5 × 5 图集，延用原有卡牌与构图顺序，提示词要求大面哑光切面、冷墨底、少量暖金焦点、无边框、无文字。按实际分格裁切。片段牌用膜地面色块承托现有片段资产。远景 `assets/art/geometric-arena.png` 以低饱和膜峡谷、上方偏左的漫反射和大块静区承托双方剪影，地面继续作为独立层。
+
+新增样例覆盖当前全部 25 个敌人和 50 张普通／状态卡的战斗用图。效果行使用固定卡面阅读区，重排按实际字体尺寸和行数分配空间，AI 注记与第三行效果共享同一高度预算。

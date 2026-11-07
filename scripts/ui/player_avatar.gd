@@ -88,6 +88,17 @@ func _liquid_color() -> Color:
 
 
 func _draw() -> void:
+	var painted := UIKit.art(MoleculeCharacter.CORE)
+	if painted:
+		var base := size * Vector2(0.5, 0.91)
+		_apply_pose(base)
+		var source := MoleculeCharacter.CORE_SOURCE
+		var k := minf(size.x * 0.95 / source.size.x, size.y * 0.82 / source.size.y)
+		var extent := source.size * k
+		draw_texture_rect_region(painted, Rect2(base - Vector2(extent.x * 0.5, extent.y), extent), source,
+			Color.WHITE.lerp(Color(1.25, 1.07, 0.96), flash))
+		draw_set_transform(Vector2.ZERO)
+		return
 	if UIKit.art("painted-enemies") != null:
 		var base := size * Vector2(0.5, 0.88)
 		_apply_pose(base)
