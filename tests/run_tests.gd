@@ -76,6 +76,7 @@ func _run() -> void:
 	_test_molecule_specimen()
 	_test_character_motion()
 	_test_battle_director()
+	await _test_music_system()
 	_test_molecule()
 	_test_molecule_in_run()
 	_test_disease_campaign()
@@ -1646,6 +1647,79 @@ func _test_battle_director() -> void:
 	var quick := CharacterMotion.new(CharacterProfiles.molecule(), 2)
 	quick.pace = 1.5
 	_expect(absf(float(quick.attack(Vector2(300, 0), "attack").impact) - 0.22 / 1.5) < 0.001, "Strike timing follows the timeline (impact at 220 ms) and the pace")
+
+
+## 战斗音乐：三层同长同拍；战况只在小节线换层；暂停原地停住、继续接上；结束在下一拍接收束乐句；音量设置作用在总线上
+func _test_music_system() -> void:
+	var audio := root.get_node_or_null("Sound") as GameAudio
+	var created := false
+	if audio == null:
+		audio = GameAudio.new()
+		audio.name = "Sound"
+		root.add_child(audio)
+		created = true
+	var mismatched: Array[String] = []
+	for track in MusicMeta.BAR:
+		var lengths: Array = []
+		for suffix in ["", "_tension", "_climax"]:
+			var stream := load("res://assets/audio/music/%s%s.ogg" % [track, suffix]) as AudioStream
+			lengths.append(stream.get_length() if stream else -1.0)
+		var expected := float(MusicMeta.BAR[track]) * 32.0
+		for length in lengths:
+			if absf(float(length) - expected) > 0.05:
+				mismatched.append("%s %.2f/%.2f" % [track, float(length), expected])
+	_expect(mismatched.is_empty(), "Every battle track's three layers loop on the same 32 bars: " + ", ".join(mismatched))
+	for id in ["mol_charge", "mol_release", "hit", "hit_heavy", "shield_form", "synergy", "ai_scan", "ai_fail", "boss_warn", "boss_hurt", "boss_die"]:
+		_expect(ResourceLoader.exists("res://assets/audio/sfx/%s.ogg" % id), "Combat sound exists: " + id)
+	for id in ["boss_intro", "boss_death", "win"]:
+		_expect(ResourceLoader.exists("res://assets/audio/music/%s.ogg" % id), "Battle phrase exists: " + id)
+	audio.play_music("battle", "", GameAudio.BATTLE_DB)
+	_expect(audio._layers != null and audio._layers.stream_count == 3 and is_equal_approx(audio._bar, float(MusicMeta.BAR.battle)),
+		"Battle music plays as one synchronized three-layer stream")
+	var playing := audio._active_music != null and audio._active_music.playing
+	_expect(playing, "Battle music is playing")
+	if playing:
+		var beat := audio._bar / 4.0
+		audio._advance_clock(beat)                     # 先走进第一小节内
+		audio.request_mood("tension")
+		audio._advance_clock(beat)
+		_expect(audio.mood == "normal", "A mood change waits for the next bar line")
+		for i in 12:
+			audio._advance_clock(beat / 4.0)
+		_expect(audio.mood == "tension" and float(audio._level[1]) > 0.9, "Tension enters on the bar line within a beat")
+		audio.request_mood("climax")
+		for i in 40:
+			audio._advance_clock(beat / 4.0)
+		_expect(audio.mood == "climax" and float(audio._level[2]) > 0.9 and float(audio._level[1]) < 0.9, "Climax swaps in its layer and eases tension back")
+		audio.request_mood("unknown")
+		_expect(audio._pending_mood.is_empty(), "Unknown moods are ignored")
+		audio.pause_music(true)
+		await create_timer(0.1).timeout
+		var held := audio._clock
+		audio._advance_clock(1.0)
+		_expect(audio._active_music.stream_paused and audio._clock == held, "Pausing holds the music in place")
+		audio.pause_music(false)
+		audio._advance_clock(0.1)
+		_expect(not audio._active_music.stream_paused and audio._clock > held, "Resuming continues from the same spot")
+		audio.play_sfx("hit_heavy")
+		_expect(audio._sfx_duck_db <= -3.0, "Key combat sounds duck the music")
+		audio.request_end("win")
+		audio._advance_clock(beat * 1.01)
+		_expect(audio._active_music == null and audio._current.is_empty() and audio._sting.stream == load("res://assets/audio/music/win.ogg"),
+			"Victory waits for the next beat, then hands over to its own phrase")
+	var saved := GameSettings.music_volume
+	GameSettings.music_volume = 0.5
+	GameSettings.apply_audio()
+	var bus := AudioServer.get_bus_index("Music")
+	_expect(bus >= 0 and absf(AudioServer.get_bus_volume_db(bus) - linear_to_db(0.5)) < 0.01, "Music volume setting drives the Music bus")
+	GameSettings.music_volume = saved
+	GameSettings.apply_audio()
+	audio.pause_music(true)
+	audio.play_music("lab")
+	_expect(not audio._paused and audio._pause_db == 0.0, "Leaving from the pause menu does not mute the next track")
+	audio.play_music("")
+	if created:
+		audio.queue_free()
 
 
 ## The visual refactor must preserve picking and every legal fragment at all display sizes.

@@ -221,7 +221,7 @@ def fade_stereo(x, attack, release):
     return x
 
 
-def write(x, path, peak=0.8):
+def write(x, path, peak=0.8, quality=6):
     x = x / max(1e-9, np.max(np.abs(x))) * peak
     x = np.tanh(x * 1.1) / np.tanh(1.1)
     pcm = (np.clip(x, -1, 1) * 32767).astype(np.int16).T.copy()
@@ -234,7 +234,7 @@ def write(x, path, peak=0.8):
         w.setframerate(SR)
         w.writeframes(pcm.tobytes())
     subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", tmp_path,
-                    "-c:a", "vorbis", "-strict", "-2", "-q:a", "6", path], check=True)
+                    "-c:a", "vorbis", "-strict", "-2", "-q:a", str(quality), path], check=True)
     os.remove(tmp_path)
     print("wrote", os.path.relpath(path), "%.1fs" % (x.shape[1] / SR))
 
@@ -335,105 +335,12 @@ def music_lab():
     write(mix.render(wet_gain=0.55, rt=2.0), os.path.join(ROOT, "music", "lab.ogg"))
 
 
-def music_battle():
-    """阶段试验（战斗）：124 BPM，E 小调十六分琶音 + 贝斯八分音型"""
-    beat = 60 / 124
-    bar = beat * 4
-    cycle = [([64, 67, 71, 76], 40), ([60, 64, 67, 71], 36), ([57, 60, 64, 69], 33), ([59, 63, 66, 69], 35)]
-    order = [0, 1, 2, 3, 2, 1, 3, 1, 0, 2, 1, 3, 2, 1, 0, 3]
-    bass_pat = [0, 0, 12, 0, 0, 12, 0, 7]
-    mix = Mix(bar * 16)
-    for c in range(8):
-        notes, root = cycle[c % 4]
-        start = c * bar * 2
-        mix.add(start, pad([n - 12 for n in notes], bar * 2, attack=0.4, release=0.8, bright=3.0), 0.28, 0, 0.4)
-        if c % 2 == 0:
-            mix.add(start, bell(notes[0] + 12, 0.6, 2.5, 1.5, 3.0), 0.12, -0.5, 0.6)
-        for b in range(2):
-            bs = start + b * bar
-            for s in range(16):
-                note = notes[order[s] % len(notes)] + (12 if (c >= 4 and s % 8 == 7) else 0)
-                mix.add(bs + s * beat / 4, pluck(note, 0.09, 0.8 + 0.2 * (s % 4 == 0), 2.0), 0.16,
-                        0.3 if s % 2 else -0.3, 0.3)
-            for e in range(8):
-                mix.add(bs + e * beat / 2, bass(root + bass_pat[e], beat * 0.45), 0.4, 0, 0.05)
-            for q in range(4):
-                mix.add(bs + q * beat, KICK, 0.6, 0, 0.05)
-                if q % 2 == 1:
-                    mix.add(bs + q * beat, SNARE, 0.3, 0.05, 0.3)
-            for s in range(16):
-                mix.add(bs + s * beat / 4, HAT, 0.1 if s % 4 == 2 else 0.05, 0.4, 0.05)
-    write(mix.render(wet_gain=0.45, rt=1.6), os.path.join(ROOT, "music", "battle.ogg"))
-
-
-def music_boss():
-    """Boss 战：136 BPM，D 小调，低音八度冲击 + 弦乐式铺底 + 警报钟"""
-    beat = 60 / 136
-    bar = beat * 4
-    cycle = [([62, 65, 69], 38), ([58, 62, 65], 34), ([60, 64, 67], 36), ([61, 64, 69], 33)]
-    mix = Mix(bar * 16)
-    for c in range(8):
-        notes, root = cycle[c % 4]
-        start = c * bar * 2
-        mix.add(start, pad([n - 12 for n in notes] + [notes[0]], bar * 2, attack=0.15, release=0.6, bright=7.0), 0.32, 0, 0.35)
-        for b in range(2):
-            bs = start + b * bar
-            for e in range(16):
-                if e % 4 != 3:
-                    note = root + (12 if e % 8 == 6 else 0)
-                    mix.add(bs + e * beat / 4, bass(note, beat * 0.2, 1.0), 0.42, 0, 0.03)
-            for q in range(4):
-                mix.add(bs + q * beat, KICK, 0.75, 0, 0.05)
-                mix.add(bs + q * beat + beat / 2, HAT, 0.12, 0.4, 0.05)
-                if q % 2 == 1:
-                    mix.add(bs + q * beat, SNARE, 0.4, 0, 0.35)
-                else:
-                    mix.add(bs + q * beat, TAIKO, 0.55, 0, 0.5)
-            if c >= 4:
-                for s16 in range(8):
-                    mix.add(bs + s16 * beat / 2, pluck(notes[s16 % 3] + 12, 0.1, 0.9, 2.5), 0.14, -0.3 if s16 % 2 else 0.3, 0.3)
-        mix.add(start, bell(notes[0] + 24, 0.7, 2.0, 1.41, 3.5), 0.14, 0.5, 0.6)
-        mix.add(start + bar, bell(notes[1] + 24, 0.6, 2.0, 1.41, 3.5), 0.12, -0.5, 0.6)
-    write(mix.render(wet_gain=0.4, rt=1.4), os.path.join(ROOT, "music", "boss.ogg"))
-
-
-def music_boss_final():
-    """最终 Boss（LM-001）：128 BPM，A 小调。前 8 小节是推进的低音与太鼓，后 8 小节钟声与拨弦齐奏 LM-001 主题"""
-    beat = 60 / 128
-    bar = beat * 4
-    mix = Mix(bar * 16)
-    for rep_i in range(2):
-        for i, (root, notes) in enumerate(THEME_CHORDS):
-            start = (rep_i * 8 + i) * bar
-            mix.add(start, pad([n - 12 for n in notes] + [notes[0]], bar, attack=0.12, release=0.5, bright=7.0), 0.3, 0, 0.35)
-            for e in range(16):
-                if e % 4 != 3:
-                    mix.add(start + e * beat / 4, bass(root + (12 if e % 8 == 6 else 0), beat * 0.2, 1.0), 0.42, 0, 0.03)
-            for q in range(4):
-                mix.add(start + q * beat, KICK, 0.75, 0, 0.05)
-                mix.add(start + q * beat + beat / 2, HAT, 0.12, 0.4, 0.05)
-                mix.add(start + q * beat, SNARE if q % 2 else TAIKO, 0.4 if q % 2 else 0.55, 0, 0.4)
-    for t, note, beats in theme_notes():
-        at = bar * 8 + t * beat
-        mix.add(at, bell(note + 12, 0.85, 2.0, 1.41, 3.5), 0.2, 0.3, 0.55)
-        for k in range(int(beats * 2)):
-            mix.add(at + k * beat / 2, pluck(note, 0.12, 0.85, 2.2), 0.14, -0.3, 0.3)
-    write(mix.render(wet_gain=0.4, rt=1.4), os.path.join(ROOT, "music", "boss_final.ogg"))
-
-
 # ---------- 短乐句 ----------
 
 def sting(name, build, tail=9.0):
     mix = Mix(0.1, tail=tail)
     build(mix)
     write(mix.render(loop=False, wet_gain=0.7, rt=2.2), os.path.join(ROOT, "music", name + ".ogg"), 0.75)
-
-
-def _win(mix):
-    for i, n in enumerate([72, 76, 79, 84]):
-        mix.add(i * 0.09, pluck(n, 0.25, 1.0, 2.0), 0.35, -0.3 + i * 0.2, 0.4)
-    mix.add(0.36, bell(84, 0.8), 0.3, 0, 0.6)
-    mix.add(0.3, pad([60, 64, 67, 72], 1.3, 0.2, 1.2), 0.5, 0, 0.5)
 
 
 def _lose(mix):
@@ -644,107 +551,6 @@ def make_combat_sfx():
     sfx("level_up", layer((up, 1.0, 0), (noise_sweep(1.0, 2000, 9000, 0.4), 0.2, 0.3)), 0.7)
 
 
-# ---------- 动态战斗音乐层 ----------
-# 和 battle / boss 主曲同速、同长度、同和弦，与主曲同时起播、各自循环，由游戏按战况调音量：
-#   drive  推进层：太鼓八分音、低频脉冲、每 4 小节一次上扫——紧迫起来时淡入
-#   danger 危险层：高音弦乐颤音（加三全音）、警报钟、心跳般的低频——生命垂危 / Boss 失控时淡入
-
-def _layer_drive(bpm, cycle, name):
-    beat = 60 / bpm
-    bar = beat * 4
-    mix = Mix(bar * 16)
-    for c in range(8):
-        root = cycle[c % 4][1]
-        start = c * bar * 2
-        for b in range(2):
-            bs = start + b * bar
-            for e in range(8):
-                mix.add(bs + e * beat / 2, TAIKO, 0.5 if e % 2 == 0 else 0.3, -0.25 if e % 4 < 2 else 0.25, 0.4)
-                mix.add(bs + e * beat / 2, bass(root - 12 if e % 2 == 0 else root, beat * 0.3, 1.0), 0.32, 0, 0.05)
-            for s16 in range(16):
-                mix.add(bs + s16 * beat / 4, SHAKER, 0.09 if s16 % 2 else 0.05, 0.5, 0.1)
-        if c % 2 == 1:
-            mix.add(start + bar, noise_sweep(bar, 400, 6000, bar * 0.6), 0.22, 0, 0.5)
-    write(mix.render(wet_gain=0.35, rt=1.2), os.path.join(ROOT, "music", name + "_drive.ogg"), peak=0.7)
-
-
-def _layer_danger(bpm, cycle, name):
-    beat = 60 / bpm
-    bar = beat * 4
-    mix = Mix(bar * 16)
-    for c in range(8):
-        notes, root = cycle[c % 4]
-        start = c * bar * 2
-        cluster = [notes[0] + 12, notes[0] + 18, notes[1] + 12]   # 三全音：不安
-        trem = pad(cluster, bar * 2, attack=0.3, release=0.5, bright=9.0, breathe=6.0)
-        mix.add(start, trem, 0.22, 0.2, 0.5)
-        for b in range(2):
-            bs = start + b * bar
-            mix.add(bs, punch(0.18, 90, 45, 0.06), 0.8, 0, 0.1)
-            mix.add(bs + beat * 0.4, punch(0.18, 90, 45, 0.06), 0.55, 0, 0.1)
-        mix.add(start + bar * 1.5, bell(notes[0] + 30, 0.6, 1.6, 1.41, 4.0), 0.09, -0.6, 0.7)
-    write(mix.render(wet_gain=0.5, rt=1.8), os.path.join(ROOT, "music", name + "_danger.ogg"), peak=0.6)
-
-
-BATTLE_CYCLE = [([64, 67, 71, 76], 40), ([60, 64, 67, 71], 36), ([57, 60, 64, 69], 33), ([59, 63, 66, 69], 35)]
-BOSS_CYCLE = [([62, 65, 69], 38), ([58, 62, 65], 34), ([60, 64, 67], 36), ([61, 64, 69], 33)]
-
-
-def music_layers():
-    _layer_drive(124, BATTLE_CYCLE, "battle")
-    _layer_danger(124, BATTLE_CYCLE, "battle")
-    _layer_drive(136, BOSS_CYCLE, "boss")
-    _layer_danger(136, BOSS_CYCLE, "boss")
-
-
-# Each stage changes harmony, lead instrument, and rhythmic phrasing.
-STAGE_SCORES = {
-    "preclinical": (94, [(38, [62, 65, 69]), (41, [60, 65, 69]), (34, [58, 62, 65]), (33, [61, 64, 70])],
-                    (0.0, 1.5, 3.25), (0, 2, 1), "bell"),
-    "phase1": (112, [(36, [60, 63, 67]), (44, [60, 63, 68]), (41, [60, 65, 68]), (43, [59, 62, 67])],
-               (0.0, 0.75, 2.0, 2.75), (0, 1, 2, 1), "bass"),
-    "phase2": (104, [(38, [62, 65, 69, 71]), (43, [62, 67, 71, 74]), (36, [60, 64, 67, 74]), (45, [61, 64, 69, 71])],
-               (0.5, 1.25, 2.5, 3.5), (0, 2, 3, 1), "epiano"),
-    "phase3": (126, [(35, [59, 62, 66]), (43, [59, 62, 67]), (38, [62, 66, 69]), (42, [58, 61, 66])],
-               (0.0, 0.5, 1.75, 2.5, 3.25), (0, 2, 1, 2, 0), "pluck"),
-}
-
-
-def stage_score(name, score, boss=False):
-    bpm, cycle, offsets, motif, instrument = score
-    beat = 60 / bpm
-    bar = beat * 4
-    mix = Mix(bar * 16)
-    for phrase in range(8):
-        root, notes = cycle[phrase % len(cycle)]
-        start = phrase * bar * 2
-        harmony = [n - 12 for n in notes] + ([root + 12] if boss else [])
-        mix.add(start, pad(harmony, 2 * bar, 0.45, 1.0, 5 if boss else 2.5), 0.46, 0, 0.55)
-        for measure in range(2):
-            t = start + measure * bar
-            for step, offset in enumerate(offsets):
-                n = notes[motif[step]] + (12 if measure and step == len(offsets) - 1 else 0)
-                if instrument == "bell":
-                    lead = bell(n, 1, 2.2, 2.01, 1.4)
-                elif instrument == "bass":
-                    lead = pluck(n - 12, 0.26, 1, 2.8)
-                elif instrument == "epiano":
-                    lead = epiano(n, 0.7)
-                else:
-                    lead = pluck(n, 0.23, 1, 1.7)
-                mix.add(t + offset * beat, lead, 0.24, -0.27 if step % 2 else 0.27, 0.44)
-            mix.add(t, bass(root, beat * 1.5), 0.48, 0, 0.1)
-            mix.add(t + beat * 2.5, bass(root + (7 if measure else 12), beat), 0.32, 0, 0.1)
-            if boss:
-                for offset in (0, 1.5, 3):
-                    mix.add(t + offset * beat, TAIKO, 0.45, -0.15, 0.28)
-            elif instrument in ("bass", "pluck"):
-                mix.add(t, KICK, 0.38, 0, 0.08)
-                mix.add(t + beat * 2.5, SHAKER, 0.13, 0.3, 0.18)
-    suffix = "_boss" if boss else ""
-    write(mix.render(wet_gain=0.54, rt=2.0), os.path.join(ROOT, "music", name + suffix + ".ogg"))
-
-
 def ceremony_audio():
     sfx("boss_entrance", layer(
         (fade(noise_sweep(1.18, 140, 1900, 2.4), 0.18, 0.18), 0.45, 0),
@@ -761,42 +567,27 @@ def ceremony_audio():
         (metal([305, 608, 933], 0.28, 0.11), 0.46, 0.05)), 0.46)
 
 
-def research_audio():
-    for name, score in STAGE_SCORES.items():
-        bpm, cycle, _, _, _ = score
-        stage_score(name, score)
-        stage_score(name, score, boss=True)
-        layer_cycle = [(notes, root) for root, notes in cycle]
-        _layer_drive(bpm, layer_cycle, name)
-        _layer_danger(bpm, layer_cycle, name)
-    ceremony_audio()
-
-
 if __name__ == "__main__":
     import sys
-    if "--research-only" in sys.argv:
-        research_audio()
-        sys.exit(0)
-    if "--layers-only" in sys.argv:   # 只生成动态战斗层，不动已有音乐和音效
-        music_layers()
+    if "--research-only" in sys.argv:   # 只生成演出音效（Boss 登场、升级、分子修饰）
+        ceremony_audio()
         sys.exit(0)
     if "--only-end-turn" in sys.argv:   # 只生成结束回合音效
         sfx_end_turn()
         sys.exit(0)
     music_title()
     music_lab()
-    music_battle()
-    music_boss()
-    music_boss_final()
-    sting("win", _win)
+    # 战斗曲（普通 / Boss / 最终 Boss 的三层分轨）、胜利与 Boss 乐句、战斗音效由 gen_battle_music.py 生成，见文件末尾
     sting("lose", _lose)
     sting("approved", _approved)
     sting("failed", _failed)
     sting("terminated", _terminated)
     sting("campaign_approved", _campaign_approved, tail=27.0)
     sting("campaign_archive", _campaign_archive, tail=21.0)
-    music_layers()
-    research_audio()
+    ceremony_audio()
     if "--music-only" not in sys.argv:   # 只改音乐时加 --music-only，音效保持不变
         make_sfx()
     sfx_end_turn()
+    import gen_battle_music   # 最后生成：覆盖旧版的 hit / hit_heavy，写入分层战斗曲
+    sys.argv = [sys.argv[0]] + (["--music"] if "--music-only" in sys.argv else [])
+    gen_battle_music.main()

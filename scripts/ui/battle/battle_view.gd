@@ -569,6 +569,7 @@ func _boss_entrance() -> void:
 		if event is InputEventMouseButton and event.pressed:
 			tween.set_speed_scale(6.0))
 	GameAudio.sfx("boss_entrance")
+	GameAudio.sting("boss_intro")   # Boss 登场的音乐标识：战斗曲压低，奏出 Boss 动机
 	tween.tween_property(top_bar, "position:y", 0.0, 0.35).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 	tween.tween_property(low_bar, "position:y", h - 58, 0.35).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 	tween.tween_property(self, "_intro_dark", 0.66, 0.4)
@@ -671,33 +672,38 @@ func _dose_surge(dose: int) -> void:
 
 ## 音乐跟着战况走，只在关键节点变化：Boss 本身就有推进感，过半血更急；敌人蓄大招时推进层涌上来；
 ## 生命垂危或毒性 Boss 剂量拉满时危险层淡入；战斗结束全部退去
+## 战况 → 音乐层：Tension＝玩家生命低、敌人蓄大招、剂量毒性失控；Climax＝Boss 半血以下或正在蓄力、普通战斗的终局。
+## GameAudio 只在小节线换层，所以这里每帧报告也不会造成频繁切换
 func _update_music(_delta: float) -> void:
 	if _manager == null or _ended:
-		GameAudio.intensity(0.0, 0.0)
 		return
-	var drive := 0.0
-	var danger := 0.0
 	var boss_low := false
 	var heavy := false
 	var strain := 0.0
+	var alive := 0
+	var hp_left := 0.0
+	var hp_total := 0.0
 	for i in _enemy_widgets.size():
 		if i >= _manager.enemies.size() or not _manager.enemies[i].is_alive():
 			continue
 		var e: Enemy = _manager.enemies[i]
+		alive += 1
+		hp_left += e.hp
+		hp_total += e.max_hp
 		heavy = heavy or _enemy_widgets[i].danger
 		strain = maxf(strain, _enemy_widgets[i].creature.strain)
 		if e.is_boss and e.hp * 2 < e.max_hp:
 			boss_low = true
-	if _is_boss:
-		drive = 0.55 + (0.45 if boss_low else 0.0)
-	if heavy:
-		drive = maxf(drive, 0.8)
 	var max_hp := _manager.player.max_hp if _manager.player else 100
-	if float(_shown_player_hp) / max_hp <= 0.3:
-		danger = 1.0
-	elif strain >= 0.75:
-		danger = 0.6
-	GameAudio.intensity(drive, danger)
+	var low_hp := float(_shown_player_hp) / max_hp <= 0.3
+	var state := "normal"
+	if _is_boss and (boss_low or heavy):
+		state = "climax"
+	elif not _is_boss and alive > 0 and hp_total > 0.0 and hp_left / hp_total < 0.25:
+		state = "climax"   # 终局：最后一点血
+	elif low_hp or heavy or strain >= 0.75:
+		state = "tension"
+	GameAudio.set_mood(state)
 
 
 ## Boss 战全程的舞台压力：地面转危险色、四周压暗；敌人下一招很痛时明显更强，打赢立刻散去
@@ -754,7 +760,10 @@ func _play(ev: Dictionary) -> void:
 			_strike_ai = played.is_ai()
 			_strike_style = _strike_style_for(played)
 			_mol.motion.pace = float(plan.pace)
-			GameAudio.sfx("zap" if _strike_ai else ("slash" if played.kind == "attack" else "card_play"))
+			if _strike_ai and not _strike_failed:
+				GameAudio.sfx("ai_scan")
+			elif played.kind != "attack" or _strike_style_for(played) != "charge":
+				GameAudio.sfx("slash" if played.kind == "attack" else "card_play")
 			var target := int(ev.get("target", -1))
 			await _fragment_response(played)
 			if _strike_ai and not _strike_failed:   # AI：先用几何准星锁定目标、扫描结构
@@ -763,7 +772,7 @@ func _play(ev: Dictionary) -> void:
 			await _animate_card_out(played, target)
 		"deviation":
 			# AI 失误：扫描在分子身上崩坏、错位，分子被品红色的噪声刺一下；不出招
-			GameAudio.sfx("deviation")
+			GameAudio.sfx("ai_fail")
 			var at := _player_point()
 			_cue(BattleCue.Kind.GLITCH, at + Vector2(0, -30), at, Vector2(170, 120))
 			_cue(BattleCue.Kind.GLITCH, _ai_chip.position + Vector2(60, 24), Vector2.ZERO, Vector2(120, 40))
@@ -778,12 +787,13 @@ func _play(ev: Dictionary) -> void:
 			_float_text(tr("battle.fx.block") % int(ev.amount), _director.number_slot(_number_anchor(String(ev.side), int(ev.index))), Color(0.5, 0.75, 1.0), 20)
 			if String(ev.side) == "player" and _mol.visible:
 				_mol.defend()   # 1 级：分子自己收缩，保护膜从中心长出来
+				GameAudio.sfx("shield_form")
 			else:
 				_body_cue(BattleCue.Kind.SHIELD, String(ev.side), int(ev.index), p)
 				if String(ev.side) == "enemy" and int(ev.index) < _enemy_widgets.size():
 					_enemy_widgets[int(ev.index)].creature.motion.defend()
+				GameAudio.sfx("block")
 			_set_bar(String(ev.side), int(ev.index), -1, int(ev.block))
-			GameAudio.sfx("block")
 			await _wait(0.16)
 		"status":
 			var id := String(ev.id)
@@ -915,6 +925,8 @@ func _play_damage(ev: Dictionary) -> void:
 			else:
 				ew.creature.motion.status(STATUS_TINT.poison)
 			GameAudio.sfx("debuff" if toxin else ("hit_heavy" if level >= BattleDirector.Tier.BURST else "hit"))
+			if not toxin and _manager.enemies[index].is_boss and int(ev.hp) > 0:
+				GameAudio.sfx("boss_hurt")
 		_stage_reaction(level, amount, p)
 	elif int(ev.blocked) > 0:
 		_float_text(tr("battle.fx.blocked"), _number_anchor(side, index) + Vector2(0, -20), Color(0.5, 0.75, 1.0), 20)
@@ -983,6 +995,8 @@ func _play_enemy_move(index: int, move: Dictionary) -> void:
 	var attacking := int(move.get("damage", 0)) > 0
 	var timing := {}
 	if attacking:   # 每种敌人按自己的性格蓄力、出手、回弹；命中瞬间才落下震屏和音效
+		if enemy.is_boss:
+			GameAudio.sfx("boss_warn")   # Boss 出招前的预警
 		timing = ew.creature.motion.attack(Vector2(-110.0 if enemy.is_boss else -70.0, 10.0), "attack")
 		await _wait_raw(float(timing.impact))
 	else:
@@ -1108,7 +1122,9 @@ func _mol_recoil(amount: float) -> void:
 func _strike_charge(to: Vector2) -> void:
 	var rest_tip := _mol.position + _mol.attack_tip(1.0, false)
 	var timing := _mol.charge(to - rest_tip)
+	GameAudio.sfx("mol_charge")   # 预备：骨架绷紧
 	await _wait_raw(float(timing.release))
+	GameAudio.sfx("mol_release")  # 释放
 	if not _director.compressed:   # 重复多次后只保留身体动作和命中，省掉拖尾
 		_cue(BattleCue.Kind.TRAIL, _mol.get_transform() * _mol.attack_tip(), to)
 	await _wait_raw(float(timing.impact) - float(timing.release))
@@ -1317,7 +1333,7 @@ func _fragment_response(card: ResearchCard) -> void:
 	await _wait(0.09)
 	_mol.pulse_site(card.synergy_site, UIKit.GOLD)
 	_mol.link_glow([[site, card.synergy_site]], UIKit.GOLD)
-	GameAudio.sfx("buff")
+	GameAudio.sfx("synergy")
 	await _wait(0.12)
 
 
@@ -1348,11 +1364,14 @@ func _play_death(side: String, index: int) -> void:
 	if side == "player":
 		if _mol.visible:
 			_mol.collapse()
+		GameAudio.sfx("loss")
 		_shake(16.0, 0.6)
 		await _wait(0.5)
 		return
 	var ew := _enemy_widgets[index]
-	GameAudio.sfx("enemy_die")
+	GameAudio.sfx("boss_die" if _manager.enemies[index].is_boss else "enemy_die")
+	if _manager.enemies[index].is_boss:
+		GameAudio.end_battle("boss_death")   # 下一拍收掉战斗曲，接 Boss 死亡的收束乐句
 	var body := ew.creature
 	var area := body.visible_body_rect()
 	var enemy := _manager.enemies[index]
@@ -1733,7 +1752,8 @@ func _show_end() -> void:
 	_faces.clear()
 	_hand_cards.clear()
 	if _victory:
-		GameAudio.sting("win")
+		if not _is_boss:   # Boss 战已在 Boss 倒下时奏过独立的收束乐句
+			GameAudio.end_battle("win")
 		_player.set_mood("")
 		_player.react("happy", 3.0)
 		_mol.cheer()
@@ -1743,7 +1763,7 @@ func _show_end() -> void:
 			await _play_level_up(_pending_level)
 		_continue.text = tr("battle.claim")
 	else:
-		GameAudio.sting("lose")
+		GameAudio.end_battle("lose")
 		_player.set_mood("sad")
 		_mol.set_mood("sad")
 		await _show_banner(tr("battle.banner.defeat"), tr("battle.banner.defeat_sub"), Color(1.0, 0.45, 0.45), 0.0, true)

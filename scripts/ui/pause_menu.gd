@@ -10,8 +10,15 @@ var _confirm: ConfirmDialog
 
 func _init() -> void:
 	super._init()
+	closed.connect(func() -> void: GameAudio.set_paused(false))
 	title_key = "pause.title"
 	panel_width = 420
+
+
+## 打开暂停菜单时音乐在原位置停住，关闭时接着播
+func open() -> void:
+	super.open()
+	GameAudio.set_paused(true)
 
 
 func _build(box: VBoxContainer) -> void:
