@@ -5,6 +5,9 @@ var ground := 400.0
 var shadows: Array = []
 var impact := Vector2.ZERO
 var impact_light := 0.0
+var pressure := 0.0                       # Boss 压迫感 0–1：地面亮边和脚下的光都转成危险色
+var pressure_color := Color(0.85, 0.2, 0.18)
+var threat_x := 0.0
 
 
 func _ready() -> void:
@@ -20,6 +23,9 @@ func _draw() -> void:
 		Vector2(w, ground + 69), Vector2(w * 0.60, ground + 77), Vector2(0, ground + 63)])
 	draw_polygon(ridge,PackedColorArray([Color(0.25,0.27,0.34,0.82),Color(0.28,0.29,0.35,0.86),Color(0.30,0.30,0.36,0.85),Color(0.27,0.28,0.35,0.8),Color(0.25,0.27,0.34,0.8),Color(0.18,0.21,0.29,0.24),Color(0.18,0.21,0.29,0.20),Color(0.18,0.21,0.29,0.24)]))
 	draw_polyline(PackedVector2Array([ridge[0],ridge[1],ridge[2],ridge[3],ridge[4]]), Color(0.48,0.45,0.46,0.6), 1.5, true)
+	if pressure > 0.01:
+		Shading.glow(self, Vector2(threat_x, ground), 330, Color(pressure_color, 0.34 * pressure))
+		draw_polyline(PackedVector2Array([ridge[0],ridge[1],ridge[2],ridge[3],ridge[4]]), Color(pressure_color.lightened(0.15), 0.8 * pressure), 2.0, true)
 	for i in 7:
 		var x := w * (i + 0.4) / 7.0
 		draw_line(Vector2(x, ground + 26), Vector2(x + 30, ground + 23), Color(0.12, 0.15, 0.23, 0.28), 2, true)

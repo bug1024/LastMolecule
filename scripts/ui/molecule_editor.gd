@@ -23,6 +23,9 @@ var _target: Label               # 靶点口袋：变体名 + 它的故事（口
 var _lineage_btn: Button
 var lineage_sites := {}          # 分子谱系里上一代的结构（有就显示「沿用上一代」）
 var _preview: Callable        # 修饰模式：func(placement) -> {kind, efficacy}
+var _baseline := {}           # 修饰模式：改动前的属性，用来对比
+var _prop_delta := {}         # 这次操作让每项属性变了多少（只在刷新后闪一下）
+var _toasts: HBoxContainer
 
 
 func _init() -> void:
@@ -39,6 +42,8 @@ func edit(molecule: Molecule, edit_mode: String, preview: Callable = Callable())
 	mode = edit_mode
 	_preview = preview
 	_work = Molecule.from_dict(molecule.to_dict())
+	_baseline = _work.properties() if edit_mode == "modify" else {}
+	_prop_delta.clear()
 	open()
 	_view.molecule = _work
 	_view.selected = "L1"
@@ -91,6 +96,15 @@ func _build(box: VBoxContainer) -> void:
 	_view.custom_minimum_size = Vector2(0, 262)
 	_view.site_clicked.connect(_on_site)
 	left.add_child(_view)
+	# 播报排在分子下方的空处，绝不盖住正在响应的结构
+	_toasts = HBoxContainer.new()
+	_toasts.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_toasts.alignment = BoxContainer.ALIGNMENT_CENTER
+	_toasts.add_theme_constant_override("separation", 8)
+	_toasts.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	_toasts.offset_top = -30
+	_toasts.offset_bottom = -2
+	_view.add_child(_toasts)
 	left.add_child(UIKit.label(tr("mol.hint"), UIKit.TEXT_DIM, 13, true))
 	left.add_child(UIKit.header(tr("mol.inventory"), 15, accent.lightened(0.2)))
 	var scroll := ScrollContainer.new()
@@ -114,14 +128,16 @@ func _build(box: VBoxContainer) -> void:
 		var b := UIKit.button(tr("mol.preset." + preset), "", "normal", Vector2(0, 32))
 		b.add_theme_font_size_override("font_size", 14)
 		b.pressed.connect(func() -> void:
+			var before := _snapshot()
 			_work.apply_preset(preset)
-			_refresh_all())
+			_after_change(before))
 		_presets.add_child(b)
 	_lineage_btn = UIKit.button(tr("mol.preset.lineage"), "", "normal", Vector2(0, 32))
 	_lineage_btn.add_theme_font_size_override("font_size", 14)
 	_lineage_btn.pressed.connect(func() -> void:
+		var before := _snapshot()
 		_work.apply_sites(lineage_sites)
-		_refresh_all())
+		_after_change(before))
 	_presets.add_child(_lineage_btn)
 	right.add_child(_presets)
 	right.add_child(UIKit.header(tr("mol.properties"), 16, accent.lightened(0.2)))
@@ -157,30 +173,109 @@ func _build(box: VBoxContainer) -> void:
 
 
 func _on_site(site_id: String) -> void:
+	var before := _snapshot()
 	if _view.selected == site_id and _work.sites.has(site_id):
 		# 再点一次已放片段的选中位点：取下片段
 		var placement := _work.sites.duplicate()
 		placement.erase(site_id)
 		_work.apply_layout(placement)
 	_view.selected = site_id
-	_refresh_all()
+	_after_change(before)
 
 
-func _place(fragment_id: String) -> void:
+func _place(fragment_id: String, chip: Control = null) -> void:
 	var site := _view.selected
 	if site.is_empty() or not Molecule.can_place(fragment_id, site):
 		GameAudio.sfx("error")
 		return
+	var before := _snapshot()
+	var from := Vector2.INF
+	if chip != null:
+		from = chip.global_position + chip.size * 0.5 - _view.global_position
 	var placement := _work.sites.duplicate()
 	placement[site] = fragment_id
 	if _work.apply_layout(placement):
 		GameAudio.sfx("card_play")
+		_view.snap(site, from)
 		# 自动跳到下一个空位点，减少点击
 		for s in Molecule.config().get("sites", []):
 			if not _work.sites.has(String(s.id)):
 				_view.selected = String(s.id)
 				break
+	_after_change(before)
+
+
+func _snapshot() -> Dictionary:
+	var combos: Array = _work.active_combos().map(func(c: Dictionary) -> String: return String(c.id))
+	return {"props": _work.properties(), "combos": combos, "alerts": _work.alerts.keys(), "sites": _work.sites.duplicate()}
+
+
+## 一次改动之后：属性闪动、结构响应，新组合和新警示各有自己的表现
+func _after_change(before: Dictionary) -> void:
+	var props := _work.properties()
+	_prop_delta.clear()
+	for p in Molecule.PROPS:
+		var change := int(props[p]) - int(before.props[p])
+		if change != 0:
+			_prop_delta[p] = change
+	for id in _work.sites:   # 方案一次换多个片段时，每个变化的位点都吸附一下
+		if String(before.sites.get(id, "")) != String(_work.sites[id]) and not _view._snap.has(id):
+			_view.snap(String(id))
 	_refresh_all()
+	_prop_delta.clear()
+	for combo in _work.active_combos():
+		if not (before.combos as Array).has(String(combo.id)):
+			_announce_combo(combo)
+	for id in _work.alerts:
+		if not (before.alerts as Array).has(id):
+			_announce_alert(String(id))
+
+
+func _announce_combo(combo: Dictionary) -> void:
+	var links := _work.combo_links(combo)
+	var bad := combo.has("alert")
+	var color := UIKit.DANGER if bad else UIKit.GOLD
+	_view.link_glow(links.pairs, color)
+	_view.flash_sites(links.sites, color)
+	if bad:
+		return   # 带警示的组合由警示本身播报
+	GameAudio.sfx("buff")
+	# 右栏已写全效果，这里只报名字
+	var short_name := tr("combo." + String(combo.id)).get_slice("：", 0).get_slice(":", 0)
+	_toast(tr("mol.toast.combo") % short_name, UIKit.GOLD)
+
+
+func _announce_alert(id: String) -> void:
+	GameAudio.sfx("debuff")
+	var hit_sites: Array = []
+	for site_id in _work.sites:
+		if String(Molecule.fragment(String(_work.sites[site_id])).get("alert", "")) == id:
+			hit_sites.append(site_id)
+	_view.flash_sites(hit_sites, UIKit.DANGER)
+	_view.hit(0.3)
+	_toast(tr("mol.toast.alert") % tr("alert." + id), UIKit.DANGER.lightened(0.2))
+
+
+func _toast(text: String, color: Color) -> void:
+	var plate := PanelContainer.new()
+	var skin := UIKit.panel_style(Color(0.07, 0.08, 0.14, 0.96), color, 8)
+	skin.content_margin_left = 10
+	skin.content_margin_right = 10
+	skin.content_margin_top = 3
+	skin.content_margin_bottom = 4
+	plate.add_theme_stylebox_override("panel", skin)
+	plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var label := UIKit.header(text, 14, color)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	plate.add_child(label)
+	_toasts.add_child(plate)
+	plate.pivot_offset = plate.get_combined_minimum_size() * 0.5
+	plate.scale = Vector2(1.25, 1.25)
+	var tween := plate.create_tween()
+	tween.tween_property(plate, "scale", Vector2.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_interval(1.6)
+	tween.tween_property(plate, "modulate:a", 0.0, 0.3)
+	tween.tween_callback(plate.queue_free)
 
 
 func _refresh_all() -> void:
@@ -217,7 +312,7 @@ func _fragment_chip(id: String, count: int) -> Control:
 	hover.bg_color = Color(col, 0.25)
 	btn.add_theme_stylebox_override("hover", hover)
 	btn.add_theme_stylebox_override("pressed", hover)
-	btn.pressed.connect(_place.bind(id))
+	btn.pressed.connect(_place.bind(id, btn))
 	var col_box := VBoxContainer.new()
 	col_box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	col_box.offset_left = 10
@@ -261,14 +356,40 @@ func _fill_props() -> void:
 		pips.custom_minimum_size = Vector2(hi * 18, 16)
 		var good := v >= 4
 		var bad := v <= 1
+		var change := int(_prop_delta.get(p, 0))
+		var was := v - change
+		var base := int(_baseline.get(p, -1))
+		var pulse := [1.0 if change != 0 else 0.0]
 		pips.draw.connect(func() -> void:
+			var t: float = pulse[0]
 			for i in hi:
 				var r := Rect2(i * 18, 3, 14, 10)
 				var on := i < v
 				var c: Color = (UIKit.ACCENT if good else (UIKit.DANGER if bad else UIKit.ACCENT_BLUE)) if on else Color(0.2, 0.24, 0.3)
-				pips.draw_rect(r, c))
+				if t > 0.0 and i >= mini(v, was) and i < maxi(v, was):   # 这次变化的格子：涨的亮起，跌的烧红后熄灭
+					if on:
+						r = r.grow(1.5 * t)
+						c = c.lerp(Color.WHITE, t)
+					else:
+						c = c.lerp(UIKit.DANGER, t)
+				pips.draw_rect(r, c)
+			if base >= 0 and base != v:   # 修饰前的位置
+				pips.draw_line(Vector2(base * 18 - 2, 0), Vector2(base * 18 - 2, 16), UIKit.GOLD, 2.0))
+		if change != 0:
+			var pulse_tween := pips.create_tween()
+			pulse_tween.tween_method(func(t: float) -> void:
+				pulse[0] = t
+				pips.queue_redraw(), 1.0, 0.0, 0.7)
 		row.add_child(pips)
 		row.add_child(UIKit.header(str(v), 15, UIKit.ACCENT if good else (UIKit.DANGER.lightened(0.2) if bad else UIKit.TEXT)))
+		if base >= 0 and base != v:
+			row.add_child(UIKit.label(tr("mol.prop_from") % base, UIKit.GOLD, 12))
+		if change != 0:
+			var delta := UIKit.header("%+d" % change, 16, UIKit.ACCENT if change > 0 else UIKit.DANGER.lightened(0.2))
+			row.add_child(delta)
+			var delta_tween := delta.create_tween()
+			delta_tween.tween_interval(0.8)
+			delta_tween.tween_property(delta, "modulate:a", 0.0, 0.4)
 		_props.add_child(row)
 		var tip := UIKit.label(tr("prop.%s.tip" % p), UIKit.ACCENT if good else (UIKit.DANGER.lightened(0.25) if bad else UIKit.TEXT_DIM), 12, true)
 		_props.add_child(tip)

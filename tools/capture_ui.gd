@@ -123,6 +123,14 @@ func run() -> void:
 		while battle._busy:
 			await process_frame
 		await shot("battle-multi" if stage == "三期临床试验" else "battle-dose")
+	# 演出标杆：Boss 登场的黑影与亮相、常驻压力（敌人蓄力时更强）
+	game.state.stage = "三期临床试验"
+	game._start_battle("boss")
+	await shot("boss-intro-shadow", 0.9)
+	await shot("boss-intro-reveal", 0.7)
+	while battle._busy:
+		await process_frame
+	await shot("boss-pressure", 1.2)
 	main._settings.open()
 	await shot("settings")
 	main._settings.visible = false
@@ -154,6 +162,30 @@ func run() -> void:
 		game.get_card_by_id("mol_hit"), game.get_card_by_id("exp_assay"), game.get_card_by_id("ai_screen")], "abilities": []})
 	await shot("reward")
 	main._reward_popup.visible = false
+	# 演出标杆：卡牌升级的蓄力、变形瞬间和定格；分子修饰的组合与警示
+	var upgrade_card := ResearchCard.from_dict(game.get_card_by_id("mol_hit"))
+	upgrade_card.upgrade_preview = ResearchCard.from_dict(game.get_card_by_id("mol_hit"), true)
+	upgrade_card.copies = 2
+	main._card_popup.show_cards([upgrade_card], "upgrade", 0, 0, game.get_ai_info())
+	await shot("upgrade-pick", 0.2)
+	main._card_popup._show_upgrade_result(upgrade_card)
+	await shot("upgrade-charge", 0.2)
+	await shot("upgrade-burst", 0.26)
+	await shot("upgrade-done", 1.3)
+	main._card_popup.visible = false
+	var editor = main._mol_editor
+	editor.edit(game.molecule, "modify", Callable())
+	editor._work.apply_layout({})
+	editor._refresh_all()
+	var before: Dictionary = editor._snapshot()
+	editor._work.apply_layout({"L1": "phenyl", "R1": "pyridine"})
+	editor._after_change(before)
+	await shot("editor-combo", 0.28)
+	before = editor._snapshot()
+	editor._work.apply_layout({"L1": "phenyl", "R1": "pyridine", "R2": "nitro"})
+	editor._after_change(before)
+	await shot("editor-alert", 0.28)
+	editor.visible = false
 	var summary: Dictionary = game.company.settle_run(game.state.data, "approved", game.state.funding)
 	main._ending.show_ending("approved", "ending.approved.flavor", summary, game.state)
 	await shot("ending")

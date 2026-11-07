@@ -114,31 +114,13 @@ func _on_panel_input(event: InputEvent, card: ResearchCard) -> void:
 		card_selected.emit(card)
 
 
-## 升级完成：单独展示升级后的卡、前后对比，点「继续」后才回到游戏
+## 升级完成：播放强化演出（可直接点继续跳过），点「继续」后才回到游戏
 func _show_upgrade_result(card: ResearchCard) -> void:
-	GameAudio.sfx("level_up")
 	for child in _card_row.get_children():
 		child.queue_free()
 	_title_label.text = tr("ui.upgrade.done_title")
 	_hint_label.text = tr("ui.upgrade.done_hint") % [card.copies, tr(card.name)]
-	var row := HBoxContainer.new()
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 24)
-	row.custom_minimum_size = Vector2(1100, 0)
-	var old_face := CardFace.create(card, 0.9)
-	old_face.set_state(false, false, true)
-	row.add_child(old_face)
-	row.add_child(UIKit.header("➜", 48, Color(0.55, 1.0, 0.65)))
-	var new_face := CardFace.create(card.upgrade_preview, 1.25, {"compare_to": card})
-	new_face.set_state(true, false)
-	row.add_child(new_face)
-	var diff := UIKit.label("\n".join(ResearchCard.upgrade_diff(card, card.upgrade_preview)), Color(0.55, 1.0, 0.65), 20, true)
-	diff.custom_minimum_size = Vector2(240, 0)
-	row.add_child(diff)
-	_card_row.add_child(row)
-	new_face.pivot_offset = new_face.custom_minimum_size * 0.5
-	new_face.scale = Vector2(0.7, 0.7)
-	create_tween().tween_property(new_face, "scale", Vector2.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_card_row.add_child(UpgradeCeremony.create(card, $Center/Margin))
 	_skip_button.text = tr("ui.upgrade.continue")
 	_purpose = "upgrade_done"
 	_pending_upgrade = card

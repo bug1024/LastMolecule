@@ -968,6 +968,10 @@ func _test_molecule() -> void:
 		if not String(c.get("card", "")).is_empty():
 			want_cards[String(c.card)] = true
 	_expect(m.signature_cards().size() == want_cards.size(), "Each active combo adds its trait card once")
+	for c in m.active_combos():
+		var links := m.combo_links(c)
+		_expect(not (links.sites as Array).is_empty() and (String(c.kind) != "adjacent" or not (links.pairs as Array).is_empty()),
+			"Every active combo can point at the sites that trigger it: " + String(c.id))
 	_expect(Molecule.card_affinity({"kind": "attack", "effects": [{"op": "damage", "value": 6}]}) == ["potency"]
 		and m.pool_weight({"kind": "attack", "effects": [{"op": "damage", "value": 6}]}) == 30
 		and m.pool_weight({"kind": "skill", "effects": [{"op": "block", "value": 5}]}) == 10,

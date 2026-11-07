@@ -66,6 +66,11 @@ var _banner: Control
 var _continue: Button
 var _player_tag: Label
 var _vignette_low: TextureRect
+var _vignette_boss: TextureRect
+var _pressure_dim: ColorRect
+var _pressure := 0.0            # Boss 战的舞台压力：随时存在，敌人蓄大招时更强
+var _intro_dark := 0.0          # 登场演出额外压暗世界
+var _intro_tween: Tween
 var _flash_rect: ColorRect
 var _tip: PanelContainer
 var _is_boss := false
@@ -210,6 +215,14 @@ func _build() -> void:
 	_vignette_low = _make_vignette(Color(0.95, 0.05, 0.05))
 	# 边缘遮罩只压在战场上，不盖住手牌和按钮
 	move_child(_vignette_low, _shake_root.get_index() + 1)
+	_vignette_boss = _make_vignette(Color(0.55, 0.06, 0.08))
+	move_child(_vignette_boss, _shake_root.get_index() + 1)
+	_pressure_dim = ColorRect.new()
+	_pressure_dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_pressure_dim.color = Color(0.015, 0.01, 0.04, 0.0)
+	_pressure_dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_pressure_dim)
+	move_child(_pressure_dim, _shake_root.get_index())   # 只压世界，角色仍站在亮处
 	_flash_rect = ColorRect.new()
 	_flash_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_flash_rect.color = Color(1, 0.1, 0.05, 0.0)
@@ -339,6 +352,7 @@ func _on_battle_started(encounter: Dictionary) -> void:
 	_victory = false
 	_queue.clear()
 	_busy = true
+	_reset_intro()
 	_selected = null
 	_hover_card = null
 	_continue.visible = false
@@ -470,11 +484,164 @@ func _intro_banner(kind: String) -> void:
 	var sub := tr("encounter.kind." + kind)
 	var color: Color = {"boss": UIKit.DANGER, "elite": UIKit.GOLD}.get(kind, Color.WHITE)
 	if kind == "boss":
-		GameAudio.sfx("boss")
-		_shake(14.0, 0.6)
-		await _show_banner(sub, title, color, 1.7, true)
+		await _boss_entrance()
 	else:
 		await _show_banner(sub, title, color, 0.9, false)
+
+
+## 战斗外的界面元素：登场演出期间让位给 Boss
+func _intro_chrome() -> Array[Control]:
+	return [_hand_root, _energy_orb, _end_button, _draw_button, _discard_button, _dose_button, _title, _turn_badge, _ai_chip, _rule_label]
+
+
+func _reset_intro() -> void:
+	if _intro_tween != null and _intro_tween.is_valid():
+		_intro_tween.kill()
+	_intro_tween = null
+	_intro_dark = 0.0
+	_pressure = 0.0
+	_shake_root.scale = Vector2.ONE
+	for node in _intro_chrome():
+		node.modulate.a = 1.0
+	_banner.modulate.a = 1.0
+
+
+## Boss 登场：世界压暗、黑影慢慢逼近，落地后才显出真身和名字。点一下快进，不会卡住老玩家
+func _boss_entrance() -> void:
+	_banner.modulate.a = 1.0
+	var w := size.x
+	var h := size.y
+	var ground := float(_space.ground)
+	var accent := _boss_accent()
+	var foot := 0.0
+	for ew in _enemy_widgets:
+		foot += ew.position.x + EnemyWidget.SIZE.x * 0.5
+	foot /= maxf(1.0, _enemy_widgets.size())
+	_shake_root.pivot_offset = Vector2(foot, ground)   # 以脚下为轴推镜头，角色始终踩在地面上
+	for node in _intro_chrome():
+		node.modulate.a = 0.0
+	var top_bar := ColorRect.new()
+	var low_bar := ColorRect.new()
+	for bar: ColorRect in [top_bar, low_bar]:
+		bar.color = Color(0.01, 0.01, 0.025)
+		bar.size = Vector2(w, 58)
+		bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_banner.add_child(bar)
+	top_bar.position.y = -58
+	low_bar.position.y = h
+	var card := _boss_title_card(ground + 88, accent)
+	card.modulate.a = 0.0
+	# 点击快进：挡在最上面吃掉这段时间的点击
+	var skip := Control.new()
+	skip.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_banner.add_child(skip)
+	var tween := create_tween().set_parallel(true)
+	_intro_tween = tween
+	skip.gui_input.connect(func(event: InputEvent) -> void:
+		if event is InputEventMouseButton and event.pressed:
+			tween.set_speed_scale(6.0))
+	GameAudio.sfx("boss")
+	tween.tween_property(top_bar, "position:y", 0.0, 0.35).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	tween.tween_property(low_bar, "position:y", h - 58, 0.35).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	tween.tween_property(self, "_intro_dark", 0.66, 0.4)
+	tween.tween_property(_shake_root, "scale", Vector2(1.05, 1.05), 1.15).set_trans(Tween.TRANS_SINE)
+	const STOMP := 1.15
+	for ew in _enemy_widgets:
+		var body: CreatureView = ew.creature
+		var home := body.position
+		ew.set_meta_alpha(0.0)
+		body.pivot_offset = body.size * Vector2(0.5, 1.0)
+		body.scale = Vector2(0.74, 0.74)
+		body.position = home + Vector2(95, 0)
+		body.modulate = Color(0.05, 0.04, 0.08)
+		tween.tween_property(body, "position", home, STOMP).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		tween.tween_property(body, "scale", Vector2(0.97, 0.97), STOMP).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		tween.tween_property(body, "scale", Vector2(1.07, 1.07), 0.07).set_delay(STOMP)
+		tween.tween_property(body, "scale", Vector2.ONE, 0.2).set_delay(STOMP + 0.07).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tween.tween_property(body, "modulate", Color(1.9, 1.35, 1.25), 0.05).set_delay(STOMP)
+		tween.tween_property(body, "modulate", Color.WHITE, 0.4).set_delay(STOMP + 0.05)
+	tween.tween_callback(func() -> void:
+		GameAudio.sfx("boss_stomp")
+		_shake(13.0, 0.45)
+		_shockwave(Vector2(foot, ground), accent, 340.0)
+		_floor.impact = Vector2(foot, ground)
+		_floor.impact_light = 1.0
+		if _mol.visible:
+			_mol.hit(0.4)).set_delay(STOMP)
+	tween.tween_property(_floor, "impact_light", 0.0, 0.7).set_delay(STOMP + 0.05)
+	tween.tween_property(self, "_intro_dark", 0.4, 0.3).set_delay(STOMP)
+	tween.tween_property(card, "modulate:a", 1.0, 0.18).set_delay(STOMP + 0.1)
+	tween.tween_property(card, "scale", Vector2.ONE, 0.28).set_delay(STOMP + 0.1).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	# 收场：把舞台交还给玩家，但压力留下
+	const LEAVE := 2.75
+	tween.tween_property(card, "modulate:a", 0.0, 0.2).set_delay(LEAVE)
+	tween.tween_property(top_bar, "position:y", -58.0, 0.3).set_delay(LEAVE)
+	tween.tween_property(low_bar, "position:y", h, 0.3).set_delay(LEAVE)
+	tween.tween_property(self, "_intro_dark", 0.0, 0.4).set_delay(LEAVE)
+	tween.tween_property(_shake_root, "scale", Vector2.ONE, 0.4).set_delay(LEAVE).set_trans(Tween.TRANS_SINE)
+	for node in _intro_chrome():
+		tween.tween_property(node, "modulate:a", 1.0, 0.3).set_delay(LEAVE + 0.1)
+	for ew in _enemy_widgets:
+		tween.tween_method(ew.set_meta_alpha, 0.0, 1.0, 0.3).set_delay(LEAVE + 0.1)
+	await tween.finished
+	_intro_tween = null
+	skip.queue_free()
+	top_bar.queue_free()
+	low_bar.queue_free()
+	card.queue_free()
+
+
+func _boss_accent() -> Color:
+	return UIKit.DANGER.lerp(Color(STAGE_TINT.get(_game.state.stage, UIKit.DANGER)).lightened(0.25), 0.25)
+
+
+## 名字落在手牌区让出来的暗处，不挡双方的身体；下面一行说清这场的考验
+func _boss_title_card(top: float, accent: Color) -> Control:
+	var card := VBoxContainer.new()
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_theme_constant_override("separation", 2)
+	card.position = Vector2(0, top)
+	card.size = Vector2(size.x, 120)
+	card.pivot_offset = Vector2(size.x * 0.5, 40)
+	card.scale = Vector2(1.18, 1.18)
+	var stage_line := UIKit.label(tr("stage." + _game.state.stage) + " · " + tr("encounter.kind.boss"), Color(accent.lightened(0.35), 0.95), 16)
+	var name_text := _title.text.get_slice(" · ", 1)
+	var name_line := UIKit.header(name_text, 46, Color(1.0, 0.93, 0.86))
+	name_line.add_theme_constant_override("outline_size", 8)
+	name_line.add_theme_color_override("font_outline_color", Color(accent.darkened(0.55), 0.95))
+	var lines: Array = [stage_line, name_line]
+	var threat := _mechanic.tooltip_text.get_slice("\n", 0)
+	if not threat.is_empty():
+		var threat_line := UIKit.label(threat, Color(1, 1, 1, 0.82), 15, true)
+		threat_line.custom_minimum_size = Vector2(minf(820.0, size.x - 80.0), 0)
+		threat_line.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		lines.append(threat_line)
+	for line: Label in lines:
+		line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card.add_child(line)
+	_banner.add_child(card)
+	return card
+
+
+## Boss 战全程的舞台压力：地面转危险色、四周压暗；敌人下一招很痛时明显更强，打赢立刻散去
+func _update_pressure(delta: float) -> void:
+	var target := 0.0
+	var threat := 0.0
+	if _is_boss and not _ended:
+		target = 0.55
+		for ew in _enemy_widgets:
+			threat += ew.position.x + EnemyWidget.SIZE.x * 0.5
+			if ew.danger:
+				target = 1.0
+		threat /= maxf(1.0, _enemy_widgets.size())
+		_floor.threat_x = threat
+		if _game != null:
+			_floor.pressure_color = _boss_accent()
+	_pressure = move_toward(_pressure, target, delta * 0.9)
+	_floor.pressure = _pressure * (0.86 + 0.14 * sin(_time * 1.7))
+	_pressure_dim.color.a = maxf(0.2 * _pressure, _intro_dark)
+	_vignette_boss.modulate.a = _pressure * (0.3 + 0.07 * sin(_time * 1.7))
 
 
 # ---------- 事件播放 ----------
@@ -1305,6 +1472,7 @@ func _process(delta: float) -> void:
 	var low := float(_shown_player_hp) / max_hp <= 0.3 and not (_ended and not _victory)
 	var target_low := (0.35 + 0.25 * sin(_time * 5.0)) if low else 0.0
 	_vignette_low.modulate.a = move_toward(_vignette_low.modulate.a, target_low, delta * 3.0)
+	_update_pressure(delta)
 	if low and not _ended:
 		_heart_timer -= delta
 		if _heart_timer <= 0.0:

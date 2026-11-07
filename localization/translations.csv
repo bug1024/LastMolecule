@@ -1083,3 +1083,6 @@ battle.mechanics_short,阶段规则 · 悬停查看,Stage rules · hover for det
 
 battle.safe_short,安全攻击 ×%d,Safe attacks ×%d
 battle.risk_short,再次攻击将反噬,Next attack backfires
+mol.toast.combo,组合触发 · %s,Combo · %s
+mol.toast.alert,⚠ 结构警示 · %s,⚠ Structural alert · %s
+mol.prop_from,原 %d,was %d

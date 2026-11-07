@@ -27,6 +27,8 @@ var _react_t := 0.0
 var _glow_burst := 0.0  # 进化时的闪光
 var _jolt := {}         # 位点 → [偏移, 速度]：受击时片段被震开再弹回
 var _offset := Vector2.ZERO   # 本帧整体位移（抖动 / 浮动 / 跳跃）
+var _snap := {}         # 位点 → 吸附反馈强度（1 → 0）
+var _links: Array = []  # 组合触发时点亮的化学键：{a, b, t, color}
 
 const SITE_R := 28.0
 const TYPE_MARK := {"linker": "连", "ring": "环", "terminal": "端"}
@@ -49,6 +51,29 @@ func flash(prop: String) -> void:
 func flash_sites(site_ids: Array, color := Color(1.0, 0.35, 0.3)) -> void:
 	for id in site_ids:
 		_site_flash[String(id)] = [1.0, color]
+
+
+## 片段装上位点：从 from（本控件坐标）飞入后弹簧吸附，相邻片段被轻轻顶开再回位
+func snap(site_id: String, from := Vector2.INF) -> void:
+	var by_id := {}
+	for site in Molecule.config().get("sites", []):
+		by_id[String(site.id)] = site
+	if not by_id.has(site_id):
+		return
+	var c := site_center(by_id[site_id])
+	var start: Vector2 = (from - c).limit_length(150.0) if from != Vector2.INF else (c - size * Vector2(0.5, 0.48)).normalized() * 18.0
+	_snap[site_id] = 1.0
+	_jolt[site_id] = [start, Vector2.ZERO]
+	for id in by_id:
+		var other := site_center(by_id[id])
+		if id != site_id and other.distance_to(c) < _scale() * 2.4:
+			_jolt[id] = [Vector2.ZERO, (other - c).normalized() * 150.0]
+
+
+## 点亮组合涉及的化学键：一道光沿键跑过
+func link_glow(pairs: Array, color: Color) -> void:
+	for pair in pairs:
+		_links.append({"a": String(pair[0]), "b": String(pair[1]), "t": 1.0, "color": color})
 
 
 ## 受击：抖动泛红、片段被震开再弹回；strength 随伤害大小
@@ -109,6 +134,13 @@ func _process(delta: float) -> void:
 			_site_flash[id][0] = float(_site_flash[id][0]) - delta * 0.8
 			if float(_site_flash[id][0]) <= 0.0:
 				_site_flash.erase(id)
+		for id in _snap.keys():
+			_snap[id] = float(_snap[id]) - delta * 2.4
+			if float(_snap[id]) <= 0.0:
+				_snap.erase(id)
+		for link in _links:
+			link.t = float(link.t) - delta * 0.65
+		_links = _links.filter(func(link: Dictionary) -> bool: return float(link.t) > 0.0)
 		_hit = maxf(0.0, _hit - delta * 2.5)
 		_cheer = maxf(0.0, _cheer - delta * 0.35)
 		_glow_burst = maxf(0.0, _glow_burst - delta * 0.6)
@@ -209,6 +241,9 @@ func _draw() -> void:
 		var filled := molecule != null and molecule.sites.has(String(site.id))
 		draw_line(anchor, c, Color(UIKit.INK, 1.0 if filled else 0.35), bw + 3, true)
 		draw_line(anchor, c, Color(bond_col, 1.0 if filled else 0.35), bw, true)
+		var bond_snap := float(_snap.get(String(site.id), 0.0))
+		if bond_snap > 0.0:
+			draw_line(anchor, c, Color(1.0, 0.97, 0.8, bond_snap), bw + 2.0 * bond_snap, true)
 	MoleculeSpecimen.draw_fragment(self, "core", center, k)
 	# 位点：绘制对应化学片段；名字只在编辑器里写
 	var r := _site_r()
@@ -246,7 +281,11 @@ func _draw() -> void:
 			var t := float(sf[0])
 			Shading.glow(self, c, r * (1.7 + (1.0 - t) * 0.9), Color(sf[1], 0.8 * t))
 			draw_arc(c, r + 3, 0, TAU, 32, Color(sf[1], t), 2.5, true)
-		MoleculeSpecimen.draw_fragment(self, frag_id, c, k)
+		var snap_t := float(_snap.get(id, 0.0))
+		if snap_t > 0.0:
+			Shading.glow(self, c, r * (1.5 + (1.0 - snap_t) * 1.2), Color(col.lightened(0.45), 0.75 * snap_t))
+			draw_arc(c, r * (1.0 + (1.0 - snap_t) * 1.5), 0, TAU, 40, Color(col.lightened(0.5), snap_t), 1.0 + 2.5 * snap_t, true)
+		MoleculeSpecimen.draw_fragment(self, frag_id, c, k * (1.0 + 0.22 * snap_t * snap_t))
 		if not String(frag.get("alert", "")).is_empty():
 			_draw_alert(c + Vector2(r * 0.85, -r * 0.85), 0.6 if compact else (1.0 if interactive else 0.75))
 		if not interactive:
@@ -257,8 +296,22 @@ func _draw() -> void:
 		var nw := font.get_string_size(frag_name, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 		draw_string_outline(font, c + Vector2(-nw * 0.5, label_y), frag_name, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 4, Color(0, 0, 0, 0.75))
 		draw_string(font, c + Vector2(-nw * 0.5, label_y), frag_name, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.WHITE)
+	_draw_links(by_id)
 	if interactive:
 		_draw_pocket(font)
+
+
+func _draw_links(by_id: Dictionary) -> void:
+	for link in _links:
+		if not by_id.has(link.a) or not by_id.has(link.b):
+			continue
+		var a := _pos(by_id[link.a])
+		var b := _pos(by_id[link.b])
+		var t := float(link.t)
+		var col: Color = link.color
+		draw_line(a, b, Color(col, 0.35 * t), 9.0, true)
+		draw_line(a, b, Color(col.lightened(0.5), t), 2.5, true)
+		Shading.glow(self, a.lerp(b, fmod((1.0 - t) * 2.2, 1.0)), 16.0, Color(1, 1, 1, t))
 
 
 ## 靶点口袋热点：位点外一圈虚线（绿＝想要的标签，红＝空间冲突），下方写提示；命中时实线发亮

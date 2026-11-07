@@ -184,6 +184,28 @@ func active_combos() -> Array:
 	return out
 
 
+## 组合实际落在哪些位点上：相邻组合给出每一对，计数组合给出所有符合的位点（编辑器用来点亮结构）
+func combo_links(combo: Dictionary) -> Dictionary:
+	var pairs: Array = []
+	var hit_sites: Array = []
+	match String(combo.get("kind", "")):
+		"adjacent":
+			var need: Array = combo.get("tags", [])
+			for pair in config().get("adjacent", []):
+				var a := fragment(String(sites.get(pair[0], ""))).get("tags", []) as Array
+				var b := fragment(String(sites.get(pair[1], ""))).get("tags", []) as Array
+				if (a.has(need[0]) and b.has(need[1])) or (a.has(need[1]) and b.has(need[0])):
+					pairs.append([String(pair[0]), String(pair[1])])
+					for id in pair:
+						if not hit_sites.has(String(id)):
+							hit_sites.append(String(id))
+		"count":
+			for site_id in sites:
+				if (fragment(String(sites[site_id])).get("tags", []) as Array).has(String(combo.get("tag", ""))):
+					hit_sites.append(String(site_id))
+	return {"pairs": pairs, "sites": hit_sites}
+
+
 ## 当前结构带来的警示 id（片段自带 + 组合触发）
 func alert_ids() -> Array:
 	var ids: Array = []

@@ -185,6 +185,12 @@ func set_stage_pose(body_size: Vector2, meta_width: float) -> void:
 	_intent_y = -body_size.y - 31
 
 
+## 登场演出时先藏起名字、血条和意图，只留下身体
+func set_meta_alpha(alpha: float) -> void:
+	for node: Control in [_intent_box, _name, bar, statuses]:
+		node.modulate.a = alpha
+
+
 func contact_point() -> Vector2:
 	var body := creature.visible_body_rect()
 	return position + creature.position + body.position + body.size * Vector2(0.28, 0.52)

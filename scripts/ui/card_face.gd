@@ -347,6 +347,8 @@ func _draw() -> void:
 	PaintedArt.frame(self, rect, UIKit.PAPER, UIKit.GOLD.darkened(0.25), 1.5 * k)
 	var header := Rect2(NAME_RECT.position * k, NAME_RECT.size * k)
 	draw_style_box(_box(role_color.lerp(UIKit.PAPER, 0.70), Color(role_color, 0.6), 2, 1), header)
+	if card.upgraded:
+		_draw_upgrade_mark(rect, k)
 	var body := Rect2(BODY_RECT.position * k, BODY_RECT.size * k)
 	# 正文区就是卡面本身的纸，不再盖一块平涂的色块；只留一道刻线分隔
 	draw_line(body.position + Vector2(6 * k, 0), Vector2(body.end.x - 6 * k, body.position.y), Color(UIKit.INK, 0.3), k, true)
@@ -367,6 +369,18 @@ func _draw() -> void:
 		var pos := orb + Vector2(-w * 0.5, fs * 0.36)
 		draw_string_outline(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 2, Color(0.055, 0.075, 0.11))
 		draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, UIKit.TEXT)
+
+
+## 升级过的卡：内圈一道金线，顶边嵌一颗金色菱形，缩小成手牌也认得出
+func _draw_upgrade_mark(rect: Rect2, k: float) -> void:
+	var line := PaintedArt.contour(rect.grow(-3.5 * k), 12)
+	line.append(line[0])
+	draw_polyline(line, Color(UIKit.GOLD, 0.95), maxf(1.0, 1.5 * k), true)
+	var c := Vector2(rect.size.x * 0.5, 2.0 * k)
+	var diamond := PackedVector2Array([c + Vector2(0, -7) * k, c + Vector2(8, 0) * k, c + Vector2(0, 7) * k, c + Vector2(-8, 0) * k])
+	draw_colored_polygon(diamond, UIKit.GOLD)
+	diamond.append(diamond[0])
+	draw_polyline(diamond, UIKit.INK, maxf(1.0, k), true)
 
 
 ## 插画上的小标记：左下类型、右上角色图标、左上稀有度宝石、右下 AI 倍率
