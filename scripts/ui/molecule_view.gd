@@ -18,15 +18,13 @@ var _hover := ""
 var compact := false
 var character := false  # Character illustration in battle and observation; editor remains a readable plan.
 var _profile := ""
-var strike_pose := 0.0:
-	set(value):
-		strike_pose = value
-		queue_redraw()
+## 角色模式的全部动作（待机、出招、受击、护盾、状态、倒下）由这一个状态机输出，布局位置从不被改写
+var motion := CharacterMotion.new(CharacterProfiles.molecule(), 11)
+var _shell := 0.0       # 护盾外壳展开进度（1 → 0）
 var _flash := {}        # 属性 → 剩余闪光强度（1 → 0）
 var _site_flash := {}   # 位点 → [剩余强度, 颜色]（被敌人攻击的片段闪红）
 var _hit := 0.0         # 受击：抖动 + 泛红
 var _cheer := 0.0       # 胜利：跳一跳、发光
-var idle_bob := false   # 战斗中：轻轻浮动，像活着
 var form := 1:          # 进化形态 1–5
 	set(value):
 		form = value
@@ -89,13 +87,17 @@ func link_glow(pairs: Array, color: Color) -> void:
 		_links.append({"a": String(pair[0]), "b": String(pair[1]), "t": 1.0, "color": color})
 
 
-## 受击：抖动泛红、片段被震开再弹回；strength 随伤害大小
+## 受击：主体后挫、骨架弹性形变、末端片段被震开后延迟弹回；strength 随伤害大小（轻击 / 重击不同）
 func hit(strength := 1.0) -> void:
-	_hit = 1.0
+	_hit = minf(1.0, 0.5 + strength * 0.4)
 	react("hurt", 0.7)
+	motion.hit(strength)
+	var spread := clampf(strength, 0.4, 2.0) * (0.55 if character else 1.0)
 	for site in Molecule.config().get("sites", []):
 		var dir := Vector2.from_angle(randf() * TAU)
-		_jolt[String(site.id)] = [Vector2.ZERO, dir * randf_range(260.0, 520.0) * clampf(strength, 0.4, 2.0)]
+		if character:   # 冲击从敌人方向来：片段先被推向后方
+			dir = (dir + Vector2(-1.2, 0)).normalized()
+		_jolt[String(site.id)] = [Vector2.ZERO, dir * randf_range(260.0, 520.0) * spread]
 
 
 func cheer() -> void:
@@ -103,9 +105,45 @@ func cheer() -> void:
 	react("happy", 3.0)
 
 
-## 出招：一瞬间的局部电荷辉光
-func attack() -> void:
+## 原地出招：小幅蓄力后前送释放。返回出手 / 命中的时间
+func attack() -> Dictionary:
 	react("fierce", 0.45)
+	return motion.attack()
+
+
+## 近身突进：reach 为从当前出招尖端到目标的像素距离
+func charge(reach: Vector2) -> Dictionary:
+	react("fierce", 0.6)
+	motion.unit = _scale()
+	return motion.attack(reach, "attack")
+
+
+func recoil(px: float) -> void:
+	motion.recoil(px)
+
+
+## 护盾：收缩成防御姿态，外层展开一圈切面保护结构
+func defend() -> void:
+	motion.defend()
+	_shell = 1.0
+
+
+## 状态影响：颤一下并按状态着色
+func afflict(color: Color) -> void:
+	motion.status(color)
+
+
+func collapse() -> void:
+	motion.die()
+
+
+## 新战斗开始：清掉上一场留下的动作、外壳和抖动
+func reset_motion() -> void:
+	motion.reset()
+	_shell = 0.0
+	_jolt.clear()
+	_hit = 0.0
+	_react_t = 0.0
 
 
 func react(kind: String, duration := 0.8) -> void:
@@ -144,11 +182,11 @@ func set_molecule(m: Molecule) -> void:
 
 
 func _process(delta: float) -> void:
-	if character and not idle_bob and _hit <= 0.0 and _cheer <= 0.0 and _glow_burst <= 0.0 \
-		and _react_t <= 0.0 and _flash.is_empty() and _site_flash.is_empty() and _jolt.is_empty():
-		return
 	if is_visible_in_tree():
 		_time += delta
+		if character:
+			motion.step(delta)
+			_shell = maxf(0.0, _shell - delta * 1.1)
 		for prop in _flash.keys():
 			_flash[prop] = float(_flash[prop]) - delta * 0.9
 			if float(_flash[prop]) <= 0.0:
@@ -168,14 +206,19 @@ func _process(delta: float) -> void:
 		_cheer = maxf(0.0, _cheer - delta * 0.35)
 		_glow_burst = maxf(0.0, _glow_burst - delta * 0.6)
 		_react_t = maxf(0.0, _react_t - delta)
-		for id in _jolt.keys():   # 阻尼弹簧：片段被震开后弹回原位
+		for id in _jolt.keys():   # 阻尼弹簧：片段被震开后弹回原位（分步积分，掉帧时也不会发散）
 			var j: Array = _jolt[id]
-			var v: Vector2 = j[1] + (-j[0] * 260.0 - j[1] * 14.0) * delta
-			j[0] = (j[0] as Vector2) + v * delta
-			j[1] = v
-			if (j[0] as Vector2).length() < 0.2 and v.length() < 2.0:
+			var left := minf(delta, 0.1)
+			while left > 0.0:
+				var dt := minf(left, 1.0 / 120.0)
+				left -= dt
+				var v: Vector2 = j[1] + (-j[0] * 260.0 - j[1] * 14.0) * dt
+				j[0] = (j[0] as Vector2) + v * dt
+				j[1] = v
+			if (j[0] as Vector2).length() < 0.2 and (j[1] as Vector2).length() < 2.0:
 				_jolt.erase(id)
-		self_modulate = Color(1, 1 - 0.45 * _hit, 1 - 0.45 * _hit)
+		var hurt := Color(1, 1 - 0.45 * _hit, 1 - 0.45 * _hit)
+		self_modulate = hurt.lerp(Color(motion.tint, 1.0), motion.tint.a * 0.4)
 		queue_redraw()
 
 
@@ -240,14 +283,13 @@ func _draw() -> void:
 	var cfg := Molecule.config()
 	var center := size * Vector2(0.5, 0.48)
 	var k := _scale()
-	var offset := Vector2(sin(_time * 70.0) * 6.0 * _hit, 0)
-	if idle_bob:
-		offset.y += sin(_time * 2.0) * 3.0
-	offset.y -= absf(sin(_time * 9.0)) * 10.0 * _cheer
-	_offset = offset
+	var offset := Vector2(0, -absf(sin(_time * 9.0)) * 10.0 * _cheer)
 	if character:
+		_offset = offset
 		_draw_character(center + offset, k)
 		return
+	offset.x += sin(_time * 70.0) * 6.0 * _hit
+	_offset = offset
 	draw_set_transform(offset)
 	if _cheer > 0:
 		Shading.glow(self, center, k * 2.6, Color(0.55, 1.0, 0.75, 0.3 * _cheer))
@@ -331,23 +373,42 @@ func _draw() -> void:
 		_draw_pocket(font)
 
 
+const TRAIL_WEIGHT := {"T1": 1.0, "T2": 1.0, "L1": 0.55, "L2": 0.55, "R1": 0.4, "R2": 0.4, "R3": 0.4}
+
+
+## 分子单位空间到控件坐标的变换：动画以两只脚的中点为基点倾斜、压扁，偏移叠加在布局位置之上
+func _body_matrix(center: Vector2, k: float) -> Transform2D:
+	var feet: Vector2 = (MoleculeCharacter.SUPPORTS[0] + MoleculeCharacter.SUPPORTS[1]) * 0.5
+	var shift := Vector2(motion.value("x"), motion.value("y"))
+	var local := Transform2D(0.0, feet + shift) * Transform2D(motion.angle(), motion.squash(), 0.0, Vector2.ZERO) * Transform2D(0.0, -feet)
+	return Transform2D(0.0, center) * Transform2D(0.0, Vector2.ONE * k, 0.0, Vector2.ZERO) * local
+
+
 func _draw_character(center: Vector2, k: float) -> void:
 	if k <= 0.0:
 		return
-	var pose := strike_pose
-	if _react == "fierce" and is_zero_approx(pose):
-		pose = sin(clampf(_react_t / 0.45, 0.0, 1.0) * PI * 0.5)
+	motion.unit = k
+	var pose := motion.value("pose")
+	var bend := motion.value("bend")
+	var t := motion.time
 	var points := {}
+	var i := 0
 	for site in Molecule.config().sites:
 		var id := String(site.id)
-		var anchor := MoleculeCharacter.anchor(id, _profile, pose)
-		points[id] = anchor + (_pos(site) - site_center(site)) * 0.62 / k
-	draw_set_transform(center, 0.0, Vector2.ONE * k)
-	MoleculeCharacter.draw(self, points, molecule.sites if molecule != null else {}, form, pose)
+		var weight := float(TRAIL_WEIGHT.get(id, 0.4))
+		# 末端片段：跟着身体走但慢半拍，再加一点各自的延迟摆动
+		var drift := Vector2(CharacterMotion.noise(t * 1.3, i * 1.7), CharacterMotion.noise(t * 1.05, i * 2.9 + 5.0)) * 0.035
+		points[id] = MoleculeCharacter.anchor(id, _profile, pose) + (_pos(site) - site_center(site)) * 0.62 / k \
+			+ (motion.lag + drift * motion.amount) * weight
+		i += 1
+	var ribbon := motion.trail + Vector2(0.0, sin(t * 2.3) * 0.05 + CharacterMotion.noise(t * 1.7, 3.0) * 0.04) * motion.amount
+	var body := _body_matrix(center, k)
+	draw_set_transform_matrix(body)
+	MoleculeCharacter.draw(self, points, molecule.sites if molecule != null else {}, form, pose + bend, ribbon)
 	draw_set_transform(Vector2.ZERO)
 	for site in Molecule.config().sites:
 		var id := String(site.id)
-		var point := center + (points[id] as Vector2) * k
+		var point := body * (points[id] as Vector2)
 		var frag := Molecule.fragment(String(molecule.sites.get(id, ""))) if molecule != null else {}
 		if _site_flash.has(id):
 			var cue: Array = _site_flash[id]
@@ -355,24 +416,66 @@ func _draw_character(center: Vector2, k: float) -> void:
 		for prop in _flash:
 			if int(frag.get("fx", {}).get(prop, 0)) > 0:
 				draw_arc(point, k * 0.33, -PI, 0.75, 16, Color(MoleculeCharacter.BONE, _flash[prop]), 1.8, true)
+	if _shell > 0.0:
+		_draw_shell(body, k)
 	if _glow_burst > 0.0:
 		draw_arc(center, k * (1.2 + 0.45 * (1.0 - _glow_burst)), -2.1, 1.3, 36,
 			Color(MoleculeCharacter.GOLD, _glow_burst), 2.5, true)
 
 
-func attack_tip(pose := 0.0) -> Vector2:
+## 护盾外壳：一圈骨白切面板从正面折叠处展开成弧，和场景同一束左上方的光；之后淡成一道薄边
+func _draw_shell(body: Transform2D, k: float) -> void:
+	var age := 1.0 - _shell
+	var open := clampf(age / 0.28, 0.0, 1.0)
+	open = 1.0 + 2.2 * pow(open - 1.0, 3) + 1.2 * pow(open - 1.0, 2)   # 带一点回弹的展开
+	var alpha := clampf(_shell * 2.4, 0.0, 1.0)
+	var center := MoleculeCharacter.FRAME.get_center()
+	var radii := Vector2(4.1, 3.3) * (0.72 + 0.28 * open)
+	var ink := Color(PaintedStyle.INK_EDGE, 0.85 * alpha)
+	var light := PaintedStyle.LIGHT.normalized()
+	for n in 7:
+		var a := lerpf(0.0, (n - 3) * 0.36, open)    # 折叠时都叠在正面，展开后排成弧
+		var mid := center + Vector2(cos(a) * radii.x, sin(a) * radii.y)
+		var out := (mid - center).normalized()
+		var side := out.orthogonal()
+		var plate := PackedVector2Array([
+			body * (mid - out * 0.36), body * (mid + side * 0.42), body * (mid + out * 0.26 + side * 0.18),
+			body * (mid + out * 0.26 - side * 0.18), body * (mid - side * 0.42)])
+		var lit := maxf(0.0, -out.dot(light)) * 0.35 + 0.65
+		draw_colored_polygon(plate, Color(Color("cfe8dc").darkened(0.35 * (1.0 - lit)), 0.62 * alpha))
+		var edge := plate.duplicate()
+		edge.append(plate[0])
+		draw_polyline(edge, ink, maxf(1.5, k * 0.05), true)
+		draw_line(plate[1], plate[2], Color(MoleculeCharacter.BONE, 0.9 * alpha * lit), maxf(1.0, k * 0.035), true)
+	if open >= 1.0:
+		var rim := PackedVector2Array()
+		for n in 25:
+			var a := lerpf(-1.25, 1.25, n / 24.0)
+			rim.append(body * (center + Vector2(cos(a) * radii.x, sin(a) * radii.y) * 1.08))
+		draw_polyline(rim, Color("9fe3cf", 0.45 * alpha), maxf(1.0, k * 0.04), true)
+
+
+## 出招尖端：live 时跟随当前动画姿态和位移；否则给出静止站位、指定姿态下的位置（用来计算突进距离）
+func attack_tip(pose := 0.0, live := true) -> Vector2:
 	if character:
-		var tip := MoleculeCharacter.attack_anchor(molecule.sites if molecule != null else {}, _profile, pose)
-		return size * Vector2(0.5, 0.48) + tip * _scale()
+		var center := size * Vector2(0.5, 0.48)
+		var tip := MoleculeCharacter.attack_anchor(molecule.sites if molecule != null else {}, _profile,
+			motion.value("pose") if live else pose)
+		return _body_matrix(center, _scale()) * tip if live else center + tip * _scale()
 	var bounds := visual_bounds()
 	return Vector2(bounds.end.x, bounds.get_center().y)
+
+
+## 动画让身体离开站位的水平距离（影子跟着走，但留在地面上）
+func motion_offset() -> Vector2:
+	return motion.offset() if character else Vector2.ZERO
 
 
 func support_points() -> PackedVector2Array:
 	var supports := PackedVector2Array()
 	if character:
 		for point in MoleculeCharacter.SUPPORTS:
-			supports.append(size * Vector2(0.5, 0.48) + point * _scale())
+			supports.append(size * Vector2(0.5, 0.48) + point * _scale() + Vector2(motion_offset().x, 0.0))
 	return supports
 
 

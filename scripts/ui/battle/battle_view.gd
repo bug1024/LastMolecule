@@ -31,7 +31,6 @@ var _battle_token := 0      # 每场战斗递增，防止上一场未完成的�
 var _bg: MoleculeBackground
 var _floor: BattleStage
 var _space := {}
-var _mol_motion: Tween
 var _brand: Label
 var _shake_root: Control
 var _player: PlayerAvatar
@@ -330,7 +329,7 @@ func _update_stage() -> void:
 	var ground := float(_space.ground)
 	if _mol.visible:
 		var footprint := _mol.visual_bounds()
-		var projected := _mol.get_transform() * footprint.get_center()
+		var projected := _mol.get_transform() * footprint.get_center() + Vector2(_mol.motion_offset().x, 0.0)
 		shadows.append({"center": Vector2(projected.x + 12, ground), "width": footprint.size.x * 0.72, "opacity": 0.085})
 		for foot in _mol.support_points():
 			var p := _mol.get_transform() * foot
@@ -342,7 +341,8 @@ func _update_stage() -> void:
 	for ew in _enemy_widgets:
 		if ew.creature.dying < 0.95:
 			var body := ew.creature.visible_body_rect()
-			shadows.append({"center": Vector2(ew.position.x + ew.creature.position.x + body.get_center().x, ground),
+			var drift := ew.creature.motion.offset().x if ew.creature.motion else 0.0
+			shadows.append({"center": Vector2(ew.position.x + ew.creature.position.x + body.get_center().x + drift, ground),
 				"width": body.size.x * 0.89, "opacity": 0.18 * (1.0 - ew.creature.dying)})
 	_floor.shadows = shadows
 	_floor.queue_redraw()
@@ -371,10 +371,7 @@ func _on_battle_started(encounter: Dictionary) -> void:
 	_victory = false
 	_queue.clear()
 	_busy = true
-	if _mol_motion != null:
-		_mol_motion.kill()
-	_mol_motion = null
-	_mol.strike_pose = 0.0
+	_mol.reset_motion()
 	_strike_style = ""
 	_strike_ai = false
 	_reset_intro()
@@ -765,7 +762,12 @@ func _play(ev: Dictionary) -> void:
 		"block":
 			var p := _side_point(String(ev.side), int(ev.index))
 			_float_text(tr("battle.fx.block") % int(ev.amount), p + Vector2(0, -40), Color(0.5, 0.75, 1.0), 22)
-			_body_cue(BattleCue.Kind.SHIELD, String(ev.side), int(ev.index), p)
+			if String(ev.side) == "player" and _mol.visible:
+				_mol.defend()   # 分子自己收缩并展开外壳
+			else:
+				_body_cue(BattleCue.Kind.SHIELD, String(ev.side), int(ev.index), p)
+				if String(ev.side) == "enemy" and int(ev.index) < _enemy_widgets.size():
+					_enemy_widgets[int(ev.index)].creature.motion.defend()
 			_set_bar(String(ev.side), int(ev.index), -1, int(ev.block))
 			GameAudio.sfx("block")
 			await _wait(0.16)
@@ -778,6 +780,7 @@ func _play(ev: Dictionary) -> void:
 				if id == "poison" and int(ev.amount) > 0:
 					_cue(BattleCue.Kind.TOXIN, p, p, Vector2.ZERO, 0.85)
 				var bad := Combatant.DEBUFFS.has(id)
+				_afflict(String(ev.side), int(ev.index), id, bad)
 				_float_text("%s %+d" % [tr("status." + id), int(ev.amount)], p + Vector2(0, -60),
 					Color(0.95, 0.5, 0.55) if bad else Color(0.5, 0.95, 0.6), 18)
 				GameAudio.sfx("debuff" if bad else "buff")
@@ -869,7 +872,10 @@ func _play_damage(ev: Dictionary) -> void:
 			_cue(BattleCue.Kind.TOXIN, p, p, Vector2.ZERO, 1.65 if cause == "toxin_burst" else 1.12)
 		if side == "player":
 			_player.hit()
-			_mol.hit(amount / 10.0)
+			if toxin:
+				_mol.afflict(STATUS_TINT.poison)
+			else:
+				_mol.hit(amount / 10.0)
 			if not toxin:
 				_cue(BattleCue.Kind.HIT, p + Vector2(120, 0), p, Vector2.ZERO, 0.85)
 				_screen_flash(0.13 + minf(amount, 30) * 0.007)
@@ -877,8 +883,11 @@ func _play_damage(ev: Dictionary) -> void:
 		else:
 			var ew := _enemy_widgets[index]
 			if not toxin:
-				ew.creature.hit(p - ew.position - ew.creature.position)
+				var knock := (0.72 + minf(amount, 28) / 20.0) * (0.55 if _strike_style == "volley" else 1.0)
+				ew.creature.hit(p - ew.position - ew.creature.position, knock)
 				_impact(index, p, amount)
+			else:
+				ew.creature.motion.status(STATUS_TINT.poison)
 			GameAudio.sfx("debuff" if toxin else ("hit_heavy" if amount >= 15 else "hit"))
 		if not toxin:
 			_shake(2.0 + minf(amount, 30) * 0.26, 0.16)
@@ -887,8 +896,8 @@ func _play_damage(ev: Dictionary) -> void:
 		GameAudio.sfx("block")
 	_set_bar(side, index, int(ev.hp), int(ev.block))
 	await _wait(0.19 + (0.07 if amount >= 12 else 0.0))
-	if side == "enemy" and is_instance_valid(_mol_motion) and _mol_motion.is_running():
-		await _mol_motion.finished
+	if side == "enemy" and _strike_style == "charge" and _mol.motion.busy():
+		await _wait(_mol.motion.remaining())   # 突进的分子先弹回站位，再推进下一个事件
 
 
 ## 用事件里的数值更新血条（hp 为 -1 时保持当前显示）
@@ -912,13 +921,14 @@ func _play_enemy_move(index: int, move: Dictionary) -> void:
 		return
 	var ew := _enemy_widgets[index]
 	_float_text(tr("move." + String(move.get("id", ""))), ew.position + Vector2(EnemyWidget.SIZE.x * 0.5, -50), Color(1, 0.9, 0.7), 20)
-	var origin := ew.creature.position
-	var tween := create_tween()
 	var enemy: Enemy = _manager.enemies[index]
-	if enemy.id == "activity_cliff":
-		var fold := ew.creature.create_tween()
-		fold.tween_property(ew.creature, "action_load", 1.0, 0.12)
-		fold.tween_property(ew.creature, "action_load", 0.0, 0.28)
+	var attacking := int(move.get("damage", 0)) > 0
+	var timing := {}
+	if attacking:   # 每种敌人按自己的性格蓄力、出手、回弹；命中瞬间才落下震屏和音效
+		timing = ew.creature.motion.attack(Vector2(-110.0 if enemy.is_boss else -70.0, 10.0), "attack")
+		await _wait(float(timing.impact))
+	else:
+		ew.creature.motion.defend()
 	if enemy.is_boss:
 		var foot := ew.position + Vector2(EnemyWidget.SIZE.x * 0.5, 0)
 		var landing := Vector2(_player_point().x, foot.y) if int(move.get("damage", 0)) > 0 else foot
@@ -928,12 +938,6 @@ func _play_enemy_move(index: int, move: Dictionary) -> void:
 	elif enemy.is_elite and int(move.get("damage", 0)) > 0:
 		GameAudio.sfx("boss_stomp")
 		_shake(4.0, 0.18)
-	if int(move.get("damage", 0)) > 0:
-		tween.tween_property(ew.creature, "position", origin + Vector2(-110 if enemy.is_boss else -70, 10), 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-		tween.tween_property(ew.creature, "position", origin, 0.2).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	else:
-		tween.tween_property(ew.creature, "scale", Vector2(1.08, 1.08), 0.12)
-		tween.tween_property(ew.creature, "scale", Vector2.ONE, 0.15)
 	await _wait(0.14)
 
 
@@ -953,7 +957,8 @@ func _molecule_cast(card: ResearchCard, face: CardFace, target: int, color: Colo
 	if _strike_style == "self":
 		return
 	if _strike_style != "charge":
-		_mol.attack()
+		var timing := _mol.attack()
+		await _wait(float(timing.release))   # 先后拉蓄力，再释放
 	var targets: Array = [target] if target >= 0 else []
 	if targets.is_empty():
 		for i in _manager.enemies.size():
@@ -961,7 +966,7 @@ func _molecule_cast(card: ResearchCard, face: CardFace, target: int, color: Colo
 				targets.append(i)
 	if targets.is_empty():
 		return
-	var muzzle := _mol.get_transform() * _mol.attack_tip()
+	var muzzle := _mol.get_transform() * _mol.attack_tip()   # 跟着当前姿态
 	var to := _side_point("enemy", int(targets[0]))
 	match _strike_style:
 		"charge":
@@ -1039,37 +1044,37 @@ func _strike_style_for(card: ResearchCard) -> String:
 
 ## 分子后坐一下（射击类出招）
 func _mol_recoil(amount: float) -> void:
-	var origin := _mol.position
-	var t := create_tween()
-	t.tween_property(_mol, "position", origin + Vector2(-amount, 0), 0.05)
-	t.tween_property(_mol, "position", origin, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_mol.recoil(amount)
 
 
-## 蓄力、推进、接触停顿、回到原位。等待出招的 Tween 结束才推进伤害事件。
+## 近身突进：分子向后收缩蓄力 → 急加速冲向目标 → 命中带着惯性 → 自然弹回站位。
+## 动作由分子的状态机完成，这里只按它给出的时间点放拖尾特效、等到命中再推进伤害事件。
 func _strike_charge(to: Vector2) -> void:
-	var origin := _mol.position
-	var tip := _mol.get_transform() * _mol.attack_tip()
-	var pivot := _mol.pivot_offset
-	var tip_local := _mol.attack_tip(1.0)
-	var destination := to - pivot - (tip_local - pivot).rotated(-0.10)
-	const ANTICIPATION := 0.08
-	const STRIKE := 0.15
-	var dash := create_tween()
-	_mol_motion = dash
-	dash.tween_property(_mol, "position", origin + Vector2(-18, 2), ANTICIPATION).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	dash.parallel().tween_property(_mol, "rotation", 0.05, ANTICIPATION)
-	dash.parallel().tween_property(_mol, "strike_pose", -0.35, ANTICIPATION)
-	dash.tween_callback(func() -> void: _cue(BattleCue.Kind.TRAIL, tip, to))
-	dash.tween_property(_mol, "position", destination, STRIKE).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
-	dash.parallel().tween_property(_mol, "rotation", -0.10, STRIKE)
-	dash.parallel().tween_property(_mol, "strike_pose", 1.0, STRIKE)
-	await dash.finished
-	var recover := create_tween()
-	_mol_motion = recover
-	recover.tween_interval(0.09)
-	recover.tween_property(_mol, "position", origin, 0.24).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	recover.parallel().tween_property(_mol, "rotation", 0.0, 0.24)
-	recover.parallel().tween_property(_mol, "strike_pose", 0.0, 0.24)
+	var rest_tip := _mol.position + _mol.attack_tip(1.0, false)
+	var timing := _mol.charge(to - rest_tip)
+	await _wait(float(timing.release))
+	_cue(BattleCue.Kind.TRAIL, _mol.get_transform() * _mol.attack_tip(), to)
+	await _wait(float(timing.impact) - float(timing.release))
+
+
+## 状态影响：被施加减益的一方颤一下并染上状态色；增益只闪一下
+const STATUS_TINT := {
+	"poison": Color(0.62, 1.0, 0.42), "weak": Color(0.6, 0.66, 0.9), "vulnerable": Color(1.0, 0.62, 0.38),
+	"strength": Color(1.0, 0.55, 0.4), "dexterity": Color(0.5, 0.85, 1.0),
+}
+
+
+func _afflict(side: String, index: int, id: String, bad: bool) -> void:
+	var color: Color = STATUS_TINT.get(id, Color(0.9, 0.5, 0.95) if bad else Color(0.6, 1.0, 0.7))
+	if side == "player":
+		if _mol.visible and bad:
+			_mol.afflict(color)
+	elif index >= 0 and index < _enemy_widgets.size():
+		var creature := _enemy_widgets[index].creature
+		if bad:
+			creature.motion.status(color)
+		else:
+			creature.motion.tint = Color(color, 0.8)
 
 
 ## 光束：AI 是带锯齿和像素块的青色数据流；精准光束（precise）是一道又细又亮的直线
@@ -1224,13 +1229,6 @@ func _impact(index: int, p: Vector2, amount: int) -> void:
 	_floor.impact = p
 	_floor.impact_light = 0.7
 	create_tween().tween_property(_floor, "impact_light", 0.0, 0.30)
-	var ew := _enemy_widgets[index]
-	var origin := ew.creature.position
-	var knock := (9.0 + minf(amount, 28) * 0.72) * (0.52 if _strike_style == "volley" else 1.0)
-	var kick := create_tween()
-	kick.tween_property(ew.creature, "position", origin + Vector2(knock, -3), 0.045).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	kick.tween_interval(0.025)
-	kick.tween_property(ew.creature, "position", origin, 0.11).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 func _cue(kind: BattleCue.Kind, origin: Vector2, target: Vector2, extent := Vector2(130, 100), power := 1.0) -> void:
@@ -1257,6 +1255,8 @@ func _body_cue(kind: BattleCue.Kind, side: String, index: int, target: Vector2) 
 
 func _play_death(side: String, index: int) -> void:
 	if side == "player":
+		if _mol.visible:
+			_mol.collapse()
 		_shake(16.0, 0.6)
 		await _wait(0.5)
 		return
@@ -1268,6 +1268,7 @@ func _play_death(side: String, index: int) -> void:
 	var boss := enemy.is_boss
 	ew.show_intent(enemy, 0)
 	_cue(BattleCue.Kind.DEATH, ew.position + body.position + area.get_center(), Vector2.ZERO, area.size, 1.45 if boss else 0.95)
+	body.motion.die()   # 按性格倒下：口袋合拢、外壳沉下、细胞胀破、晶体倾倒……
 	var tween := create_tween()
 	tween.tween_property(body, "modulate", Color(1.75, 1.37, 1.06), 0.055)
 	tween.tween_interval(0.05)
@@ -1528,6 +1529,7 @@ func _refresh_statuses() -> void:
 	_player_status.set_statuses(_manager.player.statuses)
 	for ew in _enemy_widgets:
 		ew.statuses.set_statuses(_manager.enemies[ew.index].statuses)
+		ew.creature.poison = clampf(float(_manager.enemies[ew.index].statuses.get("poison", 0)) / 6.0, 0.0, 1.0)
 
 
 func _refresh_intents() -> void:
@@ -1794,6 +1796,8 @@ static func _spark_texture() -> Texture2D:
 
 
 func _shake(strength: float, duration: float) -> void:
+	if GameSettings.reduce_motion:
+		strength *= 0.3
 	var tween := create_tween()
 	var steps := int(duration / 0.04)
 	for i in steps:

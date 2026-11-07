@@ -1111,3 +1111,5 @@ event.scene.0,安全警报,Safety Alert
 event.scene.1,研究现场,Research Front
 event.scene.2,资本谈判,Funding Talks
 event.scene.3,监管审查,Regulatory Review
+settings.reduce_motion,降低动态效果,Reduce Motion
+settings.reduce_motion_hint,角色动作幅度变小、震屏减弱，适合容易晕动的玩家。,"Smaller character movement and weaker screen shake, for players sensitive to motion."

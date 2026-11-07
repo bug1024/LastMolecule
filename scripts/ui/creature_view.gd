@@ -1,7 +1,8 @@
 class_name CreatureView
 extends Control
-## 独立插画决定敌人的剪影，形态分类决定呼吸和摆动节奏。
-## 受击、蓄力和剂量变化通过共用的姿态变形和局部特效表现。
+## 独立插画决定敌人的剪影；运动性格（CharacterProfiles）决定它怎么活着、怎么出手、怎么挨打。
+## 插画被切成网格绘制，网格顶点按性格做局部形变（口袋张合、外壳起伏、细胞局部鼓胀……），
+## 整体位移、倾斜、压扁统一来自 CharacterMotion；控件的布局位置从不被动画改写。
 
 const LEGACY_CELLS := {"blob": 0, "cell": 1, "crystal": 2, "cloud": 3, "spiky": 4, "molecule": 5}
 # Source boxes follow the visible alpha bounds inside each production sheet.
@@ -64,8 +65,11 @@ var windup := false      # 下一招很痛：身体后缩蓄力，底下透出�
 var _surge := 0.0        # 剂量刚提高：一次猛烈的膨胀
 var _shown_strain := 0.0
 var _windup := 0.0
-var action_load := 0.0
 var _id := ""
+var personality := "ooze"
+var motion: CharacterMotion
+var poison := 0.0        # 中毒程度 0..1：颜色发绿、形体出现不规则鼓动
+var _shown_poison := 0.0
 var _fx: Control         # 不受身份色着色的效果层（受击光、裂纹、毒滴）
 
 
@@ -77,6 +81,8 @@ func setup(def: Dictionary, boss := false, elite := false) -> void:
 	menace = 2 if boss else (1 if elite else 0)
 	_seed = float(hash(String(def.get("id", ""))) % 1000) / 100.0
 	_id = String(def.get("id", ""))
+	personality = CharacterProfiles.personality(_id, shape)
+	motion = CharacterMotion.new(CharacterProfiles.enemy(personality), hash(_id) % 100000 + 1)
 	for sheet in GEOMETRIC_PORTRAITS:
 		var entries: Dictionary = GEOMETRIC_PORTRAITS[sheet]
 		if entries.has(_id) and UIKit.art(sheet) != null:
@@ -110,10 +116,12 @@ func setup(def: Dictionary, boss := false, elite := false) -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
-func hit(point := Vector2(-1,-1)) -> void:
+func hit(point := Vector2(-1,-1), strength := 1.0) -> void:
 	flash = 1.0
 	var body := visible_body_rect()
 	_hit_spot = point if point.x >= 0 else body.position + body.size * Vector2(0.28,0.52)
+	if motion:
+		motion.hit(strength, Vector2(1, 0))
 
 
 func _process(delta: float) -> void:
@@ -127,6 +135,10 @@ func _process(delta: float) -> void:
 	_surge = maxf(0.0, _surge - delta * 1.6)
 	_shown_strain = move_toward(_shown_strain, strain, delta * 0.8)
 	_windup = move_toward(_windup, 1.0 if windup else 0.0, delta * 2.5)
+	_shown_poison = move_toward(_shown_poison, poison, delta * 0.8)
+	if motion:
+		motion.unit = maxf(visible_body_rect().size.y, 1.0)
+		motion.step(delta)
 	if not _geometric and material is ShaderMaterial:
 		(material as ShaderMaterial).set_shader_parameter("heat", clampf(_shown_strain * 0.45 + _surge * 0.5, 0.0, 1.0))
 	queue_redraw()
@@ -146,32 +158,97 @@ func _draw() -> void:
 	draw_set_transform_matrix(_body_transform())
 	var neutral := Color.WHITE if _geometric else Color(0.85, 0.86, 0.93)
 	var tint := neutral.lerp(Color(1.20, 1.10, 0.97), flash * 0.64)
+	if motion and motion.tint.a > 0.0:
+		tint = tint.lerp(Color(motion.tint, 1.0), motion.tint.a * 0.35)
 	tint.a = 1.0 - dying
 	var body := visible_body_rect()
 	body.position -= pivot
-	if _geometric and _id == "activity_cliff":
-		_draw_receptor(body, tint)
-	else:
-		draw_texture_rect_region(UIKit.art(_portrait), body, _source, tint)
+	_draw_mesh(body, tint)
 	draw_set_transform(Vector2.ZERO)
 
 
-func _draw_receptor(body: Rect2, tint: Color) -> void:
+const GRID := 7
+
+
+## 把插画切成网格画出来：顶点按运动性格形变，局部动起来而轮廓与笔触不被拉坏
+func _draw_mesh(body: Rect2, tint: Color) -> void:
 	var texture := UIKit.art(_portrait)
-	# Pin the planted base. The upper fold lowers into the opening during windup.
-	var rows := [0.0, 0.34, 0.63, 1.0]
-	var jaw := body.size.y * (maxf(_windup, action_load) * 0.13 - flash * 0.06)
-	var shifts := [0.0, jaw, jaw * 0.29, 0.0]
-	for i in range(rows.size() - 1):
-		var a := float(rows[i])
-		var b := float(rows[i + 1])
-		var y0 := body.position.y + body.size.y * a + float(shifts[i])
-		var y1 := body.position.y + body.size.y * b + float(shifts[i + 1])
-		var source := Rect2(_source.position + Vector2(0, a * _source.size.y),
-			Vector2(_source.size.x, (b - a) * _source.size.y))
-		PaintedArt.textured_quad(self, texture, source, PackedVector2Array([
-			Vector2(body.position.x, y0), Vector2(body.end.x, y0),
-			Vector2(body.end.x, y1), Vector2(body.position.x, y1)]), tint)
+	if texture == null:
+		return
+	var dimensions := texture.get_size()
+	var points := PackedVector2Array()
+	var uvs := PackedVector2Array()
+	var colors := PackedColorArray()
+	var sick := Color(0.72, 1.0, 0.5)
+	for row in GRID + 1:
+		for col in GRID + 1:
+			var uv := Vector2(float(col) / GRID, float(row) / GRID)
+			points.append(body.position + body.size * (uv + _deform(uv.x, uv.y)))
+			uvs.append((_source.position + _source.size * uv) / dimensions)
+			var mottle := 0.6 + 0.4 * sin(_time * 3.0 + uv.x * 5.0 + uv.y * 3.0)
+			var c := tint.lerp(Color(sick, tint.a), _shown_poison * 0.38 * mottle)
+			c.a = tint.a
+			colors.append(c)
+	var indices := PackedInt32Array()
+	for row in GRID:
+		for col in GRID:
+			var i := row * (GRID + 1) + col
+			indices.append_array([i, i + 1, i + GRID + 2, i, i + GRID + 2, i + GRID + 1])
+	RenderingServer.canvas_item_add_triangle_array(get_canvas_item(), indices, points, colors, uvs,
+		PackedInt32Array(), PackedFloat32Array(), texture.get_rid())
+
+
+## 局部形变（以身体尺寸为单位）。u 从左到右，v 从上到下；脚底一行固定在地面上（毒云除外）
+func _deform(u: float, v: float) -> Vector2:
+	if motion == null:
+		return Vector2.ZERO
+	var o := motion.value("open")
+	var t := _time
+	var amp := motion.amount
+	var pin := clampf(1.0 - v, 0.0, 1.0)
+	var disp := Vector2.ZERO
+	match personality:
+		"pocket":
+			disp = Vector2(u - 0.5, v - 0.42) * o * 0.09 * pin
+			if _id == "activity_cliff":
+				# 受体口袋：收拢时上方的褶皱压进开口，张开时向上翻起
+				var fold := v / 0.34 if v < 0.34 else (lerpf(1.0, 0.29, (v - 0.34) / 0.29) if v < 0.63 else lerpf(0.29, 0.0, (v - 0.63) / 0.37))
+				disp.y += (clampf(-o, -1.2, 1.2) * 0.11 + _windup * 0.06 - flash * 0.05) * fold
+		"shell":
+			var d := Vector2(u - 0.5, v - 0.55)
+			var rim := clampf(d.length() * 2.2, 0.0, 1.0)
+			var a := d.angle()
+			var swell := CharacterMotion.noise(a * 3.0 + t * 0.55, _seed) * 0.013 + CharacterMotion.noise(a * 5.0 - t * 0.8, _seed + 2.0) * 0.006
+			var quake := motion.value("bend")
+			disp = d.normalized() * swell * rim * amp
+			disp += Vector2(sin(v * 13.0 + u * 4.0), cos(u * 11.0 + v * 3.0)) * quake * 0.045 * rim
+			disp *= pin * 0.8 + 0.2
+		"pulse":
+			for i in 3:
+				var c := Vector2(0.5 + 0.26 * CharacterMotion.noise(t * 0.4, i * 3.0 + _seed), 0.5 + 0.22 * CharacterMotion.noise(t * 0.35, i * 5.0 + 1.0))
+				var rate := (1.3 + 0.4 * i) * (1.0 + _shown_poison * 0.9)
+				var bulge := maxf(0.0, CharacterMotion.noise(t * rate, i * 7.0 + _seed)) * (0.05 + 0.05 * _shown_poison) * amp + o * 0.03
+				var d := Vector2(u, v) - c
+				disp += d.normalized() * bulge * exp(-d.length_squared() / 0.06)
+			disp *= pin * 0.7 + 0.3
+		"pump":
+			# 门控节律：快速收紧、慢慢放开，像有节拍的泵
+			var phase := fmod(t / 1.7 + _seed, 1.0)
+			var gate := phase / 0.12 if phase < 0.12 else exp(-(phase - 0.12) * 6.0)
+			var squeeze := gate * 0.045 * amp - o * 0.05
+			disp = Vector2((u - 0.5) * -squeeze, -absf(squeeze) * 0.25 * (1.0 - v)) * pin
+		"spark":
+			disp = Vector2(CharacterMotion.noise(t * 9.0 + v * 7.0, _seed), CharacterMotion.noise(t * 8.0 + u * 6.0, _seed + 4.0)) * 0.006 * amp
+		"ooze":
+			# 黏稠：上部下坠时下部向两边摊开，波动从上往下慢半拍传过身体
+			disp = Vector2((u - 0.5) * o * 0.05 * v, o * 0.035 * (1.0 - v))
+			disp.y += sin(t * 1.3 - v * 2.2 + _seed) * 0.014 * (1.0 - v) * amp
+		"cloud":
+			disp = Vector2(CharacterMotion.noise(v * 4.0 + t * 1.2, _seed) * 0.03 + (u - 0.5) * o * 0.05,
+				CharacterMotion.noise(u * 3.5 + t * 0.9, _seed + 3.0) * 0.025 + (v - 0.5) * o * 0.03) * (0.5 + 0.5 * amp)
+	if _shown_poison > 0.0 and personality != "pulse":
+		disp += Vector2(CharacterMotion.noise(t * 2.3 + v * 5.0, _seed), CharacterMotion.noise(t * 2.0 + u * 5.0, _seed + 1.0)) * 0.012 * _shown_poison * pin
+	return disp
 
 
 func action_contact() -> Vector2:
@@ -185,27 +262,15 @@ func action_contact() -> Vector2:
 
 func _body_transform() -> Transform2D:
 	var pivot := Vector2(size.x * 0.5, size.y)
-	var motion := _motion()
-	var breathing := 1.0 + sin(_time * float(motion.speed) + _seed) * float(motion.breath)
 	var lean := -0.028 if menace == 2 else 0.0
 	var swell := 1.0 + _shown_strain * 0.12 + _surge * 0.08
 	var squeeze := 1.0 - _windup * (0.035 + 0.01 * sin(_time * 9.0))
 	var jitter := Vector2(sin(_time * 37.0), cos(_time * 41.0)) * (_shown_strain * 2.4 + _surge * 4.0)
-	var angle := lean + _windup * 0.05 + sin(_time * float(motion.sway_speed) + _seed) * float(motion.sway)
-	angle += sin(_time * 54.0) * flash * 0.018
-	var deformation := Vector2((breathing + flash * 0.045 - dying * 0.32) * swell * (2.0 - squeeze),
-		(1.0 - dying * 0.3 - flash * 0.06) * swell * squeeze)
-	return Transform2D(angle, deformation, 0.0, pivot + jitter + Vector2(_windup * 10.0, 0))
-
-
-## 每种造型自己的待机节奏：团块慢慢涌动、细胞快速搏动、晶体几乎不动、毒云飘摇、通道类有节律地开合
-func _motion() -> Dictionary:
-	match shape:
-		"cell": return {"speed": 3.2, "breath": 0.022, "sway_speed": 1.6, "sway": 0.008}
-		"crystal": return {"speed": 0.9, "breath": 0.004, "sway_speed": 0.6, "sway": 0.004}
-		"cloud": return {"speed": 1.1, "breath": 0.03, "sway_speed": 0.7, "sway": 0.03}
-		"spiky": return {"speed": 2.4, "breath": 0.014, "sway_speed": 3.1, "sway": 0.01}
-	return {"speed": 1.4, "breath": 0.016, "sway_speed": 1.0, "sway": 0.014}
+	var sq := motion.squash() if motion else Vector2.ONE
+	var angle := lean + _windup * 0.05 + (motion.angle() if motion else 0.0) + sin(_time * 54.0) * flash * 0.012
+	var deformation := Vector2((sq.x - dying * 0.32) * swell * (2.0 - squeeze), (sq.y - dying * 0.3) * swell * squeeze)
+	var shift := motion.offset() if motion else Vector2.ZERO
+	return Transform2D(angle, deformation, 0.0, pivot + jitter + Vector2(_windup * 10.0, 0) + shift)
 
 
 ## 不着身份色的效果层：受击光、蓄力光、剂量毒性的裂纹 / 暴露的核心 / 滴落的毒液

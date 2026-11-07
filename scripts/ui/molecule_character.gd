@@ -48,7 +48,8 @@ static func attack_anchor(fragments: Dictionary, profile: String, pose: float) -
 	return Vector2(bounds.end.x, center.y)
 
 
-static func draw(ci: CanvasItem, slots: Dictionary, fragments: Dictionary, level: int, pose: float) -> void:
+## ribbon：丝带末梢相对身体的滞后量（分子单位）。丝带根部固定在腰部节点，末梢按滞后量甩动
+static func draw(ci: CanvasItem, slots: Dictionary, fragments: Dictionary, level: int, pose: float, ribbon := Vector2.ZERO) -> void:
 	if level >= 3:
 		# A second thin pennant grows from the same waist node. The trailing tip moves first.
 		var waist := _core_shift(0.90, pose)
@@ -56,7 +57,10 @@ static func draw(ci: CanvasItem, slots: Dictionary, fragments: Dictionary, level
 		var source := MoleculeSpecimen.region("membrane")
 		var rect := Rect2(Vector2(-extent + 0.04, 0.30 - pose * 0.19) + waist, Vector2(extent, 1.28))
 		if source.has_area():
-			ci.draw_texture_rect_region(MoleculeSpecimen.texture(), rect, source)
+			var tip := ribbon.limit_length(1.2)
+			PaintedArt.textured_quad(ci, MoleculeSpecimen.texture(), source, PackedVector2Array([
+				rect.position + tip, Vector2(rect.end.x, rect.position.y),
+				rect.end, Vector2(rect.position.x, rect.end.y) + tip * 0.8]))
 	_draw_core(ci, pose)
 	for id in ANCHORS:
 		var point: Vector2 = slots[id]

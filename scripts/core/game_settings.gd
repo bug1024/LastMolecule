@@ -1,6 +1,6 @@
 class_name GameSettings
 extends RefCounted
-## 玩家设置（音量、全屏、语言），存于 user://settings.cfg。
+## 玩家设置（音量、全屏、降低动态效果、语言），存于 user://settings.cfg。
 ## 全部为静态成员，任何脚本都可直接读写；修改后调用 save() 落盘、apply() 生效。
 
 const DEFAULT_SAVE_PATH := "user://settings.cfg"
@@ -12,6 +12,7 @@ static var music_volume := 0.6
 static var sfx_volume := 0.8
 static var fullscreen := false
 static var locale := "zh_CN"
+static var reduce_motion := false   # 降低动态效果：角色动作幅度变小、震屏减弱
 static var _loaded := false
 
 
@@ -28,6 +29,7 @@ static func ensure_loaded() -> void:
 	music_volume = clampf(float(cfg.get_value("audio", "music", music_volume)), 0.0, 1.0)
 	sfx_volume = clampf(float(cfg.get_value("audio", "sfx", sfx_volume)), 0.0, 1.0)
 	fullscreen = bool(cfg.get_value("display", "fullscreen", fullscreen))
+	reduce_motion = bool(cfg.get_value("display", "reduce_motion", reduce_motion))
 	var saved_locale := String(cfg.get_value("general", "locale", locale))
 	locale = saved_locale if LOCALES.has(saved_locale) else "zh_CN"
 
@@ -40,6 +42,7 @@ static func save() -> void:
 	cfg.set_value("audio", "music", music_volume)
 	cfg.set_value("audio", "sfx", sfx_volume)
 	cfg.set_value("display", "fullscreen", fullscreen)
+	cfg.set_value("display", "reduce_motion", reduce_motion)
 	cfg.set_value("general", "locale", locale)
 	cfg.save(save_path)
 

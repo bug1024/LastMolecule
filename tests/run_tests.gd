@@ -74,6 +74,7 @@ func _run() -> void:
 	_test_competition()
 	_test_milestone_terminate()
 	_test_molecule_specimen()
+	_test_character_motion()
 	_test_molecule()
 	_test_molecule_in_run()
 	_test_disease_campaign()
@@ -1482,6 +1483,115 @@ func _test_title_screen() -> void:
 	await process_frame
 	_expect(title._archive.visible, "Archive opens from the title screen")
 	title.free()
+
+
+## 动画状态机：动作能被打断、总能回到站位；不同性格的敌人待机节奏可区分；降低动态效果确实变小
+func _test_character_motion() -> void:
+	var settle := func(m: CharacterMotion, seconds: float) -> void:
+		for i in int(seconds * 60.0):
+			m.step(1.0 / 60.0)
+	var at_rest := func(m: CharacterMotion) -> bool:
+		for c in CharacterMotion.CHANNELS:
+			var goal := float(CharacterMotion.REST.get(c, 0.0)) + float(m._adjust.get(c, 0.0)) * m.amount   # 待机里的姿态调整
+			if absf(float(m._value[c]) - goal) > 0.01:
+				return false
+		return m.state == CharacterMotion.State.IDLE
+	var m := CharacterMotion.new(CharacterProfiles.molecule(), 3)
+	m.unit = 45.0
+	var timing := m.attack(Vector2(320, -20), "attack")
+	_expect(float(timing.release) > 0.05 and float(timing.impact) > float(timing.release) and float(timing.total) > float(timing.impact),
+		"A strike has anticipation, release, impact and recovery in order")
+	var peak := 0.0
+	for i in 40:
+		m.step(1.0 / 60.0)
+		peak = maxf(peak, m.offset().x)
+	_expect(peak > 250.0, "The charge reaches the target distance (%.0f px)" % peak)
+	m.hit(2.0)   # 出手途中被打断
+	_expect(m.state == CharacterMotion.State.HIT and m.heavy, "A heavy hit interrupts the strike")
+	settle.call(m, 3.0)
+	_expect(at_rest.call(m), "After interrupted actions the molecule returns exactly to its stance")
+	for action in ["defend", "status", "cast", "hit"]:
+		match action:
+			"defend": m.defend()
+			"status": m.status(Color.GREEN)
+			"cast": m.attack()
+			"hit": m.hit(0.5)
+		settle.call(m, 2.5)
+	_expect(at_rest.call(m), "Repeated actions leave no positional drift or residual scale")
+	_expect(m.offset().length() < 0.15 * m.unit and absf(m.squash().y - 1.0) < 0.05, "Idle life stays a small weight shift")
+	m.die()
+	settle.call(m, 3.0)
+	_expect(m.state == CharacterMotion.State.DEATH and not m.busy() and m.squash().y < 0.85, "Death holds its final pose")
+	m.reset()
+	_expect(at_rest.call(m) and m.lag == Vector2.ZERO, "Reset clears every channel for the next battle")
+	# 不同性格的待机：用通道速度和幅度区分
+	var signature := func(kind: String) -> Vector3:
+		var e := CharacterMotion.new(CharacterProfiles.enemy(kind), 5)
+		e.unit = 200.0
+		var travel := 0.0
+		var open_range := 0.0
+		var last := e.offset()
+		for i in 600:
+			e.step(1.0 / 60.0)
+			travel += e.offset().distance_to(last)
+			last = e.offset()
+			open_range = maxf(open_range, absf(e.value("open")))
+		return Vector3(travel, open_range, 0.0)
+	var shell: Vector3 = signature.call("shell")
+	var spark: Vector3 = signature.call("spark")
+	var pocket: Vector3 = signature.call("pocket")
+	var pulse: Vector3 = signature.call("pulse")
+	_expect(spark.x > shell.x * 5.0, "Reactive oxygen jitters far more than the heavy resistant shell")
+	_expect(pocket.y > 0.2 and shell.y < 0.05, "The binding pocket slowly opens and closes; the shell does not")
+	_expect(pulse.y > pocket.y, "Infected cells pulse more strongly than the pocket breathes")
+	GameSettings.reduce_motion = true
+	var calm: Vector3 = signature.call("spark")
+	GameSettings.reduce_motion = false
+	_expect(calm.x < spark.x * 0.5, "Reduce Motion shrinks idle movement")
+	# 角色控件：动画不改写布局位置
+	var view := MoleculeView.new()
+	view.character = true
+	view.molecule = Molecule.create()
+	view.size = Vector2(460, 280)
+	view.position = Vector2(100, 200)
+	root.add_child(view)
+	var rest_tip := view.attack_tip(1.0, false).x
+	view.charge(Vector2(400, 0))
+	var tip_moved := 0.0
+	for i in 30:
+		view._process(1.0 / 60.0)
+		tip_moved = maxf(tip_moved, view.attack_tip().x - rest_tip)
+	view.hit(1.8)
+	view.defend()
+	for i in 240:
+		view._process(1.0 / 60.0)
+	_expect(tip_moved > 340.0 and tip_moved < 470.0, "The charging tip reaches its target (%.0f of 400 px)" % tip_moved)
+	_expect(view.position == Vector2(100, 200) and view.motion_offset().length() < 8.0, "Molecule layout position is never written by animation")
+	view.free()
+	var deform_issues: Array[String] = []
+	for sheet in CreatureView.GEOMETRIC_PORTRAITS:
+		for id in CreatureView.GEOMETRIC_PORTRAITS[sheet]:
+			var c := CreatureView.new()
+			c.setup({"id": id, "shape": "blob", "size": 1.0})
+			c.size = Vector2(220, 200)
+			c.position = Vector2(10, 20)
+			c.poison = 1.0
+			c.motion.attack(Vector2(-70, 10), "attack")
+			for i in 90:
+				c._process(1.0 / 60.0)
+				for uv in [Vector2(0, 0), Vector2(0.5, 0.5), Vector2(1, 0.3), Vector2(0.3, 1)]:
+					var d := c._deform(uv.x, uv.y)
+					if not d.is_finite() or d.length() > 0.2:
+						deform_issues.append("%s %s" % [id, d])
+			c.hit(Vector2(-1, -1), 1.5)
+			for i in 200:
+				c._process(1.0 / 60.0)
+			if c.position != Vector2(10, 20) or c.motion.state != CharacterMotion.State.IDLE:
+				deform_issues.append(id + " drift")
+			c.free()
+	_expect(deform_issues.is_empty(), "Every enemy deforms within bounds and settles back: " + ", ".join(deform_issues.slice(0, 5)))
+	_expect(CharacterProfiles.personality("activity_cliff", "crystal") == "pocket" and CharacterProfiles.personality("resistant_clone", "cell") == "shell"
+		and CharacterProfiles.personality("placebo", "blob") == "pulse", "Pocket, resistant clone and infected cell each get their own personality")
 
 
 ## The visual refactor must preserve picking and every legal fragment at all display sizes.

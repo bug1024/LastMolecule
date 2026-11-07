@@ -1,6 +1,6 @@
 class_name SettingsPanel
 extends ModalPanel
-## 设置页：主音量 / 音乐 / 音效、全屏、语言；在标题界面还可重置公司档案。
+## 设置页：主音量 / 音乐 / 音效、全屏、降低动态效果、语言；在标题界面还可重置公司档案。
 
 signal locale_changed()
 
@@ -42,6 +42,23 @@ func _build(box: VBoxContainer) -> void:
 		_commit())
 	full_row.add_child(full)
 	box.add_child(full_row)
+	var motion_row := HBoxContainer.new()
+	var motion_label := UIKit.label(tr("settings.reduce_motion"), UIKit.TEXT, 16)
+	motion_label.custom_minimum_size = Vector2(140, 0)
+	motion_label.tooltip_text = tr("settings.reduce_motion_hint")
+	motion_label.mouse_filter = Control.MOUSE_FILTER_PASS
+	motion_row.add_child(motion_label)
+	var calm := UIKit.button("", "", "normal", Vector2(200, 40))
+	calm.toggle_mode = true
+	calm.button_pressed = GameSettings.reduce_motion
+	calm.text = tr("settings.on" if calm.button_pressed else "settings.off")
+	calm.tooltip_text = tr("settings.reduce_motion_hint")
+	calm.toggled.connect(func(on: bool) -> void:
+		calm.text = tr("settings.on" if on else "settings.off")
+		GameSettings.reduce_motion = on
+		GameSettings.save())
+	motion_row.add_child(calm)
+	box.add_child(motion_row)
 	var lang_row := HBoxContainer.new()
 	var lang_label := UIKit.label(tr("settings.language"), UIKit.TEXT, 16)
 	lang_label.custom_minimum_size = Vector2(140, 0)
