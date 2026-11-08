@@ -663,7 +663,7 @@ func _tox_choice() -> Array:
 func _offer_fast_track() -> void:
 	var config: Dictionary = _project.get("fast_track", {})
 	_offer_event({"id": "fast_track", "tag_key": "ui.decision_tag", "title_key": "node.fast_track", "desc_key": "node.fast_track.desc", "choices": [
-		{"label_key": "fast_track.accept", "effects": {"research_progress": int(config.get("research_progress", 15))}, "action": "fast_track"},
+		{"label_key": "fast_track.accept", "label_args": [int(_encounters.get("fast_track_boss_hp", 15))], "effects": {"research_progress": int(config.get("research_progress", 15))}, "action": "fast_track"},
 		{"label_key": "fast_track.decline", "effects": {"research_progress": int(config.get("decline_progress", 5))}, "action": ""},
 	]})
 
