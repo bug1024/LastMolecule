@@ -125,8 +125,7 @@ func _ready() -> void:
 		_map.generate(state.stage, rng)
 		if bool(_type_cfg.get("molecule", false)):
 			molecule = Molecule.create()
-			for card_id in Molecule.config().get("starter_trim", []):   # 起始牌让位给片段卡
-				deck.erase(card_id)
+			_trim_starter_deck()
 		_next_opening_step()
 	_battle_manager = BattleManager.new()
 	_battle_manager.rng = rng
@@ -693,6 +692,7 @@ func _start_battle(kind: String) -> void:
 		strength += rp2d
 	var mol := molecule.effects(state.stage) if molecule != null else {}
 	strength += int(mol.get("strength", 0))
+	strength = mini(strength, get_strength_cap())   # 力量来源很多（疗效、等级、分子、剂量），总量封顶，免得后期一路猛攻就能过
 	var deck_cards := build_deck()
 	var lines: Array = (mol.get("lines", []) as Array).duplicate()
 	var exam_ctx := {}
@@ -712,6 +712,7 @@ func _start_battle(kind: String) -> void:
 		"strength": strength,
 		"hp_scale": _boss_hp_scale(),
 		"boss_strength": competition.boss_strength_bonus,
+		"enemy_strength": int(mol.get("enemy_strength", 0)),
 		"dose_max": int(_encounters.get("dose_max", 4)),
 		"start_block": int(bonus.get("start_block", 0)) + int(mol.get("start_block", 0)),
 		"first_draw": int(bonus.get("first_draw", 0)) + int(mol.get("first_draw", 0)),
@@ -771,11 +772,30 @@ func get_exam(stage: String) -> Dictionary:
 	return molecule.exam_result(stage) if molecule != null else {"has": false}
 
 
-## 疗效换算成战斗开局效力：每超过基准 20 点 +1
+## 疗效换算成战斗开局效力：每超过基准 strength_per_efficacy 点 +1
 func get_efficacy_strength() -> int:
 	var base := int(_project.get("strength_efficacy_base", 20))
 	var per := maxi(1, int(_project.get("strength_per_efficacy", 20)))
 	return maxi(0, (state.efficacy - base) / per)
+
+
+## 起始牌让位给片段卡：按 starter_trim 的顺序拿掉 starter_trim_count 张（牌组里没有的跳过）
+func _trim_starter_deck() -> void:
+	var cfg := Molecule.config()
+	var trim: Array = cfg.get("starter_trim", [])
+	var need := int(cfg.get("starter_trim_count", trim.size()))
+	var removed := 0
+	for card_id in trim:
+		if removed >= need:
+			break
+		if deck.has(card_id):
+			deck.erase(card_id)
+			removed += 1
+
+
+## 战斗开局力量的上限
+func get_strength_cap() -> int:
+	return int(_project.get("strength_cap", 99))
 
 
 func _boss_hp_scale() -> float:

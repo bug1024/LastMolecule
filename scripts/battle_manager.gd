@@ -87,7 +87,7 @@ func _ready() -> void:
 ## deck：ResearchCard 列表；abilities：已持有能力定义
 ## ctx：{hp, max_hp, strength（来自疗效与团队等级）, hp_scale（Boss 血量倍率）, boss_strength（竞品加成）, dose_max,
 ##       start_block / first_draw / dexterity（团队等级自带能力）,
-##       分子：weak / vulnerable_bonus / poison_bonus / enemy_poison / first_energy / extra_lines,
+##       分子：weak / enemy_strength / vulnerable_bonus / poison_bonus / enemy_poison / first_energy / extra_lines,
 ##       阶段考验：boss_exam_strength / boss_exam_vulnerable, 分子弱点 exposure, 疾病专属敌人名 enemy_names}
 func start_battle(enc: Dictionary, deck: Array, abilities: Array, ctx: Dictionary) -> void:
 	encounter = enc
@@ -130,6 +130,8 @@ func start_battle(enc: Dictionary, deck: Array, abilities: Array, ctx: Dictionar
 			e.add_status("strength", int(ctx.boss_exam_strength))
 		if is_boss and int(ctx.get("boss_exam_vulnerable", 0)) > 0:   # 通过了阶段考验：Boss 开局带破绽
 			e.add_status("vulnerable", int(ctx.boss_exam_vulnerable))
+		if int(ctx.get("enemy_strength", 0)) > 0:   # 分子活性过强、治疗窗口窄：敌人开局带力量
+			e.add_status("strength", int(ctx.enemy_strength))
 		if int(ctx.get("enemy_poison", 0)) > 0:   # 分子代谢很稳定：敌人开局带中毒
 			e.add_status("poison", int(ctx.enemy_poison))
 		e.roll_intent(rng)

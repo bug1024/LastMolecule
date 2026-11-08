@@ -3,8 +3,8 @@
   {
    "id": "off_target",
    "hp": [
-    22,
-    26
+    40,
+    47
    ],
    "shape": "crystal",
    "color": "#b07cf0",
@@ -37,8 +37,8 @@
   {
    "id": "poor_solubility",
    "hp": [
-    28,
-    32
+    50,
+    58
    ],
    "shape": "blob",
    "color": "#6fb7d8",
@@ -63,8 +63,8 @@
   {
    "id": "metabolite",
    "hp": [
-    12,
-    15
+    22,
+    27
    ],
    "shape": "cell",
    "color": "#e3a85b",
@@ -90,8 +90,8 @@
   {
    "id": "herg",
    "hp": [
-    54,
-    58
+    65,
+    70
    ],
    "shape": "spiky",
    "color": "#ef5d6c",
@@ -172,8 +172,8 @@
   {
    "id": "hepatotox",
    "hp": [
-    32,
-    36
+    51,
+    58
    ],
    "shape": "blob",
    "color": "#9bc43c",
@@ -204,8 +204,8 @@
   {
    "id": "animal_bias",
    "hp": [
-    34,
-    38
+    54,
+    61
    ],
    "shape": "cell",
    "color": "#d6a24b",
@@ -224,7 +224,7 @@
     {
      "id": "species_gap",
      "intent": "attack",
-     "damage": 10,
+     "damage": 11,
      "weight": 2
     },
     {
@@ -238,8 +238,8 @@
   {
    "id": "free_radical",
    "hp": [
-    16,
-    20
+    26,
+    32
    ],
    "shape": "spiky",
    "color": "#f0c64e",
@@ -261,13 +261,16 @@
      },
      "weight": 1
     }
-   ]
+   ],
+   "start_status": {
+    "thorns": 1
+   }
   },
   {
    "id": "genotox",
    "hp": [
-    66,
-    70
+    79,
+    84
    ],
    "shape": "spiky",
    "color": "#c25ad6",
@@ -281,7 +284,7 @@
     {
      "id": "mutate",
      "intent": "attack",
-     "damage": 13
+     "damage": 16
     },
     {
      "id": "strand_break",
@@ -349,8 +352,8 @@
   {
    "id": "infusion_reaction",
    "hp": [
-    36,
-    40
+    54,
+    60
    ],
    "shape": "blob",
    "color": "#ef7b6a",
@@ -360,7 +363,7 @@
     {
      "id": "flush",
      "intent": "attack",
-     "damage": 10,
+     "damage": 11,
      "weight": 2
     },
     {
@@ -377,8 +380,8 @@
   {
    "id": "pk_variance",
    "hp": [
-    24,
-    28
+    36,
+    42
    ],
    "shape": "cell",
    "color": "#e8a0c8",
@@ -403,8 +406,8 @@
   {
    "id": "cytokine_storm",
    "hp": [
-    82,
-    86
+    98,
+    103
    ],
    "shape": "cloud",
    "color": "#f25f4c",
@@ -429,7 +432,7 @@
     {
      "id": "shock",
      "intent": "attack",
-     "damage": 16
+     "damage": 22
     }
    ]
   },
@@ -478,8 +481,8 @@
   {
    "id": "placebo",
    "hp": [
-    46,
-    50
+    64,
+    70
    ],
    "shape": "blob",
    "color": "#9fb4c8",
@@ -498,7 +501,7 @@
     {
      "id": "noise_effect",
      "intent": "attack",
-     "damage": 12,
+     "damage": 13,
      "weight": 2
     }
    ]
@@ -506,8 +509,8 @@
   {
    "id": "enroll_drag",
    "hp": [
-    30,
-    34
+    48,
+    53
    ],
    "shape": "cell",
    "color": "#7aa6e8",
@@ -535,8 +538,8 @@
   {
    "id": "resistant_clone",
    "hp": [
-    98,
-    104
+    118,
+    125
    ],
    "shape": "cell",
    "color": "#5b7cf0",
@@ -544,7 +547,7 @@
    "pattern": "cycle",
    "elite": true,
    "start_status": {
-    "ritual": 1
+    "thorns": 2
    },
    "moves": [
     {
@@ -561,15 +564,15 @@
     {
      "id": "overgrow",
      "intent": "attack",
-     "damage": 18
+     "damage": 22
     }
    ]
   },
   {
    "id": "progression",
    "hp": [
-    158,
-    158
+    138,
+    138
    ],
    "shape": "cell",
    "color": "#4a8df0",
@@ -611,8 +614,8 @@
   {
    "id": "endpoint_miss",
    "hp": [
-    48,
-    52
+    70,
+    76
    ],
    "shape": "crystal",
    "color": "#58c9b9",
@@ -622,7 +625,7 @@
     {
      "id": "miss",
      "intent": "attack",
-     "damage": 12,
+     "damage": 13,
      "weight": 2
     },
     {
@@ -643,8 +646,8 @@
   {
    "id": "protocol_dev",
    "hp": [
-    30,
-    34
+    40,
+    46
    ],
    "shape": "spiky",
    "color": "#e3b45b",
@@ -667,13 +670,16 @@
      "block": 8,
      "weight": 1
     }
-   ]
+   ],
+   "start_status": {
+    "thorns": 1
+   }
   },
   {
    "id": "safety_signal",
    "hp": [
-    100,
-    106
+    120,
+    127
    ],
    "shape": "crystal",
    "color": "#ff6b8b",
@@ -701,7 +707,7 @@
     {
      "id": "suspend",
      "intent": "attack",
-     "damage": 20
+     "damage": 26
     }
    ]
   },

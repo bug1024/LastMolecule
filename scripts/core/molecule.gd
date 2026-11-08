@@ -245,11 +245,11 @@ func unknown_alerts() -> Array:
 
 
 ## 属性带来的战斗效果（game 拼进战斗上下文；stage 决定哪些只在特定阶段生效）
-## {strength, start_block, weak, offtarget (bool), vulnerable_bonus, poison_bonus, enemy_poison, clinical_cost,
+## {strength, enemy_strength, start_block, weak, offtarget (bool), vulnerable_bonus, poison_bonus, enemy_poison, clinical_cost,
 ##  first_draw, first_energy, lines: [{key, args, prop}]}
 func effects(stage: String) -> Dictionary:
 	var p := properties()
-	var fx := {"strength": 0, "start_block": 0, "weak": 0, "offtarget": false, "vulnerable_bonus": 0, "poison_bonus": 0,
+	var fx := {"strength": 0, "enemy_strength": 0, "start_block": 0, "weak": 0, "offtarget": false, "vulnerable_bonus": 0, "poison_bonus": 0,
 		"enemy_poison": 0, "clinical_cost": 0, "first_draw": 0, "first_energy": 0, "lines": []}
 	var lines: Array = []
 	var pot := int(p.potency)
@@ -263,6 +263,9 @@ func effects(stage: String) -> Dictionary:
 	if strength > 0:
 		fx.strength = strength
 		lines.append({"key": "mol.fx.strength", "args": [strength], "prop": "potency"})
+	if pot >= 5:   # 活性太强、治疗窗口窄：副作用也跟着变强
+		fx.enemy_strength = int(config().get("potent_enemy_strength", 1))
+		lines.append({"key": "mol.fx.narrow_window", "args": [fx.enemy_strength], "prop": "potency"})
 	if pot <= 1:
 		fx.weak = 1
 		lines.append({"key": "mol.fx.weak", "args": [], "prop": "potency"})

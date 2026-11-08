@@ -915,6 +915,7 @@ alert.state.unknown,待验证,untested
 alert.state.cleared,已排除,cleared
 alert.state.confirmed,已确认,confirmed
 mol.fx.strength,分子活性：开局力量 +%d,Potency: +%d Strength
+mol.fx.narrow_window,活性太强、治疗窗口窄：敌人开局力量 +%d,Narrow therapeutic window: enemies start with +%d Strength
 mol.fx.unstable_strength,代谢太快：活性带来的力量减半为 %d,Metabolized fast: potency Strength halved to %d
 mol.fx.weak,分子活性太低：开局虚弱,Low potency: start Weak
 mol.fx.offtarget,选择性差：一回合第 3 张攻击牌起脱靶，每张掉 3 血（破绽目标除外）,"Poor selectivity: from the 3rd attack each turn, 3 HP backfire (Weak Spot targets exempt)"

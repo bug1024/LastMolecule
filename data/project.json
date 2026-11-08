@@ -34,7 +34,8 @@
   ],
   "months_per_year": 12,
   "rest_heal": 25,
-  "strength_per_efficacy": 20,
+  "strength_per_efficacy": 30,
+  "strength_cap": 5,
   "strength_efficacy_base": 20,
   "fast_track": {
     "accept_progress": 0,

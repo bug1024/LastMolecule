@@ -189,6 +189,14 @@ func _test_node_time_cost() -> void:
 	game.choose_node(game.get_map().get_choices()[0])
 	_expect(game._phase == Game.RoundPhase.BATTLE and game.get_battle_kind() == "fight", "The first layer starts a fight")
 	game.free()
+	# 力量来源再多，开局力量也有上限
+	var strong := _new_game()
+	strong.state.efficacy = 200
+	strong.run_flags["strength"] = 6
+	strong.choose_node(strong.get_map().get_choices()[0])
+	_expect(strong.get_battle_manager().player.get_status("strength") == strong.get_strength_cap() and strong.get_strength_cap() == 5,
+		"Starting strength is capped no matter how many sources stack")
+	strong.free()
 
 
 func _test_efficacy_strength() -> void:
@@ -196,7 +204,9 @@ func _test_efficacy_strength() -> void:
 	game.state.efficacy = 25
 	_expect(game.get_efficacy_strength() == 0, "Starting efficacy gives no strength")
 	game.state.efficacy = 61
-	_expect(game.get_efficacy_strength() == 2, "Every 20 efficacy above 20 grants 1 strength")
+	_expect(game.get_efficacy_strength() == 1, "Every 30 efficacy above 20 grants 1 strength")
+	game.state.efficacy = 81
+	_expect(game.get_efficacy_strength() == 2, "81 efficacy grants 2 strength")
 	game.state.research_progress = 50
 	_expect(is_equal_approx(game.get_boss_info().hp_scale, 0.7), "Research progress weakens the boss up to 30%")
 	game.free()
@@ -347,9 +357,9 @@ func _test_project_types() -> void:
 	RunSave.new_project_type = "selective"
 	var sel := _new_game()
 	_expect(sel.project_type == "selective" and RunSave.new_project_type.is_empty(), "The chosen program type is applied once")
-	_expect(sel.deck.count("mol_target") == 2 - (Molecule.config().starter_trim as Array).count("mol_target")
-		and sel.deck.size() == 10 - (Molecule.config().starter_trim as Array).size(),
-		"Selective programs swap in an extra Target Lock (and make room for fragment cards)")
+	_expect(sel.deck.size() == 10 - int(Molecule.config().starter_trim_count) and sel.deck.has("exp_biomarker") and sel.deck.has("exp_assay"),
+		"Selective programs keep their own starter cards and a shield card after making room for fragment cards")
+	_expect(_new_game().deck.count("exp_assay") == 2, "Molecule projects keep two shield cards in the starter deck")
 	_expect(sel.state.safety_risk == 15 and sel.get_final_safety_limit() == 65, "Selective programs start safer but need a cleaner final review")
 	_expect(int(sel.get_battle_rules().get("offtarget_limit", 0)) == 2, "Selective rules apply in Discovery")
 	_expect(String(sel.to_save().project_type) == "selective" and sel.get_project_name().contains("LM-002"),
@@ -810,11 +820,11 @@ func _test_ai_next_tier() -> void:
 func _test_upgrade_preview() -> void:
 	var game := _new_game()
 	var options: Array = game._unique_deck_cards(true)
-	var hit: ResearchCard = null
+	var assay: ResearchCard = null
 	for c in options:
-		if c.id == "mol_hit":
-			hit = c
-	_expect(hit != null and hit.copies == game.deck.count("mol_hit") and hit.upgrade_preview != null and hit.upgrade_preview.upgraded,
+		if c.id == "exp_assay":
+			assay = c
+	_expect(assay != null and assay.copies == game.deck.count("exp_assay") and assay.upgrade_preview != null and assay.upgrade_preview.upgraded,
 		"Upgrade options count copies and carry an upgraded preview")
 	# 片段决定卡组：每个片段都有卡；装好的分子给每个位点一张，删除 / 升级只针对玩家自己的牌
 	for frag in Molecule.config().fragments:
@@ -843,12 +853,12 @@ func _test_upgrade_preview() -> void:
 	bm._repair_fragment()
 	_expect(not bound[0].damaged and bound[0].cost == before, "Playing an Experiment card repairs a damaged fragment card")
 	bm.free()
-	var diff := ResearchCard.upgrade_diff(hit, hit.upgrade_preview)
+	var diff := ResearchCard.upgrade_diff(assay, assay.upgrade_preview)
 	_expect(diff.size() >= 1 and diff[0].contains("→"), "Upgrade diff lists before → after numbers")
-	var rows: Array = hit.upgrade_preview.effect_rows({"compare_to": hit})
+	var rows: Array = assay.upgrade_preview.effect_rows({"compare_to": assay})
 	_expect(int(rows[0].change) == 1, "Upgraded numbers are marked as raised")
-	game.upgraded["mol_hit"] = true
-	_expect(not game._unique_deck_cards(true).any(func(c: ResearchCard) -> bool: return c.id == "mol_hit"),
+	game.upgraded["exp_assay"] = true
+	_expect(not game._unique_deck_cards(true).any(func(c: ResearchCard) -> bool: return c.id == "exp_assay"),
 		"Upgraded cards are at max level and no longer offered")
 	game.free()
 
@@ -1053,6 +1063,11 @@ func _test_molecule() -> void:
 	var fx := m.effects("临床前研究")
 	_expect(int(fx.strength) == 2 and int(fx.poison_bonus) == 1 and int(fx.enemy_poison) == 2 and int(fx.clinical_cost) == 1
 		and int(fx.vulnerable_bonus) == 0, "Potent: +2 Strength, very stable poison, clinical tax, neutral selectivity")
+	_expect(int(fx.enemy_strength) == 1 and (fx.lines as Array).any(func(l: Dictionary) -> bool: return l.key == "mol.fx.narrow_window"),
+		"Very high potency narrows the therapeutic window: enemies start with +1 Strength")
+	var window := _manager(["metabolite", "metabolite"], ["mol_hit"], {"enemy_strength": 1})
+	_expect(window.enemies.all(func(e: Enemy) -> bool: return e.get_status("strength") == 1), "Every enemy gets the narrow-window Strength")
+	window.free()
 	_expect(not bool(m.exam_result("临床前研究").passed) and bool(m.exam_result("二期临床试验").passed)
 		and not bool(m.exam_result("一期临床试验").passed) and not bool(m.exam_result("候选化合物发现").has),
 		"Stage exams check alerts in preclinical, selectivity in phase I, potency in phase II")
@@ -1104,6 +1119,7 @@ func _test_molecule() -> void:
 	fx = m.effects("候选化合物发现")
 	_expect(int(fx.strength) == 1 and int(fx.vulnerable_bonus) == 1 and int(fx.poison_bonus) == 1 and int(fx.first_draw) == 1,
 		"A balanced molecule gets a small bonus from every property (no dead middle)")
+	_expect(int(fx.enemy_strength) == 0, "Moderate potency has no narrow-window drawback")
 	m.apply_preset("selective")
 	fx = m.effects("候选化合物发现")
 	_expect(int(fx.weak) == 1 and int(fx.vulnerable_bonus) == 1 and int(fx.first_draw) == 1 and int(fx.first_energy) == 1 and int(fx.strength) == 0,
@@ -1285,6 +1301,46 @@ func _test_bot_runs() -> void:
 			approved += 1
 		game.free()
 	_expect(approved > 0, "At least one of 40 bot runs must reach approval")
+	# 防「全程无脑攻击」：只打攻击牌、奖励只挑高伤害的机器人，获批率必须明显低于会防守的机器人
+	var pace := [0, 0, 0]   # 普通战斗：场次、回合数合计、首回合就打完（敌人还没出手）的场次
+	var attack_only := _attack_only_approvals(false, pace)
+	var attack_only_potent := _attack_only_approvals(true, pace)
+	_expect(attack_only <= 3 and attack_only_potent <= 7 and attack_only < approved,
+		"Attack-only play rarely wins (%d/40 balanced, %d/40 potent; careful bot %d/40)" % [attack_only, attack_only_potent, approved])
+	# 普通战斗的节奏：猛攻也要打两回合以上，敌人几乎总能出手
+	var avg_turns := float(pace[1]) / maxi(1, pace[0])
+	var instant := float(pace[2]) / maxi(1, pace[0])
+	_expect(pace[0] > 100 and avg_turns >= 2.2 and instant <= 0.08,
+		"Normal fights last even under all-out attack (%.1f turns avg, %d%% won before the enemy acted)" % [avg_turns, roundi(instant * 100)])
+
+
+## 40 局「只打攻击牌」机器人的获批局数；potent 时用高活性分子并带着积累的公司数据（最有利于猛攻的条件）。
+## pace 累加普通战斗的 [场次, 回合数, 首回合就打完的场次]
+func _attack_only_approvals(potent: bool, pace: Array) -> int:
+	Bot.dumb = true
+	Bot.smart_attack = true
+	Bot.respect_rules = false
+	Bot.mol_preset = "potent" if potent else "balanced"
+	var approved := 0
+	for s in 40:
+		var game := _new_game(20000 + s, true)
+		if potent:
+			game.company.data = 220
+		var result: Dictionary = Bot.play(game, 600)
+		if result.outcome == "approved":
+			approved += 1
+		for key in result.battles:
+			if String(key).ends_with("/fight"):
+				var b: Array = result.battles[key]
+				pace[0] += int(b[1])
+				pace[1] += int(b[2])
+				pace[2] += int(b[3])
+		game.free()
+	Bot.dumb = false
+	Bot.smart_attack = false
+	Bot.respect_rules = true
+	Bot.mol_preset = "balanced"
+	return approved
 
 
 func _simulate(runs: int) -> void:
@@ -1304,6 +1360,12 @@ func _simulate(runs: int) -> void:
 	Bot.build = _arg_str("--build=")
 	Bot.mol_preset = _arg_str("--mol=") if not _arg_str("--mol=").is_empty() else "balanced"
 	Bot.mol_aware = _arg_int("--mol-aware=") == 1
+	# --dumb=1 只打攻击牌；2 只打攻击牌且奖励只挑高伤害；3 奖励同 2，但会按来袭伤害补护盾（对照组：差别只在防不防）
+	var dumb := _arg_int("--dumb=")
+	Bot.dumb = dumb == 1 or dumb == 2
+	Bot.smart_attack = dumb >= 2
+	if dumb > 0:
+		Bot.respect_rules = false
 	var company_data := _arg_int("--company-data=")
 	var by_build := {}     # 牌组主导套路 → [获批, 局数]
 	var by_card := {}      # 卡 id → [获批, 出现局数]（只统计非起始卡）
@@ -1319,9 +1381,9 @@ func _simulate(runs: int) -> void:
 		var key := "%s/%s" % [result.outcome, result.reason]
 		stages[key] = int(stages.get(key, 0)) + 1
 		for battle_key in result.battles:
-			var entry: Array = battles.get(battle_key, [0, 0])
-			entry[0] += int(result.battles[battle_key][0])
-			entry[1] += int(result.battles[battle_key][1])
+			var entry: Array = battles.get(battle_key, [0, 0, 0, 0, 0])
+			for i in 5:
+				entry[i] += int(result.battles[battle_key][i])
 			battles[battle_key] = entry
 		years += game.state.year
 		data_sum += game.state.data
@@ -1348,7 +1410,9 @@ func _simulate(runs: int) -> void:
 	var battle_keys := battles.keys()
 	battle_keys.sort()
 	for key in battle_keys:
-		print("battle %s: %d wins / %d fights" % [key, battles[key][0], battles[key][1]])
+		var b: Array = battles[key]
+		print("battle %s: %d wins / %d fights, %.1f turns, %d%% won before the enemy acted, %.1f hp lost" % [key, b[0], b[1],
+			float(b[2]) / b[1], roundi(100.0 * b[3] / b[1]), float(b[4]) / b[1]])
 	print("avg year: %.1f" % (float(years) / runs))
 	print("avg data: %.1f" % (float(data_sum) / runs))
 	print("approved only thanks to a looser safety limit: %d" % saved_by_bonus)

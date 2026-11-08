@@ -50,6 +50,6 @@
   "exam_pass_vulnerable": 1,
   "exam_fail_strength": 3,
   "fragment_choices": 3,
-  "_fragment_cards": "片段决定卡组：每个装上的片段在每场战斗给一张专属卡（cards.json 里 fragment 字段对应的 frag_ 卡）。分子项目开局时从起始牌组拿掉 starter_trim 里的卡，让出位置给 7 张片段卡。",
-  "starter_trim": ["mol_hit", "mol_hit", "mol_hit", "exp_assay", "exp_assay", "exp_assay", "mol_target"]
+  "_fragment_cards": "片段决定卡组：每个装上的片段在每场战斗给一张专属卡（cards.json 里 fragment 字段对应的 frag_ 卡）。分子项目开局时按 starter_trim 的顺序从起始牌组拿掉 starter_trim_count 张卡（牌组里没有的跳过），让出位置给 7 张片段卡；优先拿掉基础攻击，至少留下两张护盾牌。",
+  "starter_trim": ["mol_hit", "mol_hit", "mol_hit", "mol_hit", "exp_assay", "exp_assay", "mol_target", "mol_target", "exp_assay"], "starter_trim_count": 7
 }

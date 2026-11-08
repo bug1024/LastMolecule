@@ -27,7 +27,8 @@ static func play(game: Node, max_steps: int) -> Dictionary:
 			Game.RoundPhase.BATTLE:
 				var manager: BattleManager = game.get_battle_manager()
 				var key := "%s/%s" % [game.state.stage, game.get_battle_kind()]
-				var entry: Array = battles.get(key, [0, 0])
+				var entry: Array = battles.get(key, [0, 0, 0, 0, 0])   # 胜场、场次、回合数合计、首回合就打完的场次、掉血合计
+				var hp_before: int = manager.player.hp
 				var ended := []
 				var callback := func(v: bool, _o: Dictionary) -> void: ended.append(v)
 				manager.battle_ended.connect(callback)
@@ -37,6 +38,10 @@ static func play(game: Node, max_steps: int) -> Dictionary:
 					play_turn(manager)
 				manager.battle_ended.disconnect(callback)
 				entry[1] += 1
+				entry[2] += manager.turn
+				if manager.turn <= 1 and ended == [true]:
+					entry[3] += 1
+				entry[4] += hp_before - manager.player.hp
 				if ended == [true]:
 					entry[0] += 1
 				battles[key] = entry
@@ -100,9 +105,29 @@ static func _mol_score(game: Node, card: Dictionary) -> int:
 	return score
 
 
+static func _attack_value(effects: Array) -> float:
+	var v := 0.0
+	for e in effects:
+		if e.get("op", "") == "damage":
+			v += float(e.get("value", 0)) * int(e.get("times", 1))
+	return v
+
+
 static func _pick_reward_card(cards: Array, game: Node = null) -> String:
 	if cards.is_empty():
 		return ""
+	if smart_attack:
+		var best_id := ""
+		var best_v := 0.0
+		for c in cards:
+			var v := _attack_value(c.get("effects", [])) / maxf(0.5, float(c.get("cost", 1)))
+			if String(c.get("kind", "")) == "power":
+				v = 12.0
+			if v > best_v:
+				best_v = v
+				best_id = String(c.id)
+		if not best_id.is_empty():
+			return best_id
 	if mol_aware and game != null:
 		var best: Dictionary = {}
 		var best_score := 0
@@ -219,11 +244,13 @@ static var build := ""
 static var mol_preset := "balanced"   # 分子方案：potent / balanced / selective（开局设计用）
 static var mol_aware := false         # 选卡时是否顺着分子的长短处挑（模拟「看懂分子的玩家」）
 static var decision_index := 0     # 项目专属里程碑决策选第几个（模拟不同决策）
+static var smart_attack := false   # 奖励牌按每点能量的伤害挑（模拟「只认攻击牌」的挑法）
+static var dumb := false          # 只打攻击牌、不管护盾/规则/给药（模拟「全程无脑选攻击」）
 static var respect_rules := true   # false 时无视项目规则一味猛攻（模拟「攻击最高的牌全拿」）
 
 
 static func play_turn(manager: BattleManager) -> void:
-	for action in manager.get_actions():
+	for action in manager.get_actions() if not dumb else []:
 		if action.id == "dose" and action.enabled and manager.player.hp > 45 and manager.dose < 3:
 			manager.do_action("dose")
 	var guard := 0
@@ -246,6 +273,18 @@ static func _fits_build(card: Dictionary) -> bool:
 
 
 static func _pick_card(manager: BattleManager) -> ResearchCard:
+	if dumb:
+		var pick: ResearchCard = null
+		var pick_score := -1.0
+		for card: ResearchCard in manager.hand:
+			if manager.can_play(card) and card.kind in ["attack", "power"]:
+				var sc := 99.0 if card.kind == "power" else _attack_value(card.effects) / maxf(0.5, card.cost)
+				if card.effects.any(func(e: Dictionary) -> bool: return e.get("id", "") == "vulnerable"):
+					sc += 20.0
+				if sc > pick_score:
+					pick_score = sc
+					pick = card
+		return pick
 	var incoming := 0
 	for e in manager.alive_enemies():
 		incoming += manager.intent_damage(e) * e.intent_hits()
