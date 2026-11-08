@@ -146,7 +146,8 @@ func refresh() -> void:
 	_hint_label.text = tr("ui.map_hint_fast") if _game.fast_track else tr("ui.map_hint")
 	var boss: Dictionary = _game.get_boss_info()
 	var boss_title := tr("encounter." + String(boss.get("id", "")))
-	_canvas.set_map(map.get_layers(), map.path, map.get_choices(), _game.is_idle(), boss_title)
+	_canvas.set_map(map.get_layers(), map.path, map.get_choices(), _game.is_idle(), boss_title,
+		String((boss.get("enemies", [""]) as Array)[0]))
 	_fill_boss(boss, boss_title)
 	_competition_card.set_content(competition_summary(), competition_text())
 	HubView.fill_goal_card(_goal_card, _game.get_final_checklist())

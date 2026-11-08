@@ -1117,3 +1117,9 @@ settings.fx_level,战斗特效,Battle Effects
 settings.fx_normal,正常,Normal
 settings.fx_lite,精简,Minimal
 settings.fx_level_hint,精简：减少次要特效、震屏和闪光，重复动作演出更快。,"Minimal: fewer secondary effects, less shake and flash, faster repeated actions."
+mol.section.props,结构属性,Structure
+mol.section.fragment,这个位置,This Position
+mol.section.card,核心卡牌变化,Card Change
+mol.swap.empty,空位,Empty
+mol.card.lose,失去「%s」,Lose “%s”
+mol.card.gain,获得「%s」,Gain “%s”

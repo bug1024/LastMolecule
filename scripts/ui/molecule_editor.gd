@@ -1,8 +1,8 @@
 class_name MoleculeEditor
 extends ModalPanel
-## 分子设计 / 修饰界面。操作只有一件事：点分子上的位置，再点下面的片段。
-## 片段库只列能放进这个位置的；鼠标停在片段上，分子和右边的属性都会先试装给你看。
-## 右边只说现在的结果，阈值规则放在悬停提示里。
+## 分子设计 / 修饰界面（分子重构）。分子就是玩家的角色，所以它用和战斗、观察室同一个角色形象站在舞台中央；
+## 操作只有一件事：点角色身上的位置，再点下面的片段。鼠标停在片段上，角色会先把它装上给你看。
+## 右边只回答三件事：属性怎么变、这个位置的片段换成了什么、核心卡牌怎么变。阈值规则放在悬停提示里。
 ## initial：开局设计，不能取消；modify：里程碑修饰，显示这次改动的代价（局部 / 核心），可以取消。
 
 signal submitted(placement: Dictionary)
@@ -11,7 +11,7 @@ signal cancelled()
 var mode := "initial"
 var _work: Molecule          # 工作副本：所有改动先作用在它上面，确认后才提交
 var _view: MoleculeView
-var _inventory: HFlowContainer
+var _inventory: HBoxContainer
 var _props: VBoxContainer
 var _combos: Label
 var _alerts: VBoxContainer
@@ -30,7 +30,10 @@ var _toasts: HBoxContainer
 var _step: Label              # 告诉玩家这一步该做什么
 var _trial: Molecule = null   # 悬停试装：只用来显示，不影响工作副本
 var _stage := "候选化合物发现"
-var _card_box: VBoxContainer  # 片段决定卡组：右下角展示这个位置给你的那张牌
+var _card_box: HBoxContainer  # 片段决定卡组：这个位置原来的牌 → 现在的牌
+var _card_note: Label
+var _swap: HBoxContainer      # 这个位置：原片段 → 新片段
+var _origin: Molecule         # 打开编辑器时的分子，所有「原来」都和它比
 
 
 func _init() -> void:
@@ -48,10 +51,11 @@ func edit(molecule: Molecule, edit_mode: String, preview: Callable = Callable(),
 	_trial = null
 	_preview = preview
 	_work = Molecule.from_dict(molecule.to_dict())
+	_origin = Molecule.from_dict(molecule.to_dict())
 	_baseline = _work.properties() if edit_mode == "modify" else {}
 	_prop_delta.clear()
 	open()
-	_view.molecule = _work
+	_view.set_molecule(_work)
 	_view.selected = "L1"
 	_presets.visible = mode == "initial"
 	_lineage_btn.visible = not lineage_sites.is_empty()
@@ -90,21 +94,47 @@ func close() -> void:
 
 func _build(box: VBoxContainer) -> void:
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 20)
+	row.add_theme_constant_override("separation", 18)
 	box.add_child(row)
+	# --- 左：舞台。角色占主要位置，下面是这一步的提示和能放进去的片段 ---
 	var left := VBoxContainer.new()
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	left.add_theme_constant_override("separation", 8)
+	left.add_theme_constant_override("separation", 6)
 	row.add_child(left)
+	var top := HBoxContainer.new()
+	top.add_theme_constant_override("separation", 8)
+	left.add_child(top)
 	_target = UIKit.label("", Color(0.82, 0.72, 1.0), 14)
 	_target.mouse_filter = Control.MOUSE_FILTER_STOP
-	left.add_child(_target)
+	_target.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(_target)
+	_presets = HBoxContainer.new()
+	_presets.add_theme_constant_override("separation", 6)
+	_presets.add_child(UIKit.label(tr("mol.presets"), UIKit.TEXT_DIM, 13))
+	for preset in ["potent", "balanced", "selective"]:
+		var b := UIKit.button(tr("mol.preset." + preset), "", "normal", Vector2(0, 30))
+		b.add_theme_font_size_override("font_size", 13)
+		b.pressed.connect(func() -> void:
+			var before := _snapshot()
+			_work.apply_preset(preset)
+			_after_change(before))
+		_presets.add_child(b)
+	_lineage_btn = UIKit.button(tr("mol.preset.lineage"), "", "normal", Vector2(0, 30))
+	_lineage_btn.add_theme_font_size_override("font_size", 13)
+	_lineage_btn.pressed.connect(func() -> void:
+		var before := _snapshot()
+		_work.apply_sites(lineage_sites)
+		_after_change(before))
+	_presets.add_child(_lineage_btn)
+	top.add_child(_presets)
 	_view = MoleculeView.new()
 	_view.interactive = true
-	_view.custom_minimum_size = Vector2(0, 300)
+	_view.character = true   # 和战斗里是同一个角色：换片段就是换装
+	_view.custom_minimum_size = Vector2(0, 372)
 	_view.site_clicked.connect(_on_site)
+	_view.resized.connect(_fit_view)
 	left.add_child(_view)
-	# 播报排在分子下方的空处，绝不盖住正在响应的结构
+	# 播报排在角色脚下的空处，绝不盖住正在响应的结构
 	_toasts = HBoxContainer.new()
 	_toasts.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_toasts.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -116,57 +146,46 @@ func _build(box: VBoxContainer) -> void:
 	_step = UIKit.header("", 16, accent.lightened(0.25))
 	left.add_child(_step)
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(0, 156)
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.custom_minimum_size = Vector2(0, 66)
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	left.add_child(scroll)
-	_inventory = HFlowContainer.new()
-	_inventory.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_inventory.add_theme_constant_override("h_separation", 8)
-	_inventory.add_theme_constant_override("v_separation", 8)
+	_inventory = HBoxContainer.new()
+	_inventory.add_theme_constant_override("separation", 8)
 	scroll.add_child(_inventory)
 
+	# --- 右：这次改动带来的变化 ---
 	var right := VBoxContainer.new()
-	right.custom_minimum_size = Vector2(390, 0)
-	right.add_theme_constant_override("separation", 8)
+	right.custom_minimum_size = Vector2(372, 0)
+	right.add_theme_constant_override("separation", 6)
 	row.add_child(right)
-	_presets = HBoxContainer.new()
-	_presets.add_theme_constant_override("separation", 6)
-	_presets.add_child(UIKit.label(tr("mol.presets"), UIKit.TEXT_DIM, 13))
-	for preset in ["potent", "balanced", "selective"]:
-		var b := UIKit.button(tr("mol.preset." + preset), "", "normal", Vector2(0, 32))
-		b.add_theme_font_size_override("font_size", 14)
-		b.pressed.connect(func() -> void:
-			var before := _snapshot()
-			_work.apply_preset(preset)
-			_after_change(before))
-		_presets.add_child(b)
-	_lineage_btn = UIKit.button(tr("mol.preset.lineage"), "", "normal", Vector2(0, 32))
-	_lineage_btn.add_theme_font_size_override("font_size", 14)
-	_lineage_btn.pressed.connect(func() -> void:
-		var before := _snapshot()
-		_work.apply_sites(lineage_sites)
-		_after_change(before))
-	_presets.add_child(_lineage_btn)
-	right.add_child(_presets)
-	right.add_child(UIKit.header(tr("mol.properties"), 16, accent.lightened(0.2)))
+	right.add_child(_section("mol.section.props"))
 	_props = VBoxContainer.new()
-	_props.add_theme_constant_override("separation", 4)
+	_props.add_theme_constant_override("separation", 2)
 	right.add_child(_props)
-	_combos = UIKit.label("", Color(0.75, 0.85, 1.0), 13, true)
+	right.add_child(_section("mol.section.fragment"))
+	_swap = HBoxContainer.new()
+	_swap.add_theme_constant_override("separation", 8)
+	right.add_child(_swap)
+	right.add_child(_section("mol.section.card"))
+	_card_box = HBoxContainer.new()
+	_card_box.add_theme_constant_override("separation", 6)
+	_card_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	right.add_child(_card_box)
+	_card_note = UIKit.label("", UIKit.GOLD, 13, true)
+	_card_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	right.add_child(_card_note)
+	_combos = UIKit.label("", Color(0.75, 0.85, 1.0), 12, true)
 	right.add_child(_combos)
 	_alerts = VBoxContainer.new()
 	right.add_child(_alerts)
 	_exams = VBoxContainer.new()
 	_exams.add_theme_constant_override("separation", 0)
 	right.add_child(_exams)
-	_cost = UIKit.label("", UIKit.GOLD, 14, true)
+	_cost = UIKit.label("", UIKit.GOLD, 13, true)
 	right.add_child(_cost)
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	right.add_child(spacer)
-	_card_box = VBoxContainer.new()
-	_card_box.add_theme_constant_override("separation", 4)
-	right.add_child(_card_box)
 	var buttons := HBoxContainer.new()
 	buttons.add_theme_constant_override("separation", 10)
 	_cancel = UIKit.button(tr("mol.cancel"), "", "normal", Vector2(110, 46))
@@ -181,6 +200,17 @@ func _build(box: VBoxContainer) -> void:
 		submitted.emit(_work.sites.duplicate()))
 	buttons.add_child(_confirm)
 	right.add_child(buttons)
+
+
+## 角色整个站在舞台里：头顶的片段和脚都不出框，脚下留出播报的位置
+func _fit_view() -> void:
+	if _view.size.y <= 0.0:
+		return
+	_view.unit = minf(_view.size.x / 9.4, (_view.size.y * 0.52 - 38.0) / 3.45)
+
+
+func _section(key: String) -> Label:
+	return UIKit.header(tr(key), 14, accent.lightened(0.25))
 
 
 func _on_site(site_id: String) -> void:
@@ -296,6 +326,7 @@ func _refresh_all() -> void:
 	_view.queue_redraw()
 	_fill_step()
 	_fill_inventory()
+	_view.set_molecule(_work)
 	_fill_props()
 	_fill_extras()
 	_show_card(String(_work.sites.get(_view.selected, "")), false)
@@ -345,28 +376,68 @@ func _hover_chip(id: String, on: bool) -> void:
 	_show_card(id if _trial != null else String(_work.sites.get(_view.selected, "")), _trial != null)
 
 
-## 右下角：这个位置现在给的牌，或悬停片段装上后会变成的牌
+## 右栏的后两块：这个位置原来是什么片段、给什么牌 → 现在（或悬停试装后）是什么片段、给什么牌
 func _show_card(frag_id: String, trying: bool) -> void:
 	for child in _card_box.get_children():
 		child.queue_free()
-	var data := _site_card(frag_id)
-	if data.is_empty():
+	for child in _swap.get_children():
+		child.queue_free()
+	var site := _view.selected
+	if site.is_empty():
+		_card_note.text = ""
 		return
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 12)
+	var was_id := String(_origin.sites.get(site, "")) if _origin != null else ""
+	var old_data := _origin.site_card(site) if _origin != null and not was_id.is_empty() else {}
+	var new_data := _site_card(frag_id)
+	var changed := was_id != frag_id
+	# 片段：原片段 → 新片段（没变就只写一个）
+	if changed:
+		_swap.add_child(_frag_tag(was_id, true))
+		_swap.add_child(UIKit.header("→", 18, UIKit.GOLD))
+	_swap.add_child(_frag_tag(frag_id, false))
+	# 核心卡牌：原来的牌（压暗）→ 现在的牌
+	if changed and not old_data.is_empty():
+		var old_face := _face(old_data, 0.5)
+		old_face.modulate = Color(0.7, 0.7, 0.75)
+		_card_box.add_child(old_face)
+		_card_box.add_child(UIKit.header("→", 20, UIKit.GOLD))
+	if not new_data.is_empty():
+		_card_box.add_child(_face(new_data, 0.5))
+	var parts: Array[String] = []
+	if changed:
+		if not old_data.is_empty():
+			parts.append(tr("mol.card.lose") % tr(String(old_data.get("name_key", "card." + String(old_data.get("id", ""))))))
+		if not new_data.is_empty():
+			parts.append(tr("mol.card.gain") % tr(String(new_data.get("name_key", "card." + String(new_data.get("id", ""))))))
+	else:
+		parts.append(tr("mol.card_try" if trying else "mol.card_now"))
+	if new_data.has("synergy_with"):
+		parts.append(tr("mol.synergy_with") % tr("frag." + String(new_data.synergy_with)))
+	_card_note.text = " · ".join(parts) if parts.size() <= 2 else " · ".join(parts.slice(0, 2)) + "\n" + parts[2]
+	_card_note.add_theme_color_override("font_color", UIKit.GOLD if changed or trying else UIKit.TEXT_DIM)
+
+
+func _face(data: Dictionary, scale_k: float) -> CardFace:
 	var card := ResearchCard.from_dict(data)
 	card.type_name = tr("mol.fragment_tag_synergy" if data.has("synergy_with") else "mol.fragment_tag")
-	var face := CardFace.create(card, 0.6)
+	var face := CardFace.create(card, scale_k)
 	face.detail_enabled = false
-	row.add_child(face)
-	var caption_text := tr("mol.card_try" if trying else "mol.card_now")
-	if data.has("synergy_with"):
-		caption_text += "\n" + tr("mol.synergy_with") % tr("frag." + String(data.synergy_with))
-	var caption := UIKit.label(caption_text, UIKit.GOLD if trying else UIKit.TEXT_DIM, 13, true)
-	caption.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	caption.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	row.add_child(caption)
-	_card_box.add_child(row)
+	return face
+
+
+## 片段小牌签：结构图 + 名字；原来的那个压暗
+func _frag_tag(frag_id: String, old: bool) -> Control:
+	var tag := HBoxContainer.new()
+	tag.add_theme_constant_override("separation", 4)
+	var art := Control.new()
+	art.custom_minimum_size = Vector2(30, 30)
+	if not frag_id.is_empty():
+		art.draw.connect(func() -> void: MoleculeSpecimen.draw_fragment(art, frag_id, art.size * 0.5, 15.0))
+	tag.add_child(art)
+	var text := tr("frag." + frag_id) if not frag_id.is_empty() else tr("mol.swap.empty")
+	tag.add_child(UIKit.header(text, 14, UIKit.TEXT_DIM if old else Color.WHITE))
+	tag.modulate = Color(1, 1, 1, 0.7) if old else Color.WHITE
+	return tag
 
 
 ## 片段放进选中位置后的牌（算上和相邻片段的联动）
@@ -394,7 +465,7 @@ func _fragment_chip(id: String, count: int) -> Control:
 	var frag := Molecule.fragment(id)
 	var col := Color.from_string(String(frag.get("color", "#9fb4c8")), Color.GRAY)
 	var btn := Button.new()
-	btn.custom_minimum_size = Vector2(212, 48)
+	btn.custom_minimum_size = Vector2(206, 56)
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	var sb := UIKit.panel_style(Color(0.07, 0.09, 0.12, 0.85), Color(col, 0.55), 10)
 	for state_name in ["normal", "focus"]:
@@ -514,15 +585,17 @@ func _fill_props() -> void:
 				var delta_tween := delta.create_tween()
 				delta_tween.tween_interval(0.8)
 				delta_tween.tween_property(delta, "modulate:a", 0.0, 0.4)
-		_props.add_child(row)
-		# 只写现在真正生效的效果；所有阈值放在这一行的悬停提示里
+		# 现在生效的效果和全部阈值都放进这一行的悬停提示，面板上只留数值和变化
+		var active: Array[String] = []
 		for line in effect_lines:
 			if String(line.get("prop", "")) != p:
 				continue
 			var args: Array = line.get("args", [])
-			var text := tr(String(line.key)) % args if not args.is_empty() else tr(String(line.key))
-			var harmful := String(line.key) in ["mol.fx.weak", "mol.fx.offtarget", "mol.fx.poison_down", "mol.fx.clinical_cost", "mol.fx.unstable_strength"]
-			_props.add_child(UIKit.label(text, UIKit.DANGER.lightened(0.25) if harmful else UIKit.ACCENT, 12, true))
+			active.append("· " + (tr(String(line.key)) % args if not args.is_empty() else tr(String(line.key))))
+		if not active.is_empty():
+			row.tooltip_text = "\n".join(active) + "\n\n" + tr("prop.%s.tip" % p)
+			name_label.text += " ✦"
+		_props.add_child(row)
 
 
 func _fill_extras() -> void:
@@ -555,12 +628,13 @@ func _fill_extras() -> void:
 		details.append("%s %s　%s" % ["✓" if ok else "✗", short_stage, Molecule.exam_label(exam)])
 		if not ok:
 			failures.append("✗ %s　%s" % [short_stage, Molecule.exam_label(exam)])
+	# 面板上只留一行打勾；差多少放进悬停提示，开局设计时才把第一条没过的写出来
 	var summary := UIKit.label(tr("mol.exam.title") + "　" + "　".join(marks), accent.lightened(0.2), 13)
 	summary.mouse_filter = Control.MOUSE_FILTER_PASS
 	summary.tooltip_text = "\n".join(details)
 	_exams.add_child(summary)
-	for line in failures:
-		_exams.add_child(UIKit.label(line, UIKit.DANGER.lightened(0.25), 12))
+	if mode == "initial" and not failures.is_empty():
+		_exams.add_child(UIKit.label(failures[0], UIKit.DANGER.lightened(0.25), 12))
 	_confirm.disabled = false
 	_cost.add_theme_color_override("font_color", UIKit.GOLD)
 	if mode == "modify" and _preview.is_valid():

@@ -1861,36 +1861,111 @@ func _show_end() -> void:
 
 func _play_level_up(level: int) -> void:
 	_pending_level = 0
-	GameAudio.sfx("level_up")
-	_player.level_up()
-	_mol.level_up()
-	_burst(_player_point(), Color(1.0, 0.85, 0.4), 50)
-	if _mol.visible:   # 分子进化：放大一下，长出新形态（光晕 → 电子轨道 → 金色核心 → 星光）
-		_mol.pivot_offset = _mol.size * 0.5
-		var grow := create_tween()
-		grow.tween_property(_mol, "scale", Vector2(1.2, 1.2), 0.25).set_trans(Tween.TRANS_BACK)
-		grow.tween_callback(func() -> void: _mol.form = level)
-		grow.tween_property(_mol, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	var tween := create_tween()
-	tween.tween_property(_player, "scale", Vector2(1.25, 1.25), 0.25).set_trans(Tween.TRANS_BACK)
-	tween.tween_callback(func() -> void: _player.form = level)
-	tween.tween_property(_player, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_player.pivot_offset = _player.size * Vector2(0.5, 0.9)
 	_player_tag.text = tr("player.tag_mol") % [level, tr("mol.level.%d" % level)] if _mol.visible \
 		else tr("player.tag") % [level, tr("player.level.%d" % level)]
-	var up_title := tr("player.level_up_mol") % [level, tr("mol.level.%d" % level)] if _mol.visible \
-		else tr("player.level_up") % [level, tr("player.level.%d" % level)]
-	await _show_banner(up_title, PlayerHud.bonus_text(_game.get_player_bonus()),
-		Color(1.0, 0.85, 0.4), 1.2, true)
+	if not _mol.visible:
+		GameAudio.sfx("level_up")
+		_player.level_up()
+		_burst(_player_point(), Color(1.0, 0.85, 0.4), 50)
+		var tween := create_tween()
+		_player.pivot_offset = _player.size * Vector2(0.5, 0.9)
+		tween.tween_property(_player, "scale", Vector2(1.25, 1.25), 0.25).set_trans(Tween.TRANS_BACK)
+		tween.tween_callback(func() -> void: _player.form = level)
+		tween.tween_property(_player, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		await _show_banner(tr("player.level_up") % [level, tr("player.level.%d" % level)], PlayerHud.bonus_text(_game.get_player_bonus()),
+			Color(1.0, 0.85, 0.4), 1.2, true)
+		return
+	await _evolve_molecule(level)
 
 
-func _show_banner(text: String, sub: String, color: Color, hold: float, big: bool) -> void:
+## 分子进化：这是玩家努力换来的时刻，所以分子走到舞台中央，完成一次短暂的进化演出——
+##   聚能：世界压暗，金色能量从四周汇向分子，分子骨架收缩蓄力
+##   重组：各位点的片段依次亮起、弹开再归位，最后一下金光爆开，长出新形态（3 级起长出膜带）
+##   展示：新形态在中央停一下，名字和获得的能力落在脚下；然后走回站位
+func _evolve_molecule(level: int) -> void:
+	var home := _mol.position
+	var feet := _mol.size * Vector2(0.5, 0.48) + Vector2(0, MoleculeCharacter.SUPPORTS[0].y * _mol._scale())
+	var stage_feet := Vector2(size.x * 0.5, float(_space.ground))
+	var center := Vector2.ZERO
+	_mol.pivot_offset = feet
+	var step := create_tween().set_parallel(true)
+	step.tween_property(self, "_intro_dark", 0.6, 0.35)
+	step.tween_property(_mol, "position", stage_feet - feet, 0.5).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	step.tween_property(_mol, "scale", Vector2(1.25, 1.25), 0.5).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	for ew in _enemy_widgets:
+		step.tween_property(ew, "modulate:a", 0.0, 0.3)
+	await _wait_raw(0.5)
+	center = stage_feet + (_mol.size * Vector2(0.5, 0.48) - feet) * _mol.scale   # 以脚为轴放大后，身体中心的位置
+	# --- 聚能 ---
+	GameAudio.sfx("mol_charge")
+	_mol.motion.defend()   # 骨架收缩蓄力（不展开护盾）
+	_evolve_gather(center, 0.6)
+	await _wait_raw(0.6)
+	# --- 重组 ---
+	var sites: Array = Molecule.config().sites.map(func(site: Dictionary) -> String: return String(site.id))
+	for id in sites:
+		_mol.pulse_site(id, UIKit.GOLD)
+		GameAudio.sfx("molecule_modify")
+		await _wait_raw(0.05)
+	_mol.form = level
+	_player.form = level
+	_mol.level_up()
+	_mol.cheer()
+	GameAudio.sfx("level_up")
+	_gold_flash()
+	_cue(BattleCue.Kind.BURST, center + Vector2(-80, 0), center, Vector2.ZERO, 1.8)
+	_cue(BattleCue.Kind.ENTRY, stage_feet, stage_feet, Vector2.ZERO, 1.0)
+	_shake(5.0, 0.25)
+	# --- 展示 ---
+	# 名字和获得的能力落在脚下的暗处，不挡住刚长出的新形态
+	await _show_banner(tr("player.level_up_mol") % [level, tr("mol.level.%d" % level)], PlayerHud.bonus_text(_game.get_player_bonus()),
+		Color(1.0, 0.85, 0.4), 1.2, true, 0.82)
+	var back := create_tween().set_parallel(true)
+	back.tween_property(self, "_intro_dark", 0.0, 0.4)
+	back.tween_property(_mol, "position", home, 0.45).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	back.tween_property(_mol, "scale", Vector2.ONE, 0.45).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	await _wait_raw(0.45)
+
+
+## 进化的闪光是金色的，用完把闪屏层恢复成受击用的红色
+func _gold_flash() -> void:
+	var base := _flash_rect.color
+	_flash_rect.color = Color(1.0, 0.86, 0.5, 0.22)
+	var tween := create_tween()
+	tween.tween_property(_flash_rect, "color:a", 0.0, 0.45)
+	tween.tween_callback(func() -> void: _flash_rect.color = Color(base, 0.0))
+
+
+## 聚能：一圈金色细流从屏幕四周向分子核心收拢
+func _evolve_gather(center: Vector2, duration: float) -> void:
+	var lines := Control.new()
+	lines.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_fx.add_child(lines)
+	var state := [0.0]
+	lines.draw.connect(func() -> void:
+		var t: float = state[0]
+		for i in 18:
+			var a := i * TAU / 18.0 + i * 0.37
+			var far := 420.0 + (i * 53) % 160
+			var head := center + Vector2.from_angle(a) * lerpf(far, 30.0, ease(t, 2.2))
+			var tail := center + Vector2.from_angle(a) * lerpf(far + 90.0, 60.0, ease(t, 1.6))
+			lines.draw_line(tail, head, Color(UIKit.GOLD, 0.15 + 0.6 * t), 2.0 + 2.0 * t, true)
+			lines.draw_circle(head, 3.0 + 2.0 * t, Color(1.0, 0.95, 0.75, 0.4 + 0.6 * t))
+		Shading.glow(lines, center, 60.0 + 80.0 * t, Color(UIKit.GOLD, 0.35 * t)))
+	var tween := lines.create_tween()
+	tween.tween_method(func(t: float) -> void:
+		state[0] = t
+		lines.queue_redraw(), 0.0, 1.0, duration)
+	tween.tween_callback(lines.queue_free)
+
+
+func _show_banner(text: String, sub: String, color: Color, hold: float, big: bool, y_ratio := 0.42) -> void:
 	for child in _banner.get_children():
 		child.queue_free()
 	var strip := ColorRect.new()
 	strip.color = Color(0, 0, 0, 0.62)
 	strip.size = Vector2(size.x, 150 if big else 96)
-	strip.position = Vector2(0, size.y * 0.42 - strip.size.y * 0.5)
+	strip.position = Vector2(0, size.y * y_ratio - strip.size.y * 0.5)
 	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_banner.add_child(strip)
 	var label := UIKit.header(text, 48 if big else 32, color)

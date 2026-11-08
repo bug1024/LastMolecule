@@ -410,8 +410,14 @@ func _draw_character(center: Vector2, k: float) -> void:
 		i += 1
 	var ribbon := motion.trail + Vector2(0.0, sin(t * 2.3) * 0.05 + CharacterMotion.noise(t * 1.7, 3.0) * 0.04) * motion.amount
 	var body := _body_matrix(center, k)
+	var fragments: Dictionary = molecule.sites.duplicate() if molecule != null else {}
+	if interactive and not preview_frag.is_empty() and not selected.is_empty():
+		fragments[selected] = preview_frag   # 悬停试装：直接装在角色身上看
+	if interactive and not selected.is_empty():   # 编辑时选中的位置垫一层光，先于角色绘制
+		var pulse := 0.5 + 0.5 * sin(_time * 5.0)
+		Shading.glow(self, body * (points[selected] as Vector2), k * (0.85 + 0.1 * pulse), Color(UIKit.ACCENT, 0.35))
 	draw_set_transform_matrix(body)
-	MoleculeCharacter.draw(self, points, molecule.sites if molecule != null else {}, form, pose + bend, ribbon)
+	MoleculeCharacter.draw(self, points, fragments, form, pose + bend, ribbon)
 	draw_set_transform(Vector2.ZERO)
 	for site in Molecule.config().sites:
 		var id := String(site.id)
@@ -430,7 +436,7 @@ func _draw_character(center: Vector2, k: float) -> void:
 		var b := body * (points[link.b] as Vector2)
 		var lt := float(link.t)
 		var col: Color = link.color
-		draw_line(a, b, Color(col, 0.4 * lt), k * 0.32, true)
+		draw_line(a, b, Color(col, 0.4 * lt), k * 0.14, true)
 		draw_line(a, b, Color(col.lightened(0.5), lt), maxf(2.0, k * 0.07), true)
 		Shading.glow(self, a.lerp(b, clampf((1.0 - lt) * 2.5, 0.0, 1.0)), k * 0.45, Color(1, 1, 1, lt))
 	for id in _snap:   # 被点到的片段：一圈切面光环向外扩
@@ -438,11 +444,45 @@ func _draw_character(center: Vector2, k: float) -> void:
 			var ring := float(_snap[id])
 			draw_arc(body * (points[id] as Vector2), k * (0.3 + (1.0 - ring) * 0.55), 0, TAU, 24,
 				Color(MoleculeCharacter.BONE, ring), 1.0 + 2.5 * ring, true)
+	if interactive:
+		_draw_edit_marks(body, points, fragments, k)
 	if _shell > 0.0:
 		_draw_shell(body, k)
 	if _glow_burst > 0.0:
 		draw_arc(center, k * (1.2 + 0.45 * (1.0 - _glow_burst)), -2.1, 1.3, 36,
 			Color(MoleculeCharacter.GOLD, _glow_burst), 2.5, true)
+
+
+## 编辑模式画在角色身上的标记：选中环、悬停环、空位虚线、靶点口袋提示、正在看的片段名
+func _draw_edit_marks(body: Transform2D, points: Dictionary, fragments: Dictionary, k: float) -> void:
+	var font := get_theme_default_font()
+	var at := {}
+	for id in points:
+		at[id] = body * (points[id] as Vector2)
+	var r := k * 0.5
+	for site in Molecule.config().sites:
+		var id := String(site.id)
+		var c: Vector2 = at[id]
+		var frag_id := String(fragments.get(id, ""))
+		if id == selected:
+			draw_arc(c, r + 6.0, 0, TAU, 40, Color(UIKit.ACCENT, 0.95), 2.5, true)
+		elif id == _hover:
+			draw_arc(c, r + 5.0, 0, TAU, 40, Color(1, 1, 1, 0.45), 1.5, true)
+		if frag_id.is_empty():
+			for d in 16:
+				var a0 := d * TAU / 16.0
+				draw_arc(c, r, a0, a0 + TAU / 32.0, 4, Color(0.75, 0.82, 0.9, 0.7), 1.5, true)
+			var mark := String(TYPE_MARK.get(String(site.type), "?"))
+			var mw := font.get_string_size(mark, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
+			draw_string_outline(font, c + Vector2(-mw * 0.5, 5), mark, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, 3, Color(0, 0, 0, 0.8))
+			draw_string(font, c + Vector2(-mw * 0.5, 5), mark, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.8, 0.86, 0.94))
+		elif id == selected or id == _hover:
+			var frag_name := tr("frag." + frag_id)
+			var nw := font.get_string_size(frag_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
+			var top := c + Vector2(-nw * 0.5, -r - 10.0)
+			draw_string_outline(font, top, frag_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, 4, Color(0, 0, 0, 0.8))
+			draw_string(font, top, frag_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color.WHITE)
+	_draw_pocket(font, at)
 
 
 ## 护盾外壳：一圈骨白切面板从正面折叠处展开成弧，和场景同一束左上方的光；之后淡成一道薄边
@@ -522,7 +562,7 @@ func _draw_links(by_id: Dictionary) -> void:
 
 
 ## 靶点口袋热点：位点外一圈虚线（绿＝想要的标签，红＝空间冲突），下方写提示；命中时实线发亮
-func _draw_pocket(font: Font) -> void:
+func _draw_pocket(font: Font, at := {}) -> void:
 	if molecule == null or molecule.disease.is_empty() or compact:
 		return
 	var r := _site_r()
@@ -535,7 +575,7 @@ func _draw_pocket(font: Font) -> void:
 		var fits: Array = by_site.get(String(site.id), [])
 		if fits.is_empty():
 			continue
-		var c := _pos(site)
+		var c: Vector2 = at.get(String(site.id), _pos(site))
 		var y := r + 13.0
 		var looking := String(site.id) == selected or String(site.id) == _hover
 		for fit in fits:
