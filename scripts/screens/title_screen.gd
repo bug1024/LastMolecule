@@ -23,6 +23,7 @@ func _ready() -> void:
 	add_child(bg)
 	_build()
 	GameAudio.play("TITLE")
+	GameAudio.set_paused(false)
 
 
 func _build() -> void:

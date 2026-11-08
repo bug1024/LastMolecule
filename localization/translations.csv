@@ -347,7 +347,7 @@ title.help,玩法说明,How to Play
 title.settings,设置,Settings
 title.credits,制作名单,Credits
 title.quit,退出游戏,Quit
-title.version,v0.4 · Godot 4.7 · 美术与音乐均为程序生成,v0.4 · Godot 4.7 · procedural art and music
+title.version,v0.4 · Godot 4.7 · AI 辅助美术与配乐,v0.4 · Godot 4.7 · AI-assisted art and score
 title.company,公司概况,Company
 title.company_new,刚成立的新公司，还没有做过项目。第一次玩建议先看看「玩法说明」。,A brand-new company with no projects yet. First time? Check “How to Play”.
 title.company_line,已完成 %d 个项目，获批 %d 个\n流程等级 Lv%d · 公司数据 %d,"%d projects finished, %d approved\nProcess Lv%d · company data %d"
@@ -410,7 +410,7 @@ ending.level_up,流程等级提升至 Lv%d！下个项目的 AI 更可靠。,Pro
 ending.again,再来一局,Play Again
 ending.to_title,返回标题,Title Screen
 credits.title,制作名单,Credits
-credits.body,[b][color=#4fc896]最后的分子 · The Last Molecule[/color][/b]\nAI 驱动创新药研发策略卡牌\n\n[b]策划与开发[/b]　bug1024\n[b]协作开发[/b]　Claude（Anthropic）、Codex（OpenAI）\n[b]引擎[/b]　Godot Engine 4.7\n\n[b]美术[/b]　图标与界面为手写 SVG 和程序绘制的分子插画\n[b]音乐与音效[/b]　由 tools/gen_audio.py 程序合成（加法合成、FM 钟声与卷积混响），无外部素材\n\n[color=#8a94a3]谨以此献给每一位做新药的人。[/color],"[b][color=#4fc896]The Last Molecule[/color][/b]\nAI-driven drug R&D strategy card game\n\n[b]Design & development[/b]　bug1024\n[b]Co-development[/b]　Claude (Anthropic), Codex (OpenAI)\n[b]Engine[/b]　Godot Engine 4.7\n\n[b]Art[/b]　hand-written SVG icons and procedurally drawn molecules\n[b]Music & SFX[/b]　synthesized by tools/gen_audio.py (additive synthesis, FM bells, convolution reverb) — no external assets\n\n[color=#8a94a3]Dedicated to everyone who makes new medicines.[/color]"
+credits.body,[b][color=#4fc896]最后的分子 · The Last Molecule[/color][/b]\nAI 驱动创新药研发策略卡牌\n\n[b]策划与开发[/b]　bug1024\n[b]协作开发[/b]　Claude（Anthropic）、Codex（OpenAI）\n[b]引擎[/b]　Godot Engine 4.7\n\n[b]美术[/b]　图标与界面为手写 SVG 和程序绘制的分子插画\n[b]音乐与音效[/b]　场景配乐由 Suno 辅助制作，LM-001 最终战主题与音效由程序合成\n\n[color=#8a94a3]谨以此献给每一位做新药的人。[/color],"[b][color=#4fc896]The Last Molecule[/color][/b]\nAI-driven drug R&D strategy card game\n\n[b]Design & development[/b]　bug1024\n[b]Co-development[/b]　Claude (Anthropic), Codex (OpenAI)\n[b]Engine[/b]　Godot Engine 4.7\n\n[b]Art[/b]　hand-written SVG icons and procedurally drawn molecules\n[b]Music & SFX[/b]　Suno-assisted scene score. The LM-001 final battle theme and sound effects are synthesized.\n\n[color=#8a94a3]Dedicated to everyone who makes new medicines.[/color]"
 settings.on,开启,On
 settings.off,关闭,Off
 ui.hub_funding,%d 亿美元,$%d billion
@@ -876,7 +876,7 @@ credits.name.engine,Godot Engine 4.7,Godot Engine 4.7
 credits.role.art,美术,Art
 credits.name.art,手绘风格生物奇幻素材（AI 辅助制作）\n实时分子骨架与 SVG 图标,"Painted biological fantasy art (AI-assisted)\nLive molecular scaffolds and SVG icons"
 credits.role.music,音乐与音效,Music & SFX
-credits.name.music,tools/gen_audio.py 程序合成，无外部素材\nLM-001 主题为编排的固定旋律,"Synthesized by tools/gen_audio.py, no external assets\nThe LM-001 theme is a composed melody"
+credits.name.music,场景配乐由 Suno 辅助制作\nLM-001 最终战主题与音效由程序合成,"Suno-assisted scene score\nSynthesized LM-001 final battle theme and sound effects"
 credits.dedication,谨以此献给每一位做新药的人。,Dedicated to everyone who makes new medicines.
 battle.turn_word,回合,Turn
 battle.ai_miss,失误 %d%%,Miss %d%%

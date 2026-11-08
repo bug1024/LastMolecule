@@ -1684,7 +1684,7 @@ func _test_music_system() -> void:
 	for id in ["boss_death", "win", "lose"]:
 		_expect(ResourceLoader.exists("res://assets/audio/music/%s.ogg" % id), "Battle phrase exists: " + id)
 	var battle_src := FileAccess.get_file_as_string("res://scripts/ui/battle/battle_view.gd")
-	_expect(battle_src.contains("sfx(\"boss_threat\")") and not battle_src.contains("boss_intro") and not battle_src.contains("level_up\" if _is_boss"),
+	_expect(battle_src.contains("cinematic_sfx(\"boss_threat\")") and not battle_src.contains("boss_intro") and not battle_src.contains("level_up\" if _is_boss"),
 		"The boss entrance uses its threat sound, never the old fanfare phrase")
 	# 2 播放与去重
 	var players_before := audio.get_child_count()
@@ -1768,10 +1768,17 @@ func _test_music_system() -> void:
 	settle.call(1.0)
 	_expect(not battle_player.playing, "The battle track fades out under the victory phrase")
 	GameAudio.play("BOSS")
+	var boss_pickup := float(MusicTracks.DATA.boss.loop_offset) - float(MusicTracks.DATA.boss.bar) / 4.0
+	_expect(absf(audio._active_music.get_playback_position() - boss_pickup) < 0.25,
+		"The stage boss track has a one-beat pickup before the loop body")
 	settle.call(0.3)
 	audio.request_end("boss_death")
 	settle.call(audio._bar / 4.0 + 0.05)
 	_expect(GameAudio.current().is_empty() and audio._sting.stream.resource_path.ends_with("/boss_death.ogg"), "Defeating the boss ends its theme before the result")
+	GameAudio.battle_theme(4, true, true)
+	var finale := audio._active_music.stream as AudioStreamSynchronized
+	_expect(GameAudio.current() == "BOSS_FINAL" and finale != null and finale.get_sync_stream(0).resource_path.ends_with("/boss_final.ogg"),
+		"The final boss has its own layered LM-001 theme")
 	# 10 新曲缺失：退回旧的程序合成曲，旧曲的分层换层仍然有效
 	var saved_tracks := audio.tracks
 	audio.tracks = {}
@@ -1813,9 +1820,18 @@ func _test_music_system() -> void:
 	GameSettings.apply_audio()
 	settle.call(0.5)
 	_expect(not AudioServer.is_bus_mute(0) or GameSettings.master_volume <= 0.001, "Unmuting restores the master bus")
-	audio.pause_music(true)
 	GameAudio.play("LAB")
-	_expect(not audio._paused and audio._pause_db == 0.0, "Leaving from the pause menu does not mute the next track")
+	audio._active_music.seek(12.0)
+	await create_timer(0.15).timeout
+	var lab_position := audio._active_music.get_playback_position()
+	audio.pause_music(true)
+	GameAudio.play("TITLE")
+	_expect(audio._voice.size() == 1 and audio._active_music.stream_paused and audio._resume.has("LAB"),
+		"A scene change during pause preserves the outgoing position and keeps the new track paused")
+	GameAudio.set_paused(false)
+	GameAudio.play("LAB")
+	_expect(not audio._active_music.stream_paused and absf(audio._active_music.get_playback_position() - lab_position) < 0.25,
+		"The lab resumes from the position where it was left paused")
 	GameAudio.play("")
 	settle.call(1.5)
 	if created:
@@ -1875,12 +1891,39 @@ func _test_scene_music() -> void:
 	await process_frame
 	await process_frame
 	_expect(GameAudio.current().is_empty(), "Before the boss shows itself the scene music fades away")
-	await create_timer(3.2).timeout
-	_expect(GameAudio.current() == "BOSS", "The boss theme comes in once the entrance is over")
+	_expect(audio._sting.bus == "SFX" and audio._sting.stream.resource_path.ends_with("/boss_threat.ogg"),
+		"The boss entrance plays its scoped cue through the SFX bus")
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	view._banner.get_child(-1).gui_input.emit(click)
+	await create_timer(0.9).timeout
+	_expect(GameAudio.current() == "BOSS" and not audio._sting.has_stream_playback(),
+		"Skipping the entrance starts the boss theme and fades out the warning")
 	game.get_battle_manager()._active = false
 	view.visible = false
 	await process_frame
 	_expect(GameAudio.current() == "LAB", "After the battle the lab music comes back")
+	game._phase = Game.RoundPhase.IDLE
+	game._start_battle("boss")
+	await process_frame
+	scene._pause_menu.open()
+	await create_timer(1.4).timeout
+	_expect(scene._pause_menu.visible and GameAudio.current() == "BOSS" and audio._active_music.stream_paused,
+		"The boss theme stays paused if the entrance ends under the pause menu")
+	scene._pause_menu.close()
+	_expect(audio._active_music.playing, "Resuming the game starts the queued boss theme")
+	game.get_battle_manager()._active = false
+	view.visible = false
+	game._apply_project_type("final", "LM-001")
+	game.state.stage = "三期临床试验"
+	game._phase = Game.RoundPhase.IDLE
+	game._start_battle("boss")
+	await process_frame
+	view._banner.get_child(-1).gui_input.emit(click)
+	await create_timer(0.9).timeout
+	_expect(GameAudio.current() == "BOSS_FINAL" and audio._layers != null,
+		"The LM-001 finale enters on the final boss theme through the battle view")
 	scene.queue_free()
 	await create_timer(1.0).timeout   # 等战斗演出里挂起的协程随场景一起结束
 	GameAudio.play("")

@@ -5,7 +5,7 @@ extends Node
 ## 自动加载不存在时（如部分测试环境）静默跳过。
 ## 所有按钮自动获得点击与悬停音效；按钮设置 meta "sfx" 可替换点击音效，设为 "" 则静音。
 ##
-## 背景音乐按逻辑 ID 集中注册（MUSIC 表）：TITLE / MAP / LAB / EVENT / BATTLE / BOSS / ENDING。
+## 背景音乐按逻辑 ID 集中注册（MUSIC 表）。
 ## 各页面只说「现在是哪种场景」，不写文件路径。曲目文件、循环点和节拍由 tools/import_suno_music.py
 ## 写进 MusicTracks；文件缺失时退回旧的程序合成曲（fallback）并只警告一次。
 ##
@@ -18,14 +18,15 @@ const MUSIC_DIR := "res://assets/audio/music/"
 const SFX_DIR := "res://assets/audio/sfx/"
 
 ## 背景音乐注册表。gain_db 叠在导入时统一到 −16 LUFS 的文件上；fade 是切入这首时的交叉淡化秒数；
-## resume 表示短时间内回到这个页面时从离开的位置接着播；fallback 是新曲缺失时用的旧曲。
+## resume 表示短时间内回到这个页面时从离开的位置接着播；track 为空时直接使用程序合成曲。
 const MUSIC := {
 	"TITLE": {"track": "title", "gain_db": -3.0, "fade": 1.2, "resume": true, "fallback": "title", "fallback_db": -6.5},
 	"MAP": {"track": "map", "gain_db": -3.5, "fade": 1.0, "resume": true, "fallback": "lab", "fallback_db": -6.5},
 	"LAB": {"track": "lab", "gain_db": -4.0, "fade": 1.0, "resume": true, "fallback": "lab", "fallback_db": -6.5},
 	"EVENT": {"track": "event", "gain_db": -3.5, "fade": 0.8, "resume": true, "fallback": "lab", "fallback_db": -6.5},
 	"BATTLE": {"track": "battle", "gain_db": -4.0, "fade": 0.6, "resume": false, "fallback": "battle", "fallback_db": -1.0},
-	"BOSS": {"track": "boss", "gain_db": -3.0, "fade": 1.2, "resume": false, "fallback": "boss", "fallback_db": -1.0},
+	"BOSS": {"track": "boss", "gain_db": -3.0, "fade": 0.4, "resume": false, "lead_into_loop": true, "fallback": "boss", "fallback_db": -1.0},
+	"BOSS_FINAL": {"track": "", "fade": 0.4, "resume": false, "fallback": "boss_final", "fallback_db": -1.0},
 	"ENDING": {"track": "ending", "gain_db": -2.5, "fade": 1.5, "resume": false, "fallback": "campaign_approved", "fallback_db": -4.0},
 }
 const LEGACY_IDS := {"title": "TITLE", "lab": "LAB", "map": "MAP", "event": "EVENT", "battle": "BATTLE", "boss": "BOSS", "ending": "ENDING"}
@@ -40,7 +41,7 @@ const MOOD_LEVELS := {
 const LAYER_DB := [0.0, -5.0, -7.0]
 const PAUSE_FADE := 0.2
 ## 这些音效出现时，音乐短暂让出几分贝，保证关键反馈听得清；普通出牌、悬停不在其中
-const KEY_SFX := ["hit_heavy", "boss_warn", "boss_hurt", "boss_die", "boss_threat", "shield_form", "ai_scan", "ai_fail", "synergy", "mol_release"]
+const KEY_SFX := ["hit_heavy", "boss_warn", "boss_hurt", "boss_die", "shield_form", "ai_scan", "ai_fail", "synergy", "mol_release"]
 const SILENT_DB := -60.0
 const SFX_VOICES := 8
 const SFX_SAME_GAP_MS := 40       # 同一个音效 40 ms 内重复触发只响一次，避免叠加过载
@@ -74,6 +75,7 @@ var _level := [1.0, 0.0, 0.0]    # 三层当前音量（线性）
 var _ending := ""                # 等待下一拍收尾后要播放的乐句
 var _paused := false
 var _pause_db := 0.0
+var _pause_tween: Tween
 var _sfx_duck_db := 0.0
 var _bus_targets := {}           # 总线名 → 目标线性音量
 var tracks: Dictionary = MusicTracks.DATA   # 曲目元数据；测试可换成空表来验证旧曲兜底
@@ -99,9 +101,9 @@ static func music(track: String) -> void:
 	play(String(LEGACY_IDS.get(track, track)))
 
 
-## 战斗配乐：普通战斗 BATTLE，Boss 战（含最终 Boss）BOSS
-static func battle_theme(_stage: int, boss: bool, _final_boss: bool) -> void:
-	play("BOSS" if boss else "BATTLE")
+## 战斗配乐：普通战斗、阶段 Boss 和最终 Boss 各有曲目
+static func battle_theme(_stage: int, boss: bool, final_boss: bool) -> void:
+	play(("BOSS_FINAL" if final_boss else "BOSS") if boss else "BATTLE")
 
 
 ## 播放一段不循环的短乐句（胜负），期间背景乐压低
@@ -109,6 +111,13 @@ static func sting(track: String) -> void:
 	var node := _instance()
 	if node:
 		node.play_sting(track)
+
+
+## 演出用的音效走 SFX 总线，占用可单独淡出的短音频播放器。
+static func cinematic_sfx(track: String) -> void:
+	var node := _instance()
+	if node:
+		node.play_sting(track, false, "SFX")
 
 
 static func finish_sting(track: String) -> void:
@@ -228,7 +237,7 @@ func _resolve(id: String) -> Dictionary:
 		return {"stream": stream, "gain": float(entry.gain_db), "mode": String(info.mode), "offset": float(info.loop_offset),
 			"bar": float(info.bar), "gap": float(info.get("gap", 1.0)), "legacy": ""}
 	var legacy := String(entry.fallback)
-	if not _warned.has(id):
+	if not String(entry.track).is_empty() and not _warned.has(id):
 		_warned[id] = true
 		push_warning("GameAudio: %s 的曲目文件缺失，改用旧曲 %s" % [id, legacy])
 	stream = _load(MUSIC_DIR + legacy + ".ogg")
@@ -244,10 +253,13 @@ func play_music(id: String, fade := -1.0) -> void:
 	_current = id
 	_ending = ""
 	_restart_left = -1.0
-	_paused = false   # 从暂停菜单直接离开（如退回标题）时，新曲目不能继承暂停的静音
-	_pause_db = 0.0
 	_layers = null
 	_reset_clock(2.0, QUARTER_BEATS)
+	# 暂停中的旧曲已经无声，直接释放并保存位置，避免卡在无法推进的淡出上。
+	if _paused:
+		for player: AudioStreamPlayer in _voice.keys():
+			_release(player)
+		_active_music = null
 	var outgoing := _active_music
 	var seconds := fade if fade >= 0.0 else (float(MUSIC[id].fade) if MUSIC.has(id) else STOP_FADE)
 	# 快速来回切换（A → B → A）：A 还在淡出，直接把它拉回来，不重播
@@ -268,7 +280,7 @@ func play_music(id: String, fade := -1.0) -> void:
 	if track.is_empty():
 		return
 	var incoming := other
-	if incoming.playing:   # 第三首插进来：仍在淡出的那首直接停掉，同时最多两层背景音乐
+	if _voice.has(incoming):   # 第三首插进来：仍在淡出的那首直接停掉，同时最多两层背景音乐
 		_release(incoming)
 	var stream: AudioStream = track.stream
 	if String(track.legacy) != "" and MusicMeta.BAR.has(String(track.legacy)):
@@ -279,15 +291,18 @@ func play_music(id: String, fade := -1.0) -> void:
 		ogg.loop_offset = float(track.offset)
 	_reset_clock(float(track.bar), MusicMeta.ACCENTS.get(String(track.legacy), QUARTER_BEATS))
 	incoming.stream = stream
-	incoming.stream_paused = false
 	_voice[incoming] = {"id": id, "amp": 0.0, "target": 1.0, "rate": 1.0 / maxf(seconds, 0.01), "gain": float(track.gain),
 		"stop": false, "mode": String(track.mode), "gap": float(track.gap), "bar": float(track.bar)}
 	var start := 0.0
+	if bool(MUSIC[id].get("lead_into_loop", false)):
+		# 提前一拍淡入，让循环主体的首拍落在手牌恢复时。
+		start = maxf(0.0, float(track.offset) - float(track.bar) / 4.0)
 	var memory: Dictionary = _resume.get(id, {})
 	if bool(MUSIC[id].resume) and not memory.is_empty() and Time.get_ticks_msec() - int(memory.ms) < RESUME_WINDOW_MS:
 		start = float(memory.pos)
 	incoming.volume_db = SILENT_DB
 	incoming.play(start)
+	incoming.stream_paused = _paused
 	_active_music = incoming
 	_apply_voice(incoming)
 
@@ -315,7 +330,7 @@ func _retarget(player: AudioStreamPlayer, target: float, seconds: float, stop: b
 func _release(player: AudioStreamPlayer) -> void:
 	if _voice.has(player):
 		var id := String(_voice[player].id)
-		if MUSIC.has(id) and bool(MUSIC[id].resume) and player.playing:
+		if MUSIC.has(id) and bool(MUSIC[id].resume) and player.has_stream_playback():
 			_resume[id] = {"pos": player.get_playback_position(), "ms": Time.get_ticks_msec()}
 		_voice.erase(player)
 	player.stop()
@@ -383,7 +398,7 @@ func request_mood(state: String) -> void:
 
 
 func request_end(phrase: String) -> void:
-	if _active_music == null or not _active_music.playing:
+	if _active_music == null or not _active_music.has_stream_playback():
 		play_sting(phrase)
 		return
 	_ending = phrase
@@ -393,12 +408,16 @@ func pause_music(on: bool) -> void:
 	if on == _paused:
 		return
 	_paused = on
+	if _pause_tween != null:
+		_pause_tween.kill()
 	for player: AudioStreamPlayer in _voice.keys():
 		player.stream_paused = on   # 停在原位置；继续时仍从这里接上
+	_sting.stream_paused = on
 	if on:
 		_pause_db = -30.0
 	else:
-		create_tween().tween_property(self, "_pause_db", 0.0, PAUSE_FADE * 2.0)   # 继续时轻轻淡入，不突兀
+		_pause_tween = create_tween()
+		_pause_tween.tween_property(self, "_pause_db", 0.0, PAUSE_FADE * 2.0)
 
 
 func _apply_layers() -> void:
@@ -457,8 +476,9 @@ func _process(delta: float) -> void:
 	_step_buses(delta)
 
 
-func play_sting(track: String, duck := true) -> void:
-	var stream := _load(MUSIC_DIR + track + ".ogg")
+func play_sting(track: String, duck := true, bus := "Music") -> void:
+	var directory := SFX_DIR if bus == "SFX" else MUSIC_DIR
+	var stream := _load(directory + track + ".ogg")
 	if stream == null:
 		return
 	if stream is AudioStreamOggVorbis:
@@ -467,8 +487,10 @@ func play_sting(track: String, duck := true) -> void:
 		_duck_tween.kill()
 		_duck_tween = null
 	_sting.stream = stream
+	_sting.bus = bus
 	_sting.volume_db = 0.0
 	_sting.play()
+	_sting.stream_paused = _paused
 	if not duck:
 		_duck_db = 0.0
 		return
@@ -479,7 +501,7 @@ func play_sting(track: String, duck := true) -> void:
 
 
 func fade_sting(track: String) -> void:
-	if _sting.stream == null or _sting.stream.resource_path != MUSIC_DIR + track + ".ogg":
+	if not _sting.has_stream_playback() or _sting.stream.resource_path.get_file() != track + ".ogg":
 		return
 	if _duck_tween != null:
 		_duck_tween.kill()

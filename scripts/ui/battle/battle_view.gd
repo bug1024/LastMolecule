@@ -450,11 +450,12 @@ func _on_battle_started(encounter: Dictionary) -> void:
 		GameAudio.stop_music(0.5)
 	else:
 		GameAudio.play("BATTLE")
-	await _intro_banner(kind)
+	var boss_music := "BOSS_FINAL" if String(encounter.get("id", "")) == "boss_final" else "BOSS"
+	await _intro_banner(kind, boss_music)
 	if token != _battle_token:
 		return
 	if kind == "boss":
-		GameAudio.play("BOSS")   # 演出被打断或跳过时也保证 Boss 主题在播（已在播则什么都不做）
+		GameAudio.play(boss_music)
 	if _game.battles_fought == 0:
 		_show_tip()
 	_busy = false
@@ -510,12 +511,12 @@ func _show_tip() -> void:
 	add_child(dim)
 
 
-func _intro_banner(kind: String) -> void:
+func _intro_banner(kind: String, boss_music: String) -> void:
 	var title := _title.text
 	var sub := tr("encounter.kind." + kind)
 	var color: Color = {"boss": UIKit.DANGER, "elite": UIKit.GOLD}.get(kind, Color.WHITE)
 	if kind == "boss":
-		await _boss_entrance()
+		await _boss_entrance(boss_music)
 	else:
 		await _show_banner(sub, title, color, 0.9, false)
 
@@ -528,6 +529,7 @@ func _intro_chrome() -> Array[Control]:
 func _reset_intro() -> void:
 	if _intro_tween != null and _intro_tween.is_valid():
 		_intro_tween.kill()
+		GameAudio.finish_sting("boss_threat")
 	_intro_tween = null
 	_intro_dark = 0.0
 	_pressure = 0.0
@@ -537,6 +539,11 @@ func _reset_intro() -> void:
 	_banner.modulate.a = 1.0
 
 
+func _exit_tree() -> void:
+	if _intro_tween != null:
+		GameAudio.finish_sting("boss_threat")
+
+
 static var _seen_bosses := {}   # 本次运行里已经完整看过登场的 Boss：再遇到时演出加快
 
 
@@ -544,7 +551,7 @@ static var _seen_bosses := {}   # 本次运行里已经完整看过登场的 Bos
 ##   1 环境变化：战场光照转成 Boss 的危险色、世界压暗、上下黑边压进来，响起低沉的危险预警音效
 ##   2 角色出现：Boss 按自己的性格进场（踏步、升起、膨胀、聚拢、闪现），镜头推向它，威胁区域亮起，名字落下
 ##   3 恢复战斗：黑边退去、界面回来，Boss 主题淡入，机制说明和下一步意图闪一下提醒
-func _boss_entrance() -> void:
+func _boss_entrance(boss_music: String) -> void:
 	_banner.modulate.a = 1.0
 	var w := size.x
 	var h := size.y
@@ -583,7 +590,7 @@ func _boss_entrance() -> void:
 	# --- 第一段：环境变化 ---
 	# 危险预警是一个低沉、下沉、不协和的音效（不是音乐，也绝不用升级 / 胜利类的上行乐句）；
 	# 场景音乐此前已淡出，Boss 主题等第三段再淡入，不和预警抢开头
-	GameAudio.sfx("boss_threat")
+	GameAudio.cinematic_sfx("boss_threat")
 	tween.tween_property(top_bar, "position:y", 0.0, 0.3).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 	tween.tween_property(low_bar, "position:y", h - 58, 0.3).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 	tween.tween_property(self, "_intro_dark", 0.62, 0.45)
@@ -618,7 +625,9 @@ func _boss_entrance() -> void:
 	tween.tween_property(low_bar, "position:y", h, 0.3).set_delay(LEAVE)
 	tween.tween_property(self, "_intro_dark", 0.0, 0.4).set_delay(LEAVE)
 	tween.tween_property(_shake_root, "scale", Vector2.ONE, 0.35).set_delay(LEAVE).set_trans(Tween.TRANS_SINE)
-	tween.tween_callback(func() -> void: GameAudio.play("BOSS")).set_delay(LEAVE)
+	tween.tween_callback(func() -> void:
+		GameAudio.finish_sting("boss_threat")
+		GameAudio.play(boss_music)).set_delay(LEAVE)
 	for node in _intro_chrome():
 		tween.tween_property(node, "modulate:a", 1.0, 0.3).set_delay(LEAVE + 0.1)
 	for ew in _enemy_widgets:
