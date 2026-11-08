@@ -12,14 +12,15 @@ extends Node
 const MUSIC_DIR := "res://assets/audio/music/"
 const SFX_DIR := "res://assets/audio/sfx/"
 const STAGE_TRACKS := ["", "preclinical", "phase1", "phase2", "phase3"]
-const BATTLE_DB := -5.0
+const AMBIENCE_DB := -6.5   # 标题和研发曲的持续响度高，和战斗基础层对齐
+const BATTLE_DB := -1.0
 ## 各战况下三层的目标音量（线性）：基础、紧张、高潮
 const MOOD_LEVELS := {
 	"normal": [1.0, 0.0, 0.0],
 	"tension": [1.0, 1.0, 0.0],
 	"climax": [1.0, 0.45, 1.0],
 }
-const LAYER_DB := [0.0, -2.0, -1.0]   # 各层的音量上限，给主旋律和出牌音效留空间
+const LAYER_DB := [0.0, -5.0, -7.0]   # 基础层调响后，给分轨重叠和命中音效留出余量
 const PAUSE_FADE := 0.2
 ## 这些音效出现时，音乐短暂让出几分贝，保证关键反馈听得清
 const KEY_SFX := ["hit_heavy", "boss_warn", "boss_hurt", "boss_die", "shield_form", "ai_scan", "ai_fail", "synergy", "mol_release"]
@@ -58,7 +59,8 @@ var _sfx_duck_db := 0.0
 static func music(track: String) -> void:
 	var node := _instance()
 	if node:
-		node.play_music(track)
+		var gain_db := AMBIENCE_DB if track in ["title", "lab"] else 0.0
+		node.play_music(track, "", gain_db)
 
 
 static func battle_theme(stage: int, boss: bool, final_boss: bool) -> void:
