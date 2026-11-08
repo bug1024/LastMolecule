@@ -141,7 +141,7 @@ func _add_intent(icon_name: String, amount: String, color: Color) -> void:
 	var item := HBoxContainer.new()
 	item.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	item.add_theme_constant_override("separation", 3)
-	item.add_child(UIKit.icon_rect(icon_name, 20, color))
+	item.add_child(UIKit.icon_rect(icon_name, 24 if icon_name == "intent_attack" else 20, color))
 	if not amount.is_empty():
 		var number := UIKit.label(amount, UIKit.PAPER.lightened(0.55), 24)
 		number.theme_type_variation = &"NumberLabel"

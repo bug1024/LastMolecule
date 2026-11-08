@@ -1704,10 +1704,23 @@ func _test_music_system() -> void:
 		_expect(not audio._active_music.stream_paused and audio._clock > held, "Resuming continues from the same spot")
 		audio.play_sfx("hit_heavy")
 		_expect(audio._sfx_duck_db <= -3.0, "Key combat sounds duck the music")
+		audio.play_sting("boss_intro")
+		audio._duck_tween.custom_step(0.4)
+		audio.fade_sting("boss_intro")
+		audio._duck_tween.custom_step(0.2)
+		_expect(not audio._sting.playing and is_zero_approx(audio._duck_db) and audio._active_music.playing,
+			"Leaving the intro fades its phrase and restores the running battle track")
 		audio.request_end("win")
 		audio._advance_clock(beat * 1.01)
 		_expect(audio._active_music == null and audio._current.is_empty() and audio._sting.stream == load("res://assets/audio/music/win.ogg"),
 			"Victory waits for the next beat, then hands over to its own phrase")
+	audio.play_music("boss", "", GameAudio.BATTLE_DB)
+	audio.request_end("boss_death")
+	audio._advance_clock(audio._bar * 0.26)
+	_expect(audio._current == "boss", "A 7/8 boss score continues past the artificial quarter-bar boundary")
+	audio._advance_clock(audio._bar * 0.04)
+	_expect(audio._current.is_empty() and audio._sting.stream.resource_path.ends_with("/boss_death.ogg"),
+		"The boss phrase starts on the next real group accent")
 	var saved := GameSettings.music_volume
 	GameSettings.music_volume = 0.5
 	GameSettings.apply_audio()
@@ -1773,6 +1786,21 @@ func _test_enemy_personas() -> void:
 	_expect(dlt.death_style == "rupture" and pocket.death_style == "seal", "Boss deaths follow their biology: overdose rupture, pocket sealing")
 	_expect(CharacterProfiles.ENTRANCE.get(dlt.personality, "") == "stomp" and CharacterProfiles.ENTRANCE.get(pocket.personality, "") == "rise",
 		"Bosses enter in character")
+	var view := BattleView.new()
+	var approach := 0.30
+	var arrival := 1.35
+	for style in ["rise", "swell", "gather"]:
+		var tween := create_tween().set_parallel(true)
+		tween.pause()
+		view._stage_entrance(tween, pocket, style, approach, arrival)
+		tween.custom_step(arrival - 0.01)
+		var before := pocket.scale
+		_expect(pocket.modulate.r < 0.1, "%s stays silhouetted during approach" % style)
+		tween.custom_step(0.02)
+		_expect(pocket.modulate.r > 0.2 and before.distance_to(pocket.scale) < 0.09,
+			"%s completes its movement before the reveal flash" % style)
+		tween.kill()
+	view.free()
 	dlt.strain = 1.0
 	dlt.hp_ratio = 0.2
 	settle.call(dlt, 120)

@@ -525,6 +525,7 @@ func _intro_chrome() -> Array[Control]:
 func _reset_intro() -> void:
 	if _intro_tween != null and _intro_tween.is_valid():
 		_intro_tween.kill()
+		GameAudio.finish_sting("boss_intro")
 	_intro_tween = null
 	_intro_dark = 0.0
 	_pressure = 0.0
@@ -586,12 +587,14 @@ func _boss_entrance() -> void:
 	tween.tween_property(self, "_intro_dark", 0.62, 0.45)
 	tween.tween_property(self, "_pressure", 0.55, 0.45)   # 地面光提前转成 Boss 的危险色
 	# --- 第二段：角色出现 ---
-	const ARRIVE := 1.05
+	const APPROACH := 0.30
+	const ARRIVE := 1.35
 	var style := String(CharacterProfiles.ENTRANCE.get(_enemy_widgets[0].creature.personality, "stomp")) if not _enemy_widgets.is_empty() else "stomp"
-	tween.tween_property(_shake_root, "scale", Vector2(1.08, 1.08), ARRIVE + 0.2).set_delay(0.3).set_trans(Tween.TRANS_SINE)
+	tween.tween_property(_shake_root, "scale", Vector2(1.08, 1.08), ARRIVE - APPROACH).set_delay(APPROACH).set_trans(Tween.TRANS_SINE)
 	for ew in _enemy_widgets:
 		ew.set_meta_alpha(0.0)
-		_stage_entrance(tween, ew.creature, style, ARRIVE)
+		var body_style := String(CharacterProfiles.ENTRANCE.get(ew.creature.personality, "stomp"))
+		_stage_entrance(tween, ew.creature, body_style, APPROACH, ARRIVE)
 	tween.tween_callback(func() -> void:
 		GameAudio.sfx("boss_stomp")
 		_shake(13.0 if style == "stomp" else 6.0, 0.4)
@@ -613,7 +616,9 @@ func _boss_entrance() -> void:
 	tween.tween_property(low_bar, "position:y", h, 0.3).set_delay(LEAVE)
 	tween.tween_property(self, "_intro_dark", 0.0, 0.4).set_delay(LEAVE)
 	tween.tween_property(_shake_root, "scale", Vector2.ONE, 0.35).set_delay(LEAVE).set_trans(Tween.TRANS_SINE)
-	tween.tween_callback(func() -> void: GameAudio.set_mood("normal")).set_delay(LEAVE)
+	tween.tween_callback(func() -> void:
+		GameAudio.finish_sting("boss_intro")
+		GameAudio.set_mood("normal")).set_delay(LEAVE)
 	for node in _intro_chrome():
 		tween.tween_property(node, "modulate:a", 1.0, 0.3).set_delay(LEAVE + 0.1)
 	for ew in _enemy_widgets:
@@ -628,22 +633,23 @@ func _boss_entrance() -> void:
 
 
 ## Boss 按自己的性格进场：都从黑影开始，在 arrive 秒落定并显出本色
-func _stage_entrance(tween: Tween, body: CreatureView, style: String, arrive: float) -> void:
+func _stage_entrance(tween: Tween, body: CreatureView, style: String, start: float, arrive: float) -> void:
 	var home := body.position
+	var travel := arrive - start
 	body.pivot_offset = body.size * Vector2(0.5, 1.0)
 	body.modulate = Color(0.05, 0.04, 0.08)
 	match style:
 		"rise":     # 从地面升起：先扁平地贴着地，再向上撑开
 			body.scale = Vector2(1.05, 0.15)
-			tween.tween_property(body, "scale", Vector2(0.97, 1.08), arrive).set_delay(0.3).set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_IN)
+			tween.tween_property(body, "scale", Vector2(0.97, 1.08), travel).set_delay(start).set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_IN)
 		"swell":    # 膨胀成形：从一团小核长大，带弹性
 			body.scale = Vector2(0.35, 0.3)
-			tween.tween_property(body, "scale", Vector2(1.06, 1.06), arrive).set_delay(0.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+			tween.tween_property(body, "scale", Vector2(1.06, 1.06), travel).set_delay(start).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 		"gather":   # 聚拢成形：从弥散的大团收拢
 			body.scale = Vector2(1.6, 1.3)
 			body.modulate.a = 0.0
-			tween.tween_property(body, "scale", Vector2(0.96, 0.96), arrive).set_delay(0.3).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-			tween.tween_property(body, "modulate:a", 1.0, arrive * 0.8).set_delay(0.3)
+			tween.tween_property(body, "scale", Vector2(0.96, 0.96), travel).set_delay(start).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+			tween.tween_property(body, "modulate:a", 1.0, travel * 0.8).set_delay(start)
 		"snap":     # 闪现：几次闪烁后突然出现在位
 			body.scale = Vector2(0.9, 0.9)
 			body.modulate.a = 0.0
@@ -655,8 +661,8 @@ func _stage_entrance(tween: Tween, body: CreatureView, style: String, arrive: fl
 		_:          # 踏步而来：黑影从远处一步步逼近，最后一脚落地
 			body.scale = Vector2(0.74, 0.74)
 			body.position = home + Vector2(95, 0)
-			tween.tween_property(body, "position", home, arrive).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-			tween.tween_property(body, "scale", Vector2(0.97, 0.97), arrive).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+			tween.tween_property(body, "position", home, travel).set_delay(start).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+			tween.tween_property(body, "scale", Vector2(0.97, 0.97), travel).set_delay(start).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tween.tween_property(body, "scale", Vector2(1.07, 1.07), 0.07).set_delay(arrive)
 	tween.tween_property(body, "scale", Vector2.ONE, 0.22).set_delay(arrive + 0.07).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tween.tween_property(body, "modulate", Color(1.9, 1.35, 1.25), 0.05).set_delay(arrive)
@@ -665,7 +671,7 @@ func _stage_entrance(tween: Tween, body: CreatureView, style: String, arrive: fl
 
 ## 回到战斗时，把这场的特殊机制和 Boss 的下一步意图各闪两下
 func _remind_threat() -> void:
-	var targets: Array = [_mechanic]
+	var targets: Array = [_rule_label]
 	for ew in _enemy_widgets:
 		targets.append(ew._intent_box)
 	for target: Control in targets:
@@ -775,7 +781,8 @@ func _update_pressure(delta: float) -> void:
 		_floor.threat_x = threat
 		if _game != null:
 			_floor.pressure_color = _boss_accent()
-	_pressure = move_toward(_pressure, target, delta * 0.9)
+	if _intro_tween == null:
+		_pressure = move_toward(_pressure, target, delta * 0.9)
 	_update_music(delta)
 	_floor.pressure = _pressure * 0.82
 	_pressure_dim.color.a = maxf(0.2 * _pressure, _intro_dark)
@@ -1428,8 +1435,6 @@ func _play_death(side: String, index: int) -> void:
 		return
 	var ew := _enemy_widgets[index]
 	GameAudio.sfx("boss_die" if _manager.enemies[index].is_boss else "enemy_die")
-	if _manager.enemies[index].is_boss:
-		GameAudio.end_battle("boss_death")   # 下一拍收掉战斗曲，接 Boss 死亡的收束乐句
 	var body := ew.creature
 	var area := body.visible_body_rect()
 	var enemy := _manager.enemies[index]
@@ -1833,8 +1838,7 @@ func _show_end() -> void:
 	_faces.clear()
 	_hand_cards.clear()
 	if _victory:
-		if not _is_boss:   # Boss 战已在 Boss 倒下时奏过独立的收束乐句
-			GameAudio.end_battle("win")
+		GameAudio.end_battle("boss_death" if _is_boss else "win")
 		_player.set_mood("")
 		_player.react("happy", 3.0)
 		_mol.cheer()

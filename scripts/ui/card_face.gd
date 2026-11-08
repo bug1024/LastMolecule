@@ -257,7 +257,9 @@ func _make_row(row: Dictionary, bounds: Vector2) -> Control:
 	if not number_text.is_empty():
 		occupied += number_width + gap
 	var x := floorf((bounds.x - occupied) * 0.5)
-	var icon := UIKit.icon_rect(String(row.icon), icon_size, Color(row.color).darkened(0.42))
+	var icon_name := String(row.icon)
+	var icon_ink := Color(row.color).darkened(0.18 if icon_name == "intent_attack" else 0.42)
+	var icon := UIKit.icon_rect(icon_name, icon_size, icon_ink)
 	icon.size = Vector2.ONE * icon_size
 	icon.position = Vector2(x, (bounds.y - icon_size) * 0.5)
 	line.add_child(icon)

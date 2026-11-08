@@ -26,6 +26,7 @@ const KEY_SFX := ["hit_heavy", "boss_warn", "boss_hurt", "boss_die", "shield_for
 const SILENT_DB := -60.0
 const FADE := 0.8
 const SFX_VOICES := 8
+const QUARTER_BEATS := [0.0, 0.25, 0.5, 0.75]
 
 var _music_a: AudioStreamPlayer
 var _music_b: AudioStreamPlayer
@@ -42,6 +43,7 @@ var _cache := {}
 var _last_hover_ms := 0
 var _layers: AudioStreamSynchronized = null   # 当前战斗曲的分层流（非分层曲目为空）
 var _bar := 2.0                  # 当前战斗曲一小节的秒数
+var _accents: Array = QUARTER_BEATS
 var _clock := 0.0                # 当前战斗曲已播放的秒数（暂停时停走）
 var _last_bar := -1
 var mood := "normal"             # 已生效的战况
@@ -78,6 +80,12 @@ static func sting(track: String) -> void:
 	var node := _instance()
 	if node:
 		node.play_sting(track)
+
+
+static func finish_sting(track: String) -> void:
+	var node := _instance()
+	if node:
+		node.fade_sting(track)
 
 
 ## 战况：normal 普通 / tension 紧张（生命低、敌人蓄力、危险机制）/ climax 高潮（Boss 关键阶段、终局）。
@@ -183,6 +191,8 @@ func play_music(track: String, _layer_theme := "", gain_db := 0.0) -> void:
 func _music_stream(track: String) -> AudioStream:
 	var main_stream := _load(MUSIC_DIR + track + ".ogg", true)
 	_layers = null
+	_bar = float(MusicMeta.BAR.get(track, 2.0))
+	_accents = MusicMeta.ACCENTS.get(track, QUARTER_BEATS)
 	_clock = 0.0
 	_last_bar = -1
 	mood = "normal"
@@ -194,7 +204,6 @@ func _music_stream(track: String) -> AudioStream:
 	var climax := _load(MUSIC_DIR + track + "_climax.ogg", true)
 	if tension == null or climax == null:
 		return main_stream
-	_bar = float(MusicMeta.BAR.get(track, 2.0))
 	var sync := AudioStreamSynchronized.new()
 	sync.stream_count = 3
 	for i in 3:
@@ -242,10 +251,10 @@ func _apply_layers() -> void:
 func _advance_clock(delta: float) -> void:
 	if _active_music == null or not _active_music.playing or _active_music.stream_paused:
 		return
-	var beat := _bar / 4.0
+	var beat := _bar / _accents.size()
 	var before := _clock
 	_clock += delta
-	if not _ending.is_empty() and floorf(_clock / beat) != floorf(before / beat):
+	if not _ending.is_empty() and _beat_index(_clock) != _beat_index(before):
 		var phrase := _ending
 		_ending = ""
 		_fade_music(_active_music, -40.0, 0.5, true)
@@ -269,6 +278,17 @@ func _advance_clock(delta: float) -> void:
 		_apply_layers()
 
 
+func _beat_index(seconds: float) -> int:
+	var bars := seconds / _bar
+	var index := int(bars) * _accents.size()
+	var phase := fposmod(bars, 1.0)
+	for i in range(1, _accents.size()):
+		if phase < float(_accents[i]):
+			break
+		index += 1
+	return index
+
+
 func _process(delta: float) -> void:
 	_advance_clock(delta)
 	_sfx_duck_db = move_toward(_sfx_duck_db, 0.0, delta * 8.0)
@@ -280,18 +300,33 @@ func play_sting(track: String, duck := true) -> void:
 	var stream := _load(MUSIC_DIR + track + ".ogg", false)
 	if stream == null:
 		return
-	_sting.stream = stream
-	_sting.play()
-	if not duck:
-		return
 	if _duck_tween != null:
 		_duck_tween.kill()
-	if _active_music != null:
+		_duck_tween = null
+	_sting.stream = stream
+	_sting.volume_db = 0.0
+	_sting.play()
+	if not duck:
+		_duck_db = 0.0
+		return
+	if _active_music != null and _music_tweens.has(_active_music):
+		_duck_db = minf(_duck_db, _active_music.volume_db - _base_gain_db - _pause_db - _sfx_duck_db)
 		_cancel_music_tween(_active_music)
 	_duck_tween = create_tween()
 	_duck_tween.tween_property(self, "_duck_db", -18.0, 0.3)
 	_duck_tween.tween_interval(maxf(stream.get_length() - 1.0, 0.5))
 	_duck_tween.tween_property(self, "_duck_db", 0.0, 1.2)
+
+
+func fade_sting(track: String) -> void:
+	if _sting.stream == null or _sting.stream.resource_path != MUSIC_DIR + track + ".ogg":
+		return
+	if _duck_tween != null:
+		_duck_tween.kill()
+	_duck_tween = create_tween()
+	_duck_tween.tween_property(self, "_duck_db", 0.0, 0.18)
+	_duck_tween.parallel().tween_property(_sting, "volume_db", SILENT_DB, 0.18)
+	_duck_tween.tween_callback(_sting.stop)
 
 
 func _cancel_music_tween(player: AudioStreamPlayer) -> void:
