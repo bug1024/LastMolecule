@@ -83,10 +83,19 @@ func _run() -> void:
 	_test_disease_campaign()
 	_test_bot_runs()
 	await _test_ui_smoke()
+	await _test_scene_music()
 	await _test_restart()
 	await _test_ending_and_menu()
 	await _test_title_screen()
 	print("%d checks, %d failures" % [_checks, _failures.size()])
+	# 退出前停掉所有还在响的播放器，免得退出瞬间的播放实例被报成泄漏
+	var sound := root.get_node_or_null("Sound")
+	if sound:
+		for player in sound.get_children():
+			if player is AudioStreamPlayer:
+				player.stop()
+				player.stream = null
+		await create_timer(0.3).timeout   # 播放实例在音频线程上释放，留一点时间
 	quit(0 if _failures.is_empty() else 1)
 
 
@@ -1659,79 +1668,222 @@ func _test_music_system() -> void:
 		audio.name = "Sound"
 		root.add_child(audio)
 		created = true
-	var mismatched: Array[String] = []
-	for track in MusicMeta.BAR:
-		var lengths: Array = []
-		for suffix in ["", "_tension", "_climax"]:
-			var stream := load("res://assets/audio/music/%s%s.ogg" % [track, suffix]) as AudioStream
-			lengths.append(stream.get_length() if stream else -1.0)
-		var expected := float(MusicMeta.BAR[track]) * 32.0
-		for length in lengths:
-			if absf(float(length) - expected) > 0.05:
-				mismatched.append("%s %.2f/%.2f" % [track, float(length), expected])
-	_expect(mismatched.is_empty(), "Every battle track's three layers loop on the same 32 bars: " + ", ".join(mismatched))
-	for id in ["mol_charge", "mol_release", "hit", "hit_heavy", "shield_form", "synergy", "ai_scan", "ai_fail", "boss_warn", "boss_hurt", "boss_die"]:
+	var settle := func(seconds: float) -> void:
+		for i in int(seconds * 60.0):
+			audio._process(1.0 / 60.0)
+	# 1 集中注册：每个场景 ID 都有曲目文件，循环点落在文件内
+	var broken: Array[String] = []
+	for id in ["TITLE", "MAP", "LAB", "EVENT", "BATTLE", "BOSS", "ENDING"]:
+		var info: Dictionary = MusicTracks.DATA.get(String(GameAudio.MUSIC[id].track), {})
+		var stream := load(String(info.get("file", ""))) as AudioStreamOggVorbis if not info.is_empty() else null
+		if stream == null or float(info.loop_offset) >= stream.get_length() - 5.0 or absf(stream.get_length() - float(info.length)) > 0.1:
+			broken.append(id)
+	_expect(broken.is_empty(), "Every scene music ID resolves to an OGG with its loop inside the file: " + ", ".join(broken))
+	for id in ["mol_charge", "mol_release", "hit", "hit_heavy", "shield_form", "synergy", "ai_scan", "ai_fail", "boss_warn", "boss_hurt", "boss_die", "boss_threat"]:
 		_expect(ResourceLoader.exists("res://assets/audio/sfx/%s.ogg" % id), "Combat sound exists: " + id)
-	for id in ["boss_intro", "boss_death", "win"]:
+	for id in ["boss_death", "win", "lose"]:
 		_expect(ResourceLoader.exists("res://assets/audio/music/%s.ogg" % id), "Battle phrase exists: " + id)
-	audio.play_music("battle", "", GameAudio.BATTLE_DB)
+	var battle_src := FileAccess.get_file_as_string("res://scripts/ui/battle/battle_view.gd")
+	_expect(battle_src.contains("sfx(\"boss_threat\")") and not battle_src.contains("boss_intro") and not battle_src.contains("level_up\" if _is_boss"),
+		"The boss entrance uses its threat sound, never the old fanfare phrase")
+	# 2 播放与去重
+	var players_before := audio.get_child_count()
+	GameAudio.play("TITLE")
+	var title_player := audio._active_music
+	_expect(GameAudio.current() == "TITLE" and title_player != null and title_player.playing, "TITLE starts the title theme")
+	var ogg := title_player.stream as AudioStreamOggVorbis
+	_expect(ogg != null and ogg.loop and is_equal_approx(ogg.loop_offset, float(MusicTracks.DATA.title.loop_offset)),
+		"Looping tracks jump back to their loop point instead of replaying the intro")
+	settle.call(1.5)
+	GameAudio.play("TITLE")
+	_expect(audio._active_music == title_player and title_player.playing and audio._voice.size() == 1, "Requesting the same scene again does not restart it")
+	# 3 交叉淡化
+	GameAudio.play("MAP")
+	_expect(audio._voice.size() == 2 and audio._active_music != title_player, "Changing scene crossfades two players")
+	settle.call(0.5)
+	var mid_old := float(audio._voice[title_player].amp) if audio._voice.has(title_player) else 0.0
+	_expect(mid_old > 0.0 and mid_old < 1.0, "Halfway through the crossfade both tracks are audible")
+	settle.call(1.5)
+	_expect(audio._voice.size() == 1 and not title_player.playing and GameAudio.current() == "MAP", "The old track stops once the crossfade ends")
+	_expect(audio._resume.has("TITLE"), "Leaving a page remembers where its music was")
+	# 4 回到刚离开的页面：从原位置接着播
+	audio._resume["LAB"] = {"pos": 12.0, "ms": Time.get_ticks_msec()}
+	GameAudio.play("LAB")
+	_expect(absf(audio._active_music.get_playback_position() - 12.0) < 0.5, "Returning to a page resumes its music where it left off")
+	audio._resume["LAB"] = {"pos": 12.0, "ms": Time.get_ticks_msec() - GameAudio.RESUME_WINDOW_MS - 1}
+	settle.call(1.2)
+	# 5 快速来回切换：A → B → A 不重播、最多两层
+	var lab_player := audio._active_music
+	GameAudio.play("MAP")
+	GameAudio.play("LAB")
+	_expect(audio._active_music == lab_player and audio._voice.size() <= 2, "Switching back mid-fade pulls the same track back up")
+	for id in ["MAP", "EVENT", "LAB", "MAP", "TITLE", "EVENT", "BATTLE", "MAP"]:
+		GameAudio.play(id)
+		audio._process(0.05)
+		_expect(audio._voice.size() <= 2, "At most two background tracks overlap (%s)" % id)
+	settle.call(2.0)
+	var playing := 0
+	for player in [audio._music_a, audio._music_b]:
+		playing += 1 if player.playing else 0
+	_expect(playing == 1 and audio.get_child_count() == players_before, "Many scene changes leave one player running and no new nodes")
+	# 6 找不到循环点的曲目：播完停顿后从头淡入
+	GameAudio.play("EVENT")
+	settle.call(1.0)
+	var event_player := audio._active_music
+	_expect(not (event_player.stream as AudioStreamOggVorbis).loop, "The event track is not looped blindly")
+	audio._on_music_finished(event_player)
+	_expect(audio._restart_left > 0.0, "When the event track ends it waits before starting over")
+	settle.call(float(MusicTracks.DATA.event.gap) + 0.1)
+	_expect(event_player.playing and float(audio._voice[event_player].amp) < 1.0, "The event track restarts from the top with a fade-in")
+	# 7 单轨战斗曲：战况变化与出牌都不会让曲子重播
+	GameAudio.play("BATTLE")
+	settle.call(1.0)
+	var battle_player := audio._active_music
+	audio.request_mood("climax")
+	settle.call(audio._bar * 1.5)
+	audio.play_sfx("card_play")
+	audio.play_sfx("hit")
+	_expect(audio._active_music == battle_player and battle_player.playing and GameAudio.current() == "BATTLE",
+		"Mood changes and card sounds never restart the battle track")
+	audio.play_sfx("hit_heavy")
+	_expect(audio._sfx_duck_db <= -3.0, "Key combat sounds duck the music")
+	var duck_after := audio._sfx_duck_db
+	audio.play_sfx("hit_heavy")
+	_expect(audio._sfx_duck_db == duck_after, "The same sound fired twice at once plays only once")
+	# 8 暂停
+	audio.pause_music(true)
+	var held := audio._clock
+	audio._advance_clock(1.0)
+	_expect(battle_player.stream_paused and audio._clock == held, "Pausing holds the music in place")
+	audio.pause_music(false)
+	audio._advance_clock(0.1)
+	_expect(not battle_player.stream_paused and audio._clock > held, "Resuming continues from the same spot")
+	# 9 战斗结束：下一拍收掉战斗曲，再接收束乐句
+	var beat := audio._bar / 4.0
+	audio._clock = beat * 0.5
+	audio.request_end("win")
+	audio._advance_clock(beat * 0.6)
+	_expect(audio._active_music == null and GameAudio.current().is_empty() and audio._sting.stream == load("res://assets/audio/music/win.ogg"),
+		"Victory waits for the next beat, then hands over to its own phrase")
+	settle.call(1.0)
+	_expect(not battle_player.playing, "The battle track fades out under the victory phrase")
+	GameAudio.play("BOSS")
+	settle.call(0.3)
+	audio.request_end("boss_death")
+	settle.call(audio._bar / 4.0 + 0.05)
+	_expect(GameAudio.current().is_empty() and audio._sting.stream.resource_path.ends_with("/boss_death.ogg"), "Defeating the boss ends its theme before the result")
+	# 10 新曲缺失：退回旧的程序合成曲，旧曲的分层换层仍然有效
+	var saved_tracks := audio.tracks
+	audio.tracks = {}
+	audio._warned["BATTLE"] = true   # 测试里不打印兜底警告
+	GameAudio.play("BATTLE")
 	_expect(audio._layers != null and audio._layers.stream_count == 3 and is_equal_approx(audio._bar, float(MusicMeta.BAR.battle)),
-		"Battle music plays as one synchronized three-layer stream")
-	var playing := audio._active_music != null and audio._active_music.playing
-	_expect(playing, "Battle music is playing")
-	if playing:
-		var beat := audio._bar / 4.0
-		audio._advance_clock(beat)                     # 先走进第一小节内
+		"A missing track falls back to the old layered battle score")
+	if audio._active_music != null and audio._active_music.playing:
+		var b := audio._bar / 4.0
+		audio._advance_clock(b)
 		audio.request_mood("tension")
-		audio._advance_clock(beat)
+		audio._advance_clock(b)
 		_expect(audio.mood == "normal", "A mood change waits for the next bar line")
 		for i in 12:
-			audio._advance_clock(beat / 4.0)
+			audio._advance_clock(b / 4.0)
 		_expect(audio.mood == "tension" and float(audio._level[1]) > 0.9, "Tension enters on the bar line within a beat")
-		audio.request_mood("climax")
-		for i in 40:
-			audio._advance_clock(beat / 4.0)
-		_expect(audio.mood == "climax" and float(audio._level[2]) > 0.9 and float(audio._level[1]) < 0.9, "Climax swaps in its layer and eases tension back")
-		audio.request_mood("unknown")
-		_expect(audio._pending_mood.is_empty(), "Unknown moods are ignored")
-		audio.pause_music(true)
-		await create_timer(0.1).timeout
-		var held := audio._clock
-		audio._advance_clock(1.0)
-		_expect(audio._active_music.stream_paused and audio._clock == held, "Pausing holds the music in place")
-		audio.pause_music(false)
-		audio._advance_clock(0.1)
-		_expect(not audio._active_music.stream_paused and audio._clock > held, "Resuming continues from the same spot")
-		audio.play_sfx("hit_heavy")
-		_expect(audio._sfx_duck_db <= -3.0, "Key combat sounds duck the music")
-		audio.play_sting("boss_intro")
-		audio._duck_tween.custom_step(0.4)
-		audio.fade_sting("boss_intro")
-		audio._duck_tween.custom_step(0.2)
-		_expect(not audio._sting.playing and is_zero_approx(audio._duck_db) and audio._active_music.playing,
-			"Leaving the intro fades its phrase and restores the running battle track")
-		audio.request_end("win")
-		audio._advance_clock(beat * 1.01)
-		_expect(audio._active_music == null and audio._current.is_empty() and audio._sting.stream == load("res://assets/audio/music/win.ogg"),
-			"Victory waits for the next beat, then hands over to its own phrase")
-	audio.play_music("boss", "", GameAudio.BATTLE_DB)
-	audio.request_end("boss_death")
-	audio._advance_clock(audio._bar * 0.26)
-	_expect(audio._current == "boss", "A 7/8 boss score continues past the artificial quarter-bar boundary")
-	audio._advance_clock(audio._bar * 0.04)
-	_expect(audio._current.is_empty() and audio._sting.stream.resource_path.ends_with("/boss_death.ogg"),
-		"The boss phrase starts on the next real group accent")
-	var saved := GameSettings.music_volume
+	audio.request_mood("unknown")
+	_expect(audio._pending_mood.is_empty(), "Unknown moods are ignored")
+	audio.tracks = saved_tracks
+	GameAudio.play("")
+	settle.call(1.0)
+	# 11 音量与静音：平滑到位
+	var saved := [GameSettings.music_volume, GameSettings.muted]
 	GameSettings.music_volume = 0.5
 	GameSettings.apply_audio()
 	var bus := AudioServer.get_bus_index("Music")
+	settle.call(0.5)
 	_expect(bus >= 0 and absf(AudioServer.get_bus_volume_db(bus) - linear_to_db(0.5)) < 0.01, "Music volume setting drives the Music bus")
-	GameSettings.music_volume = saved
+	GameSettings.music_volume = 1.0
 	GameSettings.apply_audio()
+	audio._process(1.0 / 60.0)
+	_expect(AudioServer.get_bus_volume_db(bus) < -0.5, "Volume changes ramp instead of jumping")
+	GameSettings.muted = true
+	GameSettings.apply_audio()
+	settle.call(0.5)
+	_expect(AudioServer.is_bus_mute(0), "Mute silences the master bus")
+	GameSettings.music_volume = saved[0]
+	GameSettings.muted = saved[1]
+	GameSettings.apply_audio()
+	settle.call(0.5)
+	_expect(not AudioServer.is_bus_mute(0) or GameSettings.master_volume <= 0.001, "Unmuting restores the master bus")
 	audio.pause_music(true)
-	audio.play_music("lab")
+	GameAudio.play("LAB")
 	_expect(not audio._paused and audio._pause_db == 0.0, "Leaving from the pause menu does not mute the next track")
-	audio.play_music("")
+	GameAudio.play("")
+	settle.call(1.5)
+	if created:
+		audio.queue_free()
+
+
+## 场景音乐：研发界面按当前页面切换背景音乐，子面板不打断，战斗自己管战斗曲
+func _test_scene_music() -> void:
+	var audio := root.get_node_or_null("Sound") as GameAudio
+	var created := audio == null
+	if created:
+		audio = GameAudio.new()
+		audio.name = "Sound"
+		root.add_child(audio)
+	var scene := load("res://main.tscn").instantiate() as Control
+	root.add_child(scene)
+	var game: Node = scene.get_node("GameLogic")
+	game.reseed(7)
+	await process_frame
+	await process_frame
+	var map: Control = scene.get_node("MapScreen")
+	var events: Control = scene.get_node("EventPopup")
+	var cards: Control = scene.get_node("CardPopup")
+	_expect(GameAudio.current() == ("EVENT" if events.visible else "LAB"), "A new run opens on its first event's music")
+	events.visible = false
+	await process_frame
+	_expect(GameAudio.current() == "LAB", "The lab hub plays the lab music")
+	map.visible = true
+	await process_frame
+	_expect(GameAudio.current() == "MAP", "Opening the research map switches to the map music")
+	var map_player := audio._active_music
+	cards.visible = true
+	await process_frame
+	cards.visible = false
+	await process_frame
+	_expect(GameAudio.current() == "MAP" and audio._active_music == map_player, "Opening and closing a card panel keeps the map music running")
+	events.visible = true
+	await process_frame
+	_expect(GameAudio.current() == "EVENT", "A real event scene switches to the event music")
+	events.visible = false
+	await process_frame
+	_expect(GameAudio.current() == "MAP", "Leaving the event goes back to the map music")
+	map.visible = false
+	await process_frame
+	_expect(GameAudio.current() == "LAB", "Closing the map returns to the lab music")
+	var view: BattleView = scene.get_node("BattleView")
+	game._phase = Game.RoundPhase.IDLE
+	game._start_battle("fight")
+	await process_frame
+	await process_frame
+	_expect(view.visible and GameAudio.current() == "BATTLE", "A normal fight plays the battle music, not the lab music")
+	game.get_battle_manager()._active = false
+	view.visible = false
+	await process_frame
+	game._phase = Game.RoundPhase.IDLE
+	game._start_battle("boss")
+	await process_frame
+	await process_frame
+	_expect(GameAudio.current().is_empty(), "Before the boss shows itself the scene music fades away")
+	await create_timer(3.2).timeout
+	_expect(GameAudio.current() == "BOSS", "The boss theme comes in once the entrance is over")
+	game.get_battle_manager()._active = false
+	view.visible = false
+	await process_frame
+	_expect(GameAudio.current() == "LAB", "After the battle the lab music comes back")
+	scene.queue_free()
+	await create_timer(1.0).timeout   # 等战斗演出里挂起的协程随场景一起结束
+	GameAudio.play("")
 	if created:
 		audio.queue_free()
 

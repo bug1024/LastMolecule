@@ -357,6 +357,7 @@ settings.audio,声音,Audio
 settings.master,主音量,Master
 settings.music,音乐,Music
 settings.sfx,音效,Sound Effects
+settings.mute,静音,Mute
 settings.display,显示与语言,Display & Language
 settings.fullscreen,全屏显示,Fullscreen
 settings.language,语言,Language

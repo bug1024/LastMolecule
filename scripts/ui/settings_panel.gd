@@ -1,6 +1,6 @@
 class_name SettingsPanel
 extends ModalPanel
-## 设置页：主音量 / 音乐 / 音效、全屏、降低动态效果、语言；在标题界面还可重置公司档案。
+## 设置页：主音量 / 音乐 / 音效、静音、全屏、降低动态效果、语言；在标题界面还可重置公司档案。
 
 signal locale_changed()
 
@@ -19,7 +19,25 @@ func _init() -> void:
 
 
 func _build(box: VBoxContainer) -> void:
-	box.add_child(_section("settings.audio"))
+	# 「声音」标题行右侧放静音开关，不另占一行（标题界面的设置页还要放存档区）
+	var audio_head := HBoxContainer.new()
+	var audio_title := _section("settings.audio")
+	audio_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	audio_head.add_child(audio_title)
+	var mute_label := UIKit.label(tr("settings.mute"), UIKit.TEXT_DIM, 15)
+	mute_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	audio_head.add_child(mute_label)
+	var mute := UIKit.button("", "", "normal", Vector2(96, 34))
+	mute.toggle_mode = true
+	mute.button_pressed = GameSettings.muted
+	mute.text = tr("settings.on" if mute.button_pressed else "settings.off")
+	mute.toggled.connect(func(on: bool) -> void:
+		mute.text = tr("settings.on" if on else "settings.off")
+		GameSettings.muted = on
+		GameSettings.apply_audio()
+		GameSettings.save())
+	audio_head.add_child(mute)
+	box.add_child(audio_head)
 	box.add_child(_slider_row("settings.master", GameSettings.master_volume, func(v: float) -> void:
 		GameSettings.master_volume = v))
 	box.add_child(_slider_row("settings.music", GameSettings.music_volume, func(v: float) -> void:

@@ -539,6 +539,33 @@ def _sweep_up(dur, f0, f1):
     return out * (t / dur) ** 1.5
 
 
+def boss_threat():
+    """Boss 登场预警（音效，不是音乐）：低沉、短促、不稳定，绝不出现上行或大三和弦。
+    重击 + 下沉的次低频，叠一组小二度 / 三全音的低音簇，音高整体缓慢下滑、带不规则颤动，
+    0.6 秒处一记较弱的「第二下心跳」；约 2 秒内衰减干净，给随后淡入的 Boss 主题让出开头。"""
+    dur = 2.1
+    n = int(dur * SR)
+    t = ts(n)
+    sink = 2 ** (-0.7 * np.minimum(t / 1.8, 1.0) / 12)          # 整体下滑约 0.7 个半音
+    wobble = 1 + 0.004 * np.sin(TAU * 5.3 * t) + 0.003 * np.sin(TAU * 3.1 * t + 1.0)
+    cluster = np.zeros(n)
+    for m, gain in ((38, 1.0), (39, 0.8), (44, 0.55)):         # D2 / E♭2 / A♭2：小二度 + 三全音
+        f = 440 * 2 ** ((m - 69) / 12) * sink * wobble
+        phase = np.cumsum(TAU * f / SR)
+        cluster += gain * sum(np.sin(k * phase) / k for k in range(1, 12))
+    swell = np.minimum(t / 0.12, 1.0) * np.exp(-np.maximum(t - 0.35, 0) / 0.55)
+    cluster = lowpass(np.tanh(cluster * 0.5), 650) * swell
+    sub = np.sin(np.cumsum(TAU * (46 - 12 * np.minimum(t / 1.6, 1.0)) / SR)) * np.minimum(t / 0.03, 1) * np.exp(-t / 0.75)
+    rumble = np.zeros(n)
+    noise = R.standard_normal(n)
+    for i in range(0, n, 512):
+        rumble[i:i + 512] = lowpass(noise[i:i + 512], 900 - 760 * min(i / (1.4 * SR), 1.0))
+    rumble *= np.minimum(t / 0.05, 1) * np.exp(-t / 0.6)
+    sig = layer((cluster, 0.55, 0), (sub, 0.9, 0), (rumble, 0.35, 0),
+                (punch(0.7, 95, 32, 0.32), 1.0, 0), (punch(0.5, 80, 30, 0.22), 0.5, 0.6))
+    sfx("boss_threat", fade(sig[:n], 0.0, 0.25), 0.72)
+
+
 def combat_sfx():
     # 分子蓄力：骨架绷紧的上扫 + 生物质感的低频「吸气」
     n = int(0.16 * SR)
@@ -613,6 +640,9 @@ def combat_sfx():
 def main():
     args = sys.argv[1:]
     only = next((a.split("=", 1)[1] for a in args if a.startswith("--only=")), "")
+    if only == "boss_threat":
+        boss_threat()
+        return
     do_music = "--sfx" not in args or "--music" in args
     do_sfx = "--music" not in args or "--sfx" in args
     meta_path = os.path.join(MUSIC, "music_meta.json")
@@ -648,6 +678,7 @@ def main():
             fh.write("}\n")
     if do_sfx:
         combat_sfx()
+        boss_threat()
 
 
 if __name__ == "__main__":

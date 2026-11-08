@@ -22,7 +22,7 @@ func _ready() -> void:
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 	_build()
-	GameAudio.music("title")
+	GameAudio.play("TITLE")
 
 
 func _build() -> void:

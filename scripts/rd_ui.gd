@@ -95,7 +95,9 @@ func _ready() -> void:
 	_style_buttons()
 	_event_label.text = _company_intro()
 	_on_state_synced(_game_logic.get_state())
-	GameAudio.music("lab")
+	for screen: Control in [_map_screen, _event_popup, _mol_editor, _battle_view]:
+		screen.visibility_changed.connect(_queue_music_sync)
+	_sync_music()
 	if _game_logic.resumed:
 		_event_label.text = tr("ui.resumed")
 		_game_logic.replay_pending()
@@ -305,6 +307,38 @@ func _set_message(text: String, tone: String) -> void:
 	_event_label.add_theme_color_override("font_color", EVENT_COLOR[tone])
 
 
+# ---------- 场景音乐 ----------
+
+var _music_sync_queued := false
+
+
+## 页面显隐变化时，到帧末再统一决定背景音乐：同一帧里「地图关上、战斗打开」只算一次，不会先切到实验室曲
+func _queue_music_sync() -> void:
+	if _music_sync_queued:
+		return
+	_music_sync_queued = true
+	_sync_music.call_deferred()
+
+
+## 当前真正所在的场景 → 背景音乐。战斗自己管战斗曲，结局流程自己管结局曲；
+## 卡牌、奖励、暂停、设置、帮助这类子面板不在判断里，开关它们不会打断音乐
+func _sync_music() -> void:
+	_music_sync_queued = false
+	if _finished or _battle_view.visible:
+		return
+	GameAudio.play(music_scene())
+
+
+func music_scene() -> String:
+	if _event_popup.visible:
+		return "EVENT"
+	if _mol_editor.visible:
+		return "LAB"
+	if _map_screen.visible:
+		return "MAP"
+	return "LAB"
+
+
 # ---------- 决策弹窗 ----------
 
 ## 战斗结果仍在展示时，后续弹窗排队等待「继续」
@@ -316,8 +350,7 @@ func _show_or_queue(callable: Callable) -> void:
 
 
 func _flush_after_battle() -> void:
-	if not _finished:
-		GameAudio.music("lab")
+	_queue_music_sync()
 	var queued := _after_battle.duplicate()
 	_after_battle.clear()
 	for callable in queued:
@@ -382,8 +415,11 @@ func _on_run_ended(outcome: String, reason_key: String, summary: Dictionary) -> 
 	_challenge_button.disabled = true
 	# 战斗中落败时，先让玩家看完战斗结果，点「继续」后再显示结局
 	_show_or_queue(func() -> void:
-		GameAudio.music("")
-		# 主线结局用 LM-001 主题：获批是大调完整版，「把答案留下」是安静的单音版
+		# 获批上市与主线结局（通关）用结局曲；终止、失败只留一段短乐句，不放结局曲
 		var campaign := String(summary.get("campaign_ending", ""))
-		GameAudio.sting(outcome if campaign.is_empty() else ("campaign_archive" if campaign == "leave_answer" else "campaign_approved"))
+		if outcome == "approved" or not campaign.is_empty():
+			GameAudio.play("ENDING")
+		else:
+			GameAudio.stop_music()
+			GameAudio.sting(outcome)
 		_ending.show_ending(outcome, reason_key, summary, _game_logic.get_state()))
