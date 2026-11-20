@@ -79,7 +79,25 @@ var _is_boss := false
 var _heart_timer := 0.0
 var _pending_level := 0
 var _shown_player_hp := 100
-
+var _vignette_hurt: TextureRect
+var _hurt_pulse := 0.0          # 挨打瞬间四周的一下红
+var _cam_focus := Vector2.ZERO  # 镜头推近的轴心（最近一次命中点）
+var _cam_zoom := 0.0
+var _cam_kick := Vector2.ZERO   # 镜头被命中顶开的位移（弹簧回正）
+var _cam_kick_v := Vector2.ZERO
+var _cam_live := false
+var _shake_amp := 0.0
+var _shake_fade := 1.0
+var _slow_token := 0
+var _impact_tween: Tween
+var _flash_tween: Tween
+var _player_phase := true       # 玩家回合内的命中才计入连击
+var _combo := 0
+var _combo_total := 0
+var _combo_pop := 0.0
+var _combo_show := 0.0
+var _combo_idle := 0.0          # 距上一次命中的秒数：停手一会儿计数淡出，再命中时接着数
+var _combo_tag: Control
 
 func bind(manager: BattleManager, game) -> void:
 	_manager = manager
@@ -243,8 +261,14 @@ func _build() -> void:
 		visible = false   # 回到地图 / 实验室的音乐由研发界面按当前页面决定
 		continue_pressed.emit())
 	add_child(_continue)
+	_vignette_hurt = _make_vignette(Color(0.92, 0.14, 0.1))
+	move_child(_vignette_hurt, _shake_root.get_index() + 1)
+	_combo_tag = Control.new()
+	_combo_tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_combo_tag.draw.connect(_draw_combo)
+	add_child(_combo_tag)
+	move_child(_combo_tag, _fx.get_index() + 1)
 	resized.connect(_layout)
-
 
 ## 屏幕边缘渐变遮罩（中心透明、四周着色）
 func _make_vignette(color: Color) -> TextureRect:
@@ -305,6 +329,7 @@ func _layout() -> void:
 	_discard_button.position = Vector2(w - maxf(110,_discard_button.get_combined_minimum_size().x) - 24,h - 63)
 	_rule_label.position = Vector2(32,65)
 	_continue.position = Vector2(w * 0.5 - 120,h * 0.5 + 70)
+	_combo_tag.position = Vector2(w * 0.5, 132)
 	for i in _enemy_widgets.size():
 		var slot: Dictionary = _space.slots[i]
 		var ew := _enemy_widgets[i]
@@ -379,6 +404,11 @@ func _on_battle_started(encounter: Dictionary) -> void:
 	_strike_style = ""
 	_strike_ai = false
 	_reset_intro()
+	_reset_camera()
+	Engine.time_scale = 1.0
+	_player_phase = true
+	_combo_end()
+	_hurt_pulse = 0.0
 	_selected = null
 	_hover_card = null
 	_continue.visible = false
@@ -540,6 +570,7 @@ func _reset_intro() -> void:
 
 
 func _exit_tree() -> void:
+	Engine.time_scale = 1.0   # 慢动作途中离开战斗
 	if _intro_tween != null:
 		GameAudio.finish_sting("boss_threat")
 
@@ -902,6 +933,8 @@ func _play(ev: Dictionary) -> void:
 			GameAudio.sfx("deviation")
 			await _wait(0.45)
 		"enemy_turn":
+			_player_phase = false
+			_combo_end()
 			_strike_style = ""
 			_strike_ai = false
 			_director.pace = 1.0
@@ -910,6 +943,7 @@ func _play(ev: Dictionary) -> void:
 		"enemy_move":
 			await _play_enemy_move(int(ev.index), ev.move)
 		"turn":
+			_player_phase = true
 			_director.new_turn()
 			_refresh_intents()
 			if int(ev.turn) > 1:
@@ -971,36 +1005,52 @@ func _play_damage(ev: Dictionary) -> void:
 	if amount > 0:
 		var style := _director.number_style(level, amount)
 		var ink: Color = Color("c8e08a") if toxin else style.color
-		_float_text("-%d" % amount, _director.number_slot(_number_anchor(side, index)), ink, int(style.size), 0.045)
+		_damage_number(amount, _director.number_slot(_number_anchor(side, index)), ink, int(style.size), level, 1.0 if side == "enemy" else -1.0)
 		if toxin:   # 局部腐蚀扩散 + 异常脉冲
 			_cue(BattleCue.Kind.CORRODE, p, p, Vector2.ZERO, 1.5 if cause == "toxin_burst" else 1.0)
 		var stop := BattleDirector.hitstop_for(level)
-		if lethal and side == "enemy" and boss:
-			stop = 0.12   # 最后一击：比普通 4 级多停一下
+		if lethal and side == "enemy":
+			stop = 0.12 if boss else maxf(stop, 0.08)   # 最后一击多停一下
 		if side == "player":
 			_player.hit()
+			_hurt_pulse = minf(0.8, (0.28 + amount / 40.0) * (0.5 if toxin else 1.0))
 			if toxin:
 				_mol.afflict(STATUS_TINT.poison)
 			else:
 				_mol.hit(amount / 10.0)
 				_mol.motion.freeze(stop)
 				_impact_cue(level, p + Vector2(120, 0), p, 0.85)
+				_cue(BattleCue.Kind.FLARE, p + Vector2(120, 0), p, Vector2.ZERO, 0.6 + minf(amount, 30) / 40.0)
+				var punch := BattleDirector.punch_for(level, amount)
+				_camera_punch(p, Vector2(-1.0, 0.15), float(punch.kick) * 1.2, float(punch.zoom))
+				if level < BattleDirector.Tier.BURST:
+					_shake(2.0 + minf(amount, 30) * 0.2, 0.18)
+				_burst(p, UIKit.DANGER.lightened(0.25), 6 + mini(amount, 14))
 			GameAudio.sfx("debuff" if toxin else ("hit_heavy" if level >= BattleDirector.Tier.BURST else "hurt"))
 		else:
 			var ew := _enemy_widgets[index]
 			if not toxin:
-				var knock := (0.72 + minf(amount, 28) / 20.0) * (0.55 if _strike_style == "volley" else 1.0)
+				if _player_phase:
+					_combo_hit(amount)
+				var knock := (0.85 + minf(amount, 28) / 18.0) * (0.55 if _strike_style == "volley" else 1.0)
 				ew.creature.hit(p - ew.position - ew.creature.position, knock)
 				ew.creature.motion.freeze(stop)
 				if _strike_style == "charge":
 					_mol.motion.freeze(stop)
+				_enemy_flash(ew)
 				_impact(index, p, amount, level)
+				if lethal:   # 击杀：慢下来看清这一下，镜头推到它身上
+					_slow_motion(0.2 if boss else 0.3, 0.5 if boss else 0.22)
+					_camera_punch(p, Vector2(1.0, -0.1), 6.0, 0.06)
+					_screen_flash(0.14, Color(1.0, 0.95, 0.8))
+				elif level >= BattleDirector.Tier.SIGNATURE:
+					_slow_motion(0.45, 0.12)
 			else:
 				ew.creature.motion.status(STATUS_TINT.poison)
 			GameAudio.sfx("debuff" if toxin else ("hit_heavy" if level >= BattleDirector.Tier.BURST else "hit"))
 			if not toxin and _manager.enemies[index].is_boss and int(ev.hp) > 0:
 				GameAudio.sfx("boss_hurt")
-		_stage_reaction(level, amount, p)
+		_stage_reaction(level, amount, p, side)
 	elif int(ev.blocked) > 0:
 		_float_text(tr("battle.fx.blocked"), _number_anchor(side, index) + Vector2(0, -20), Color(0.5, 0.75, 1.0), 20)
 		GameAudio.sfx("block")
@@ -1013,22 +1063,28 @@ func _play_damage(ev: Dictionary) -> void:
 const TIMELINE_REACT := 0.19
 
 
-## 按强度决定舞台反应：2 级什么都不加；3 级轻震；4 级压暗、闪屏、重震
-func _stage_reaction(level: int, amount: int, at: Vector2) -> void:
+## 按强度决定舞台反应：3 级震屏；4 级再加压暗和闪屏（打在敌人身上是暖白，打在自己身上是危险红）
+func _stage_reaction(level: int, amount: int, at: Vector2, side := "player") -> void:
 	var strength := BattleDirector.shake_for(level, amount)
 	if strength > 0.0:
 		_shake(strength, 0.16 if level < BattleDirector.Tier.SIGNATURE else 0.3)
 	var flash := BattleDirector.flash_for(level)
 	if flash > 0.0:
-		_screen_flash(flash)
+		_screen_flash(flash, Color(1.0, 0.95, 0.8) if side == "enemy" else Color(1.0, 0.1, 0.05))
 	if level >= BattleDirector.Tier.SIGNATURE:
-		_floor.impact = at
-		_floor.impact_light = 1.0
-		create_tween().tween_property(_floor, "impact_light", 0.0, 0.6)
+		_light_floor(at, 1.0, 0.6)
 		var dim := create_tween()
 		dim.tween_property(self, "_intro_dark", 0.32, 0.06)
 		dim.tween_property(self, "_intro_dark", 0.0, 0.5)
 
+
+func _light_floor(at: Vector2, strength: float, duration: float) -> void:
+	if _impact_tween != null and _impact_tween.is_valid():
+		_impact_tween.kill()
+	_floor.impact = at
+	_floor.impact_light = maxf(_floor.impact_light, strength)
+	_impact_tween = create_tween()
+	_impact_tween.tween_property(_floor, "impact_light", 0.0, duration)
 
 ## 伤害数字的锚点：身体朝向对手那一侧的肩部上方，数字往上飘，不压在身体中央
 func _number_anchor(side: String, index: int) -> Vector2:
@@ -1098,6 +1154,7 @@ func _molecule_cast(card: ResearchCard, face: CardFace, target: int, color: Colo
 	tween.chain().tween_callback(face.queue_free)
 	_layout_hand()
 	await _wait(0.14)
+	_cast_flare(home + Vector2(30, -20), color)
 	if _strike_style == "self" or _strike_failed:
 		return   # 只作用自己的牌由效果事件演出；AI 失误不出招
 	if _strike_style != "charge":
@@ -1235,14 +1292,15 @@ func _beam(from: Vector2, to: Vector2, color: Color, precise: bool) -> void:
 	for i in n + 1:
 		seed_pts.append(randf_range(-1.0, 1.0))
 	var state := [0.0]
+	var weight := 1.0 + 0.8 * maxi(0, _director.tier - BattleDirector.Tier.DIRECT)   # 重的牌光束更粗
 	ray.draw.connect(func() -> void:
 		var t: float = state[0]
 		var a := 1.0 - t
 		var dir := (to - from).normalized()
 		var normal := Vector2(-dir.y, dir.x)
 		if precise:
-			ray.draw_line(from, to, Color(col, 0.35 * a), 14.0 * a + 2.0, true)
-			ray.draw_line(from, to, Color(1, 1, 1, a), 3.0, true)
+			ray.draw_line(from, to, Color(col, 0.35 * a), (14.0 * a + 2.0) * weight, true)
+			ray.draw_line(from, to, Color(1, 1, 1, a), 3.0 * weight, true)
 			return
 		var pts := PackedVector2Array()
 		for i in n + 1:
@@ -1250,8 +1308,8 @@ func _beam(from: Vector2, to: Vector2, color: Color, precise: bool) -> void:
 			if i > 0 and i < n:
 				p += normal * float(seed_pts[i]) * 14.0 * (0.4 + t)
 			pts.append(p)
-		ray.draw_polyline(pts, Color(col, 0.3 * a), 16.0 * a + 2.0, true)
-		ray.draw_polyline(pts, Color(col.lightened(0.5), a), 3.0, true)
+		ray.draw_polyline(pts, Color(col, 0.3 * a), (16.0 * a + 2.0) * weight, true)
+		ray.draw_polyline(pts, Color(col.lightened(0.5), a), 3.0 * weight, true)
 		for i in range(1, n, 2):   # 数据像素
 			var q := from.lerp(to, float(i) / n) + normal * float(seed_pts[i]) * 26.0
 			ray.draw_rect(Rect2(q - Vector2(4, 4), Vector2(8, 8)), Color(col, 0.8 * a)))
@@ -1365,20 +1423,50 @@ func _projectile(from: Vector2, to: Vector2, color: Color, scale_k := 1.0) -> vo
 	tween.tween_callback(bolt.queue_free)
 
 
-## 击中敌人：命中特效按强度分级——2 级短促命中，3 级碎片爆点，4 级重击；AI 命中是青色的几何扫描
+## 击中敌人：每一下都有星芒、镜头冲击和地面受光；再按强度分级——2 级短促命中，3 级碎片爆点加地面冲击环，
+## 4 级重击加速度线。近身突进多一道斩痕；AI 命中是青色的几何扫描。连击越多，这些都越重
 func _impact(index: int, p: Vector2, amount: int, level := BattleDirector.Tier.DIRECT) -> void:
-	var strength := clampf(0.72 + amount / 33.0, 0.8, 1.44)
+	var punch := BattleDirector.punch_for(level, amount, _combo)
+	var strength := clampf(0.72 + amount / 33.0, 0.8, 1.44) * float(punch.heat)
+	var from := p - Vector2(120, 8) if _strike_style == "charge" else _player_point()
+	var grade := level - BattleDirector.Tier.DIRECT   # 0 / 1 / 2
 	if _strike_ai:
 		_cue(BattleCue.Kind.AI, p, p, Vector2(76, 65), strength)
 		if level >= BattleDirector.Tier.BURST:   # AI 强化命中：青色数据方块从命中点炸开
 			_cue(BattleCue.Kind.BURST, _player_point(), p, Vector2.ZERO, strength, true)
 	else:
-		var from := p - Vector2(120, 8) if _strike_style == "charge" else _player_point()
 		_impact_cue(level, from, p, strength)
+		if _strike_style == "charge":
+			_cue(BattleCue.Kind.SLASH, from, p, Vector2.ZERO, strength * (1.0 + grade * 0.25))
+	_cue(BattleCue.Kind.FLARE, from, p, Vector2.ZERO, strength * (0.75 + grade * 0.4), _strike_ai)
+	_burst(p, Color(0.55, 0.9, 0.95) if _strike_ai else UIKit.GOLD.lightened(0.2), 7 + grade * 9)
+	_camera_punch(p, Vector2(1.0, -0.1), float(punch.kick), float(punch.zoom))
+	_light_floor(p, 0.45 + grade * 0.25, 0.3)
 	if level >= BattleDirector.Tier.BURST:
-		_floor.impact = p
-		_floor.impact_light = 0.7
-		create_tween().tween_property(_floor, "impact_light", 0.0, 0.30)
+		_cue(BattleCue.Kind.SHOCK, Vector2(p.x, _floor.ground), p, Vector2.ZERO, 0.8 + grade * 0.2)
+		_screen_flash(0.05, Color(1.0, 0.95, 0.8))
+	if level >= BattleDirector.Tier.SIGNATURE and not BattleDirector.lite():
+		_cue(BattleCue.Kind.SPEED, p, p)
+
+
+## 受击的一瞬整个身体提亮，再落回本色
+func _enemy_flash(ew: EnemyWidget) -> void:
+	var body := ew.creature
+	if body.dying > 0.0:
+		return
+	_stop_flash(ew)
+	var alpha := body.modulate.a
+	body.modulate = Color(1.42, 1.33, 1.2, alpha)   # 提亮但不吹白：命中特效要能在身体上读出来
+	var tween := body.create_tween()
+	tween.tween_property(body, "modulate", Color(1, 1, 1, alpha), 0.12)
+	ew.set_meta("hit_flash", tween)
+
+
+func _stop_flash(ew: EnemyWidget) -> void:
+	if ew.has_meta("hit_flash"):
+		var old: Tween = ew.get_meta("hit_flash")
+		if old != null and old.is_valid():
+			old.kill()
 
 
 func _impact_cue(level: int, from: Vector2, at: Vector2, strength: float) -> void:
@@ -1389,8 +1477,7 @@ func _impact_cue(level: int, from: Vector2, at: Vector2, strength: float) -> voi
 		BattleDirector.Tier.BURST:
 			_cue(BattleCue.Kind.BURST, from, at, Vector2.ZERO, strength)
 		_:
-			_cue(BattleCue.Kind.HIT, from, at, Vector2.ZERO, strength * (0.8 if _director.compressed else 1.0))
-
+			_cue(BattleCue.Kind.HIT, from, at, Vector2.ZERO, strength)
 
 ## 片段响应：片段卡打出时那个片段先亮起、向前一顶；联动卡再让相邻片段依次亮起、键上跑过一道光
 func _fragment_response(card: ResearchCard) -> void:
@@ -1422,6 +1509,19 @@ func _cue(kind: BattleCue.Kind, origin: Vector2, target: Vector2, extent := Vect
 	_fx.add_child(cue)
 
 
+## 出牌的一瞬：卡牌没入分子时，按牌的类型色亮一下
+func _cast_flare(at: Vector2, color: Color) -> void:
+	if _director.compressed:
+		return
+	var cue := BattleCue.new()
+	cue.kind = BattleCue.Kind.FLARE
+	cue.origin = at - Vector2(40, 0)
+	cue.target = at
+	cue.power = 0.55
+	cue.tint = Color(color.lightened(0.35), 1.0)
+	_fx.add_child(cue)
+
+
 func _body_cue(kind: BattleCue.Kind, side: String, index: int, target: Vector2) -> void:
 	var area: Rect2
 	if side == "player":
@@ -1450,7 +1550,12 @@ func _play_death(side: String, index: int) -> void:
 	var boss := enemy.is_boss
 	ew.show_intent(enemy, 0)
 	_cue(BattleCue.Kind.DEATH, ew.position + body.position + area.get_center(), Vector2.ZERO, area.size, 1.45 if boss else 0.95)
+	_stop_flash(ew)
 	if not boss:
+		var burst_at := ew.position + body.position + area.get_center()
+		_cue(BattleCue.Kind.BURST, burst_at - Vector2(80, 0), burst_at, Vector2.ZERO, 1.25)
+		_burst(burst_at, UIKit.PAPER, 26)
+		_shake(5.0, 0.2)
 		# 普通敌人：短促的失活，按生物学特征碎裂 / 溃散 / 融化 / 飘散，快速清场
 		body.motion.die()
 		var quick := create_tween()
@@ -1671,6 +1776,10 @@ func _process(delta: float) -> void:
 	var low := float(_shown_player_hp) / max_hp <= 0.3 and not (_ended and not _victory)
 	var target_low := 0.29 if low else 0.0
 	_vignette_low.modulate.a = move_toward(_vignette_low.modulate.a, target_low, delta * 3.0)
+	_hurt_pulse = move_toward(_hurt_pulse, 0.0, delta * 1.8)
+	_vignette_hurt.modulate.a = _hurt_pulse
+	_update_camera(delta)
+	_update_combo(delta)
 	_update_pressure(delta)
 	if low and not _ended:
 		_heart_timer -= delta
@@ -1679,9 +1788,12 @@ func _process(delta: float) -> void:
 			GameAudio.sfx("heartbeat")
 
 
-func _screen_flash(strength: float) -> void:
-	_flash_rect.color.a = strength
-	create_tween().tween_property(_flash_rect, "color:a", 0.0, 0.35)
+func _screen_flash(strength: float, color := Color(1.0, 0.1, 0.05)) -> void:
+	_flash_rect.color = Color(color, maxf(strength, _flash_rect.color.a))
+	if _flash_tween != null and _flash_tween.is_valid():
+		_flash_tween.kill()
+	_flash_tween = create_tween().set_ignore_time_scale(true)   # 慢动作里闪光照常收掉，不把画面洗白
+	_flash_tween.tween_property(_flash_rect, "color:a", 0.0, 0.3)
 
 
 ## 由 rd_ui 转发：本场胜利后团队升级，在胜利横幅后播放进化
@@ -1842,6 +1954,7 @@ func _update_controls() -> void:
 
 func _show_end() -> void:
 	_set_targeting(false)
+	_combo_end()
 	for card in _faces:
 		(_faces[card] as CardFace).queue_free()
 	_faces.clear()
@@ -2031,6 +2144,157 @@ func _float_text(text: String, pos: Vector2, color: Color, font_size: int, delay
 	tween.chain().tween_callback(label.queue_free)
 
 
+## 伤害数字：从大砸到位，停一拍，再顺着受击方向抛出去落下
+func _damage_number(amount: int, pos: Vector2, color: Color, font_size: int, level: int, away: float) -> void:
+	var label := UIKit.header("-%d" % amount, font_size, color)
+	label.theme_type_variation = &"NumberLabel"
+	label.add_theme_constant_override("outline_size", 9 if level >= BattleDirector.Tier.BURST else 7)
+	label.add_theme_color_override("font_outline_color", Color(0.04, 0.03, 0.07, 0.96))
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_fx.add_child(label)
+	var w := label.get_combined_minimum_size()
+	var start := pos - w * 0.5
+	label.position = start
+	label.pivot_offset = w * 0.5
+	label.rotation = randf_range(-0.1, 0.1)
+	label.modulate.a = 0.0
+	var big := 2.3 if level >= BattleDirector.Tier.BURST else 1.8
+	label.scale = Vector2(big, big)
+	var fling := Vector2(away * randf_range(46.0, 74.0), -96.0)
+	var tween := label.create_tween()
+	tween.tween_interval(0.045)
+	tween.tween_property(label, "modulate:a", 1.0, 0.02)
+	tween.parallel().tween_property(label, "scale", Vector2(0.9, 0.9), 0.09).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tween.tween_property(label, "scale", Vector2.ONE, 0.07).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_interval(0.16 if level < BattleDirector.Tier.BURST else 0.26)
+	tween.tween_method(func(t: float) -> void:
+		label.position = start + Vector2(fling.x * t, fling.y * t + 170.0 * t * t)
+		label.modulate.a = 1.0 - smoothstep(0.55, 1.0, t), 0.0, 1.0, 0.62)
+	tween.tween_callback(label.queue_free)
+
+
+# ---------- 镜头、慢动作、连击 ----------
+
+## 命中顶一下镜头：沿 direction 给一个冲量（弹簧回正），并以命中点为轴瞬间推近再松开
+func _camera_punch(at: Vector2, direction: Vector2, kick: float, zoom: float) -> void:
+	var k := 0.3 if GameSettings.reduce_motion else (0.5 if BattleDirector.lite() else 1.0)
+	_cam_focus = at
+	_cam_kick_v += direction.normalized() * kick * 42.0 * k
+	_cam_zoom = maxf(_cam_zoom, zoom * k)
+
+
+func _update_camera(delta: float) -> void:
+	if _intro_tween != null:
+		return   # Boss 登场自己在推镜头
+	_cam_kick_v += (-_cam_kick * 620.0 - _cam_kick_v * 30.0) * delta
+	_cam_kick += _cam_kick_v * delta
+	_cam_zoom = lerpf(_cam_zoom, 0.0, 1.0 - exp(-9.0 * delta))
+	_shake_amp = maxf(0.0, _shake_amp - _shake_fade * delta)
+	var live := _cam_zoom > 0.0005 or _cam_kick.length() > 0.05 or _cam_kick_v.length() > 1.0 or _shake_amp > 0.05
+	if not live and not _cam_live:
+		return
+	_cam_live = live
+	var offset := Vector2.ZERO
+	var zoom := 0.0
+	if live:
+		offset = _cam_kick + Vector2(randf_range(-1, 1), randf_range(-1, 1)) * _shake_amp
+		zoom = _cam_zoom
+	else:
+		_reset_camera()
+		return
+	for layer in [_floor, _shake_root, _fx]:
+		layer.pivot_offset = _cam_focus
+		layer.scale = Vector2.ONE * (1.0 + zoom)
+		layer.position = offset
+	_bg.pivot_offset = _cam_focus   # 远景动得少一些，拉开层次
+	_bg.scale = Vector2.ONE * (1.0 + zoom * 0.5)
+	_bg.position = offset * 0.4
+
+
+func _reset_camera() -> void:
+	_cam_zoom = 0.0
+	_cam_kick = Vector2.ZERO
+	_cam_kick_v = Vector2.ZERO
+	_shake_amp = 0.0
+	_cam_live = false
+	for layer in [_bg, _floor, _shake_root, _fx]:
+		layer.scale = Vector2.ONE
+		layer.position = Vector2.ZERO
+
+
+## 慢动作：全局放慢 real_seconds（真实时间），音乐不受影响
+func _slow_motion(time_scale: float, real_seconds: float) -> void:
+	if GameSettings.reduce_motion or BattleDirector.lite():
+		return
+	Engine.time_scale = minf(Engine.time_scale, time_scale)
+	_slow_token += 1
+	var token := _slow_token
+	get_tree().create_timer(real_seconds, true, false, true).timeout.connect(func() -> void:
+		if token == _slow_token:
+			Engine.time_scale = 1.0)
+
+
+func _combo_hit(amount: int) -> void:
+	_combo += 1
+	_combo_total += amount
+	_combo_pop = 1.0
+	_combo_show = 1.0
+	_combo_idle = 0.0
+	_combo_tag.queue_redraw()
+
+
+func _combo_end() -> void:
+	_combo = 0
+	_combo_total = 0
+	_combo_show = 0.0
+	_combo_tag.queue_redraw()   # 不主动重绘的话，最后画出的计数会一直留在画布上
+
+
+## 连击计数：玩家回合内每命中一次加一，从第 2 下开始显示，数字越大颜色越热；敌方回合清零
+func _draw_combo() -> void:
+	if _combo_show <= 0.0 or _combo_tag.get_meta("count", 0) < 2:
+		return
+	var count: int = _combo_tag.get_meta("count", 0)
+	var total: int = _combo_tag.get_meta("total", 0)
+	var heat := clampf((count - 2) / 6.0, 0.0, 1.0)
+	var ink := Color(1.0, 0.9, 0.6).lerp(Color(1.0, 0.5, 0.32), heat)
+	var alpha := clampf(_combo_show * 3.0, 0.0, 1.0)
+	var pop := 1.0 + 0.7 * pow(_combo_pop, 2.0)
+	var number_font := get_theme_font("font", &"NumberLabel")
+	var word_font := get_theme_font("font", &"HeaderLabel")
+	var digits := str(count)
+	var digit_size := 62 + mini(count, 10) * 3
+	var word := tr("battle.fx.combo")
+	var digits_w := number_font.get_string_size(digits, HORIZONTAL_ALIGNMENT_LEFT, -1, digit_size).x
+	var word_w := word_font.get_string_size(word, HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x
+	var left := -(digits_w + 8.0 + word_w) * 0.5
+	_combo_tag.draw_set_transform(Vector2.ZERO, -0.07, Vector2(pop, pop))
+	var outline := Color(0.04, 0.03, 0.07, 0.95 * alpha)
+	_combo_tag.draw_string_outline(number_font, Vector2(left, 0), digits, HORIZONTAL_ALIGNMENT_LEFT, -1, digit_size, 10, outline)
+	_combo_tag.draw_string(number_font, Vector2(left, 0), digits, HORIZONTAL_ALIGNMENT_LEFT, -1, digit_size, Color(ink, alpha))
+	var word_at := Vector2(left + digits_w + 8.0, -6)
+	_combo_tag.draw_string_outline(word_font, word_at, word, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, 7, outline)
+	_combo_tag.draw_string(word_font, word_at, word, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(UIKit.PAPER, alpha))
+	var sum := tr("battle.fx.combo_total") % total
+	var sum_w := word_font.get_string_size(sum, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
+	_combo_tag.draw_set_transform(Vector2.ZERO, -0.07, Vector2.ONE)
+	_combo_tag.draw_string_outline(word_font, Vector2(-sum_w * 0.5, 24), sum, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, 5, outline)
+	_combo_tag.draw_string(word_font, Vector2(-sum_w * 0.5, 24), sum, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(ink, alpha * 0.9))
+
+
+func _update_combo(delta: float) -> void:
+	_combo_idle += delta
+	if _combo >= 2:
+		_combo_tag.set_meta("count", _combo)
+		_combo_tag.set_meta("total", _combo_total)
+	var was := _combo_show + _combo_pop
+	if _combo < 2 or _combo_idle > 1.6:
+		_combo_show = maxf(0.0, _combo_show - delta * 2.5)
+	_combo_pop = maxf(0.0, _combo_pop - delta * 5.0)
+	if was > 0.0:
+		_combo_tag.queue_redraw()
+
+
 func _burst(pos: Vector2, color: Color, amount: int) -> void:
 	if BattleDirector.lite():
 		return
@@ -2082,12 +2346,8 @@ static func _spark_texture() -> Texture2D:
 func _shake(strength: float, duration: float) -> void:
 	if GameSettings.reduce_motion:
 		strength *= 0.3
-	var tween := create_tween()
-	var steps := int(duration / 0.04)
-	for i in steps:
-		var falloff := 1.0 - float(i) / steps
-		tween.tween_property(_shake_root, "position", Vector2(randf_range(-1, 1), randf_range(-1, 1)) * strength * falloff, 0.04)
-	tween.tween_property(_shake_root, "position", Vector2.ZERO, 0.04)
+	_shake_amp = maxf(_shake_amp, strength)
+	_shake_fade = maxf(_shake_amp / maxf(duration, 0.05), 1.0)
 
 
 ## 角色动作给出的时间已经按它自己的速度换算过，不再压缩

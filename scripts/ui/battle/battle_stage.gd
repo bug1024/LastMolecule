@@ -9,6 +9,8 @@ var pressure := 0.0                       # Boss 压迫感 0–1：地面亮边�
 var pressure_color := Color(0.85, 0.2, 0.18)
 var threat_x := 0.0
 
+const OVERSCAN := 48.0   # 镜头冲击会把这一层推开几像素：四周多画一圈，不露出底色
+
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -17,11 +19,12 @@ func _ready() -> void:
 
 func _draw() -> void:
 	var w := size.x
-	draw_polygon(PackedVector2Array([Vector2.ZERO,Vector2(w,0),Vector2(w,48),Vector2(0,48)]),PackedColorArray([Color(0.04,0.06,0.11,0.75),Color(0.04,0.06,0.11,0.75),Color(0.04,0.06,0.11,0.2),Color(0.04,0.06,0.11,0.2)]))
+	var over := OVERSCAN
+	draw_polygon(PackedVector2Array([Vector2(-over,-over),Vector2(w+over,-over),Vector2(w+over,48),Vector2(-over,48)]),PackedColorArray([Color(0.04,0.06,0.11,0.75),Color(0.04,0.06,0.11,0.75),Color(0.04,0.06,0.11,0.2),Color(0.04,0.06,0.11,0.2)]))
 	var terrain := UIKit.art("geometric-ground")
 	if terrain:
 		var depth := clampf(size.y * 0.32, 155.0, 238.0)
-		draw_texture_rect(terrain, Rect2(0, ground - depth * 0.68, w, depth), false, Color(0.89, 0.90, 0.98))
+		draw_texture_rect(terrain, Rect2(-over, ground - depth * 0.68, w + over * 2.0, depth), false, Color(0.89, 0.90, 0.98))
 	else:
 		draw_rect(Rect2(0, ground - 22, w, 80), Color(0.22, 0.24, 0.31, 0.8))
 	if pressure > 0.01:
@@ -47,6 +50,6 @@ func _draw() -> void:
 	var fade := 70.0
 	var dark := Color(0.05, 0.065, 0.115, 0.95)
 	var top := dock_y - fade
-	draw_polygon(PackedVector2Array([Vector2(0, top), Vector2(w, top), Vector2(w, dock_y), Vector2(0, dock_y)]),
+	draw_polygon(PackedVector2Array([Vector2(-over, top), Vector2(w + over, top), Vector2(w + over, dock_y), Vector2(-over, dock_y)]),
 		PackedColorArray([Color(dark, 0.0), Color(dark, 0.0), dark, dark]))
-	draw_rect(Rect2(0, dock_y, w, maxf(0, size.y - dock_y)), dark)
+	draw_rect(Rect2(-over, dock_y, w + over * 2.0, maxf(0, size.y - dock_y) + over), dark)

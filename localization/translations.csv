@@ -625,6 +625,8 @@ battle.fx.cleanse,坏状态清除,Cleansed
 battle.fx.data,+%d 数据,+%d data
 battle.fx.add_card,加入 %d 张「%s」,Added %d %s
 battle.fx.blocked,挡住了,Blocked
+battle.fx.combo,连击,HITS
+battle.fx.combo_total,合计 %d,%d total
 battle.fx.unplayable,这张不能打,Can't play this
 battle.fx.no_energy,能量不够,Not enough energy
 battle.banner.enemy_turn,对手回合,Enemy Turn

@@ -28,6 +28,11 @@ func _ready() -> void:
 		scene.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		scene.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 		scene.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		# 战斗镜头会推动这一层：四周留出余量
+		scene.offset_left = -24
+		scene.offset_top = -24
+		scene.offset_right = 24
+		scene.offset_bottom = 24
 		scene.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(scene)
 

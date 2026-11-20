@@ -4,8 +4,9 @@ extends Control
 ## TRAIL 攻击轨迹 / HIT 短促命中（2 级）/ BURST 爆点命中（3 级）/ CRUSH 重击（4 级）
 ## AI 扫描框 / ANALYZE AI 锁定分析（几何符号 + 结构扫描）/ GLITCH AI 失误（扫描崩坏、错位）
 ## DATA 数据轨迹 / TOXIN 毒雾 / CORRODE 局部腐蚀扩散 + 异常脉冲 / SHIELD 护盾 / BOSS ENTRY DEATH 舞台演出
-enum Kind { TRAIL, HIT, SHIELD, DATA, AI, TOXIN, BOSS, ENTRY, DEATH, BURST, CRUSH, ANALYZE, GLITCH, CORRODE }
-const DURATION := [0.29, 0.30, 0.55, 0.62, 0.53, 0.52, 0.54, 0.76, 0.76, 0.42, 0.62, 0.30, 0.55, 0.85]
+## SLASH 近身斩痕 / FLARE 命中瞬间的星芒 / SPEED 重击时向命中点汇聚的速度线 / SHOCK 地面冲击环
+enum Kind { TRAIL, HIT, SHIELD, DATA, AI, TOXIN, BOSS, ENTRY, DEATH, BURST, CRUSH, ANALYZE, GLITCH, CORRODE, SLASH, FLARE, SPEED, SHOCK }
+const DURATION := [0.29, 0.30, 0.55, 0.62, 0.53, 0.52, 0.54, 0.76, 0.76, 0.42, 0.62, 0.30, 0.55, 0.85, 0.28, 0.20, 0.34, 0.46]
 const GOLD := Color("f5b754")
 const WHITE := Color("fff0c2")
 const CYAN := Color("89d9e5")
@@ -19,6 +20,7 @@ var target := Vector2.ZERO
 var extent := Vector2(130, 100)
 var power := 1.0
 var cyan := false   # BURST 用青色的数据碎片（AI 命中），默认是金色厚涂碎片
+var tint := Color.TRANSPARENT   # FLARE 可以指定颜色（卡牌的类型色）
 var _phase := 0.0
 
 
@@ -50,6 +52,10 @@ func _draw() -> void:
 		Kind.ANALYZE: _draw_analyze(fade)
 		Kind.GLITCH: _draw_glitch(fade)
 		Kind.CORRODE: _draw_corrode(fade)
+		Kind.SLASH: _draw_slash(fade)
+		Kind.FLARE: _draw_flare(fade)
+		Kind.SPEED: _draw_speed(fade)
+		Kind.SHOCK: _draw_shock(fade)
 
 
 func _draw_trail(fade: float) -> void:
@@ -69,6 +75,10 @@ func _draw_trail(fade: float) -> void:
 			var blade := sin(float(step) / 13.0 * PI) * (13.0 - band * 3.0) * power
 			shape.append(origin.lerp(target, u) - normal * (sin(u * PI) * bow + blade))
 		draw_colored_polygon(shape, Color(WHITE if band == 0 else GOLD, fade * (0.94 - band * 0.22)))
+	for line in 6:   # 贴着轨迹的速度线
+		var lift := normal * (float(line) - 2.5) * 13.0
+		var tail := origin.lerp(target, maxf(0.0, front - 0.5 - line % 3 * 0.1))
+		draw_line(tail + lift, origin.lerp(target, front) + lift, Color(WHITE, fade * 0.45), 1.6, true)
 
 
 func _draw_hit(fade: float) -> void:
@@ -76,13 +86,13 @@ func _draw_hit(fade: float) -> void:
 	var axis := Vector2.from_angle(angle)
 	var p := target
 	var flash := pow(1.0 - _phase, 4.0)
-	Shading.glow(self, p, 62.0 * power, Color(GOLD, flash * 0.52))
-	_streak(p, axis.rotated(-0.35), 62.0 * power, 9.0 * flash + 1.0, Color(WHITE, fade))
-	_streak(p, axis.orthogonal(), 24.0 * power, 4.0, Color(GOLD, fade))
-	for i in 9:
-		var dir := axis.rotated((i - 4) * 0.35)
-		var start := p + dir * (_phase * (30.0 + 5.0 * i) + 6.0)
-		_streak(start, dir, (13.0 + (i * 7) % 24) * power, 2.4, Color(GOLD if i % 3 else WHITE, fade))
+	Shading.glow(self, p, 84.0 * power, Color(GOLD, flash * 0.6))
+	_streak(p, axis.rotated(-0.35), 92.0 * power, 11.0 * flash + 1.0, Color(WHITE, fade))
+	_streak(p, axis.orthogonal(), 36.0 * power, 5.0, Color(GOLD, fade))
+	for i in 11:
+		var dir := axis.rotated((i - 5) * 0.3)
+		var start := p + dir * (_phase * (52.0 + 7.0 * i) + 8.0)
+		_streak(start, dir, (18.0 + (i * 7) % 28) * power, 3.0, Color(GOLD if i % 3 else WHITE, fade))
 
 
 func _draw_shield(fade: float) -> void:
@@ -202,28 +212,28 @@ func _draw_burst(fade: float) -> void:
 	var pop := pow(1.0 - _phase, 3.0)
 	var main_color := CYAN if cyan else GOLD
 	var shard_fill := Color("12303a") if cyan else Color("2a2338")
-	Shading.glow(self, p, 90.0 * power, Color(CYAN if cyan else WHITE, pop * 0.55))
+	Shading.glow(self, p, 68.0 * power, Color(CYAN if cyan else WHITE, pop * 0.4))
 	var ring := 18.0 + 70.0 * smoothstep(0.0, 0.7, _phase) * power
 	var facets := PackedVector2Array()
 	for i in 13:
 		var a := i * TAU / 12.0
 		facets.append(p + Vector2.from_angle(a) * ring * (1.0 if i % 2 == 0 else 0.86) * Vector2(1.0, 0.8))
-	draw_polyline(facets, Color(main_color, fade * 0.9), 3.0 * fade + 1.0, true)
+	draw_polyline(facets, Color(main_color, fade * 0.9), 3.5 * fade + 1.0, true)
 	for i in 11:
 		var dir := axis.rotated((i - 5) * 0.28 + sin(i * 2.3) * 0.1)
-		var travel := (24.0 + (i * 17) % 40) * smoothstep(0.0, 0.55, _phase) * power
+		var travel := (36.0 + (i * 17) % 58) * smoothstep(0.0, 0.55, _phase) * power
 		var shard := p + dir * (travel + 10.0)
-		var length := (16.0 + (i * 11) % 18) * power * (1.0 - _phase * 0.6)
-		var n := dir.orthogonal() * (4.0 + i % 3)
+		var length := (24.0 + (i * 11) % 26) * power * (1.0 - _phase * 0.5)
+		var n := dir.orthogonal() * (5.0 + i % 3) * power * 0.8
 		if cyan:   # 数据碎片是方块，不是厚涂碎片
 			var square := Rect2(shard - Vector2(5, 5) * power, Vector2(10, 10) * power * (1.0 - _phase * 0.5))
 			draw_rect(square, Color(shard_fill, fade * 0.8))
 			draw_rect(square, Color(WHITE if i % 3 == 0 else CYAN, fade), false, 1.6)
 			continue
 		var poly := PackedVector2Array([shard - dir * length * 0.4, shard + n, shard + dir * length, shard - n * 0.7])
-		draw_colored_polygon(poly, Color(shard_fill, fade * 0.8))
-		draw_polyline(PackedVector2Array([poly[0], poly[1], poly[2]]), Color(WHITE if i % 3 == 0 else main_color, fade), 2.0, true)
-	_streak(p, axis, 110.0 * power * (0.5 + pop), 10.0 * pop + 2.0, Color(WHITE, fade))
+		draw_colored_polygon(poly, Color(shard_fill, fade * 0.9))
+		draw_polyline(PackedVector2Array([poly[0], poly[1], poly[2]]), Color(WHITE if i % 3 == 0 else main_color, fade), 2.6, true)
+	_streak(p, axis, 130.0 * power * (0.5 + pop), 13.0 * pop + 2.0, Color(WHITE, fade))
 
 
 ## 4 级重击：深色裂开的冲击 + 两圈扩散的压力环，读起来是“重”而不是“亮”
@@ -318,6 +328,84 @@ func _draw_corrode(fade: float) -> void:
 	for k in 2:
 		var beat := fmod(_phase * 2.0 + k * 0.5, 1.0)
 		draw_arc(origin, (16.0 + 46.0 * beat) * power, 0, TAU, 28, Color(sick, (1.0 - beat) * fade * 0.6), 2.0, true)
+
+
+## 近身斩痕：一道月牙从上到下劈过命中点，先亮后收细；白芯外面包一层金。
+## 刀光逐段拼成四边形（整条月牙带自交点多，三角化会失败）
+func _draw_slash(fade: float) -> void:
+	var axis := (target - origin).normalized() if origin.distance_squared_to(target) > 4.0 else Vector2.RIGHT
+	var radius := 150.0 * power
+	var center := target - axis * radius * 0.78
+	var reveal := smoothstep(0.0, 0.3, _phase)
+	if reveal < 0.04:
+		return   # 头一两帧月牙还没张开，所有点挤在一起无法三角化
+	var thin := 1.0 - smoothstep(0.25, 1.0, _phase) * 0.8
+	var base := axis.angle()
+	for layer in 2:
+		var outer := PackedVector2Array()
+		var inner := PackedVector2Array()
+		for step in 19:
+			var u := step / 18.0
+			var dir := Vector2.from_angle(base + lerpf(-1.05, 1.05, u * reveal))
+			var blade := sin(u * PI) * (30.0 if layer == 0 else 15.0) * power * thin
+			outer.append(center + dir * (radius + blade * 0.35))
+			inner.append(center + dir * (radius - maxf(blade, 2.0)))
+		var color := Color(GOLD if layer == 0 else WHITE, fade * (0.7 if layer == 0 else 1.0))
+		for step in 18:
+			draw_colored_polygon(PackedVector2Array([outer[step], outer[step + 1], inner[step + 1], inner[step]]), color)
+
+
+## 命中瞬间：一枚四角星芒在一两帧内炸到最大再收掉，是整次命中里最亮的一笔
+func _draw_flare(_fade: float) -> void:
+	var pop := pow(1.0 - _phase, 2.2)
+	if pop <= 0.01:
+		return
+	var axis := (target - origin).normalized() if origin.distance_squared_to(target) > 4.0 else Vector2.RIGHT
+	var ink := tint if tint.a > 0.0 else (CYAN if cyan else GOLD)
+	var reach := 150.0 * power
+	Shading.glow(self, target, reach * 0.42, Color(ink, pop * 0.5))
+	_streak(target - axis * reach * 0.14 * pop, axis, reach * 1.25 * pop, 13.0 * power * pop + 1.5, Color(ink, pop))
+	_streak(target + axis * reach * 0.14 * pop, -axis, reach * 0.9 * pop, 9.0 * power * pop + 1.5, Color(ink, pop))
+	for side in [-1.0, 1.0]:
+		_streak(target, axis.orthogonal() * side, reach * 0.66 * pop, 7.0 * power * pop + 1.0, Color(ink, pop * 0.9))
+	_shading_core(target, reach * 0.13, pop)
+
+
+
+## 速度线：从画面四周指向命中点，只留给 4 级
+func _draw_speed(fade: float) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 311
+	var pull := smoothstep(0.0, 0.5, _phase)
+	for i in 30:
+		var dir := Vector2.from_angle(i * TAU / 30.0 + rng.randf_range(-0.08, 0.08))
+		var near := lerpf(330.0, 210.0, pull) + rng.randf() * 130.0
+		var far := near + 280.0 + rng.randf() * 520.0
+		var half := dir.orthogonal() * rng.randf_range(2.5, 8.0) * power
+		var a := target + dir * near
+		var b := target + dir * far
+		draw_colored_polygon(PackedVector2Array([a, b + half, b - half]), Color(WHITE, fade * rng.randf_range(0.2, 0.5)))
+
+
+## 地面冲击环：贴着承托面的一圈扁椭圆向外推，带起几片碎屑
+func _draw_shock(fade: float) -> void:
+	var wave := 1.0 - pow(1.0 - _phase, 3.0)
+	for k in 2:
+		var rx := (36.0 + (250.0 - k * 90.0) * wave) * power
+		var ring := PackedVector2Array()
+		for i in 41:
+			var a := i * TAU / 40.0
+			ring.append(origin + Vector2(cos(a) * rx, sin(a) * rx * 0.15))
+		draw_polyline(ring, Color(WHITE if k == 0 else GOLD, fade * (0.8 - k * 0.3)), (7.0 - k * 3.0) * fade + 1.0, true)
+	for i in 9:
+		var side := -1.0 if i % 2 == 0 else 1.0
+		var run := (30.0 + (i * 37) % 150) * wave * power
+		var lift := sin(minf(_phase * 1.25, 1.0) * PI) * (16.0 + (i * 13) % 30) * power
+		var chip := origin + Vector2(side * run, -lift)
+		_streak(chip, Vector2(side, -0.6).normalized(), 9.0 + i % 4 * 3.0, 2.6, Color(Color("cdb893") if i % 3 else WHITE, fade))
+
+func _shading_core(at: Vector2, radius: float, alpha: float) -> void:
+	Shading.glow(self, at, radius, Color(1, 1, 1, alpha))
 
 
 func _streak(p: Vector2, direction: Vector2, length: float, width: float, color: Color) -> void:

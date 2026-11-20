@@ -10,6 +10,7 @@ var is_player := false
 var _shown := 100.0
 var _trail := 100.0
 var _block_pop := 0.0
+var _jolt := 0.0   # 掉血瞬间：血条抖一下、液面闪白
 
 
 func _ready() -> void:
@@ -20,6 +21,8 @@ func _ready() -> void:
 func set_values(hp: int, max_hp: int, block_value: int, instant := false) -> void:
 	if block_value > block:
 		_block_pop = 1.0
+	if hp < value and not instant:
+		_jolt = 1.0
 	max_value = maxi(1, max_hp)
 	value = hp
 	block = block_value
@@ -62,10 +65,13 @@ func _process(delta: float) -> void:
 	else:
 		_trail = _shown
 	_block_pop = maxf(0.0, _block_pop - delta * 3.0)
+	_jolt = maxf(0.0, _jolt - delta * 4.5)
 	queue_redraw()
 
 
 func _draw() -> void:
+	if _jolt > 0.0 and not GameSettings.reduce_motion:
+		draw_set_transform(Vector2(sin(_jolt * 34.0) * 5.0, cos(_jolt * 23.0) * 2.0) * _jolt)
 	var rect := Rect2(Vector2(16, 3), Vector2(size.x - 18, size.y - 6))
 	_draw_groove(rect)
 	var inner := rect.grow(-2.0)
@@ -83,6 +89,8 @@ func _draw() -> void:
 			var t := (p.y - inner.position.y) / maxf(inner.size.y, 1.0)
 			colors.append(fill.lerp(fill.lightened(0.28), 1.0 - t).darkened(t * 0.28))
 		draw_polygon(shape, colors)
+		if _jolt > 0.0:
+			draw_colored_polygon(shape, Color(1, 1, 1, 0.5 * _jolt))
 		draw_line(inner.position + Vector2(3, 1), inner.position + Vector2(maxf(3.0, fill_w - 3), 1), Color(1, 1, 1, 0.22), 1.0, true)
 	var font := get_theme_font("font", &"NumberLabel")   # 血量数字用数字字体
 	var text := "%d/%d" % [value, max_value]

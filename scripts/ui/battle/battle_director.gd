@@ -3,6 +3,8 @@ extends RefCounted
 ## 战斗演出调度：只读战斗事件，不改战斗逻辑。决定每个动作的演出强度、节奏、顿帧、震屏、
 ## 闪屏和伤害数字的位置；同一回合重复的动作逐渐压缩，常态画面保持克制。
 ##
+## 每次命中都有镜头冲击、星芒和顿帧；震屏、闪屏、速度线和慢动作按强度逐级加上。
+##
 ## 强度分四级：
 ##   1 安静：抽牌、普通护盾、状态变化——只有简短的形体反馈
 ##   2 有方向：普通攻击、破绽、中毒——有明确的作用方向，没有震屏和闪屏
@@ -83,7 +85,7 @@ static func damage_tier(amount: int, lethal: bool, boss: bool, card_tier_value :
 static func shake_for(level: int, amount := 0) -> float:
 	var strength := 0.0
 	match level:
-		Tier.BURST: strength = 3.0 + minf(amount, 30) * 0.12
+		Tier.BURST: strength = 4.5 + minf(amount, 30) * 0.12
 		Tier.SIGNATURE: strength = 8.0 + minf(amount, 40) * 0.15
 	if lite():
 		strength *= 0.4
@@ -97,9 +99,10 @@ static func flash_for(level: int) -> float:
 	return 0.10 if lite() else 0.18
 
 
-## 局部顿帧：只冻结命中双方的姿态 30–60ms，不阻塞战斗推进
+## 局部顿帧：只冻结命中双方的姿态 25–60ms，不阻塞战斗推进
 static func hitstop_for(level: int) -> float:
 	match level:
+		Tier.DIRECT: return 0.025
 		Tier.BURST: return 0.035
 		Tier.SIGNATURE: return 0.06
 	return 0.0
@@ -107,18 +110,31 @@ static func hitstop_for(level: int) -> float:
 
 ## 伤害数字：字号和颜色随强度变化；数字放在身体上方并左右错开，不压住角色
 func number_style(level: int, amount: int) -> Dictionary:
-	var size := 24 + mini(amount, 12)
-	var color := UIKit.GOLD.lightened(0.25)
+	var size := 34 + mini(amount, 12)
+	var color := UIKit.GOLD.lightened(0.3)
 	match level:
 		Tier.BURST:
-			size = 32 + mini(amount, 14)
+			size = 46 + mini(amount, 16)
 			color = Color(1.0, 0.86, 0.45)
 		Tier.SIGNATURE:
-			size = 42 + mini(amount, 16)
+			size = 60 + mini(amount, 20)
 			color = Color(1.0, 0.62, 0.42)
-	if compressed:
-		size = int(size * 0.85)
 	return {"size": size, "color": color}
+
+
+## 镜头冲击：每次命中都沿出手方向顶一下镜头并略微推近，幅度随强度分级；连击越多越重
+static func punch_for(level: int, amount: int, combo := 1) -> Dictionary:
+	var heat := 1.0 + clampf(combo - 1, 0, 6) * 0.08
+	var kick := 4.0
+	var zoom := 0.01
+	match level:
+		Tier.BURST:
+			kick = 9.0
+			zoom = 0.028
+		Tier.SIGNATURE:
+			kick = 15.0
+			zoom = 0.055
+	return {"kick": (kick + minf(amount, 30) * 0.15) * heat, "zoom": zoom * heat, "heat": heat}
 
 
 ## 给新数字找一个不和最近数字重叠的位置
