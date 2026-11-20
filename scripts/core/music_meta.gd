@@ -3,9 +3,9 @@ extends RefCounted
 ## 由 tools/gen_battle_music.py 生成：分层战斗曲的一小节秒数，GameAudio 用它把战况切换对齐到小节线。
 
 const BAR := {
-	"battle": 1.739130,
-	"boss": 1.400000,
-	"boss_final": 1.558442,
+	"battle": 1.818182,
+	"boss": 1.458333,
+	"boss_final": 1.621622,
 	"phase1": 1.690141,
 	"phase1_boss": 1.381579,
 	"phase2": 1.714286,

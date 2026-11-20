@@ -2,7 +2,7 @@
 
 ## 背景音乐
 
-背景音乐用 Suno 生成的 7 首原创曲目。WAV 原件不进仓库，放在 `~/Documents/musics/LM`。导入工具 `tools/import_suno_music.py` 把它们处理成 `assets/audio/music/bgm/` 下的 OGG，并生成 `scripts/core/music_tracks.gd`。
+页面配乐由 Suno 辅助制作。战斗使用程序生成的分层曲目。Suno WAV 原件放在 `~/Documents/musics/LM`，导入工具为 `tools/import_suno_music.py`。
 
 | 逻辑 ID | 原曲 | 文件 | 场景 |
 | --- | --- | --- | --- |
@@ -10,8 +10,8 @@
 | MAP | LM4.wav | bgm_map.ogg | 研发地图 |
 | LAB | LM5.wav | bgm_lab.ogg | 研发实验室（总览）、分子设计 / 修饰 |
 | EVENT | LM6.wav | bgm_event.ogg | 随机事件、阶段关口决策 |
-| BATTLE | LM1.wav | bgm_battle.ogg | 普通战斗（含精英） |
-| BOSS | LM2.wav | bgm_boss.ogg | 阶段 Boss 战 |
+| BATTLE | 程序编曲 | battle.ogg + 两条分轨 | 普通战斗（含精英） |
+| BOSS | 程序编曲 | boss.ogg + 两条分轨 | 阶段 Boss 战 |
 | BOSS_FINAL | LM-001 主题 | boss_final.ogg + 两条分轨 | 最终 Boss 战 |
 | ENDING | LM7.wav | bgm_ending.ogg | 获批上市、主线结局 |
 
@@ -22,6 +22,8 @@
 7 首原曲的左右声道逐采样完全相同（双单声道），所以按单声道编码，没有伪造立体声。只做一次有损编码：WAV 直接编为 Vorbis（libvorbis，compression_level 0.42，约 q5.8）。7 首合计约 9 MB。
 
 ### 循环
+
+下表保留 Suno 导入参数。LM1、LM2 当前作为候选素材保留，战斗实际使用上表的程序曲目。
 
 工具先用频谱通量估出速度和节拍网格，再在节拍上找循环点。
 
@@ -55,12 +57,14 @@ OGG 文件只保留到循环终点。最后一段和循环起点前的同长一�
 | MAP | −3.5 dB | 1.0 s | 是 |
 | LAB | −4.0 dB | 1.0 s | 是 |
 | EVENT | −3.5 dB | 0.8 s | 是 |
-| BATTLE | −4.0 dB | 0.6 s | 否 |
-| BOSS | −3.0 dB | 0.4 s（登场第三段） | 否 |
+| BATTLE | −1.0 dB | 0.6 s | 否 |
+| BOSS | −1.0 dB | 0.4 s（登场第三段） | 否 |
 | BOSS_FINAL | −1.0 dB | 0.4 s（登场第三段） | 否 |
 | ENDING | −2.5 dB | 1.5 s | 否 |
 
-战斗曲给音效留出空间。阶段 Boss 曲提前一拍淡入，使循环主体的首拍接近手牌恢复时点。
+所有战斗使用程序生成的三层分轨。基础增益 −1 dB，紧张和高潮层分别再衰减 5 dB 和 7 dB。普通战 132 BPM、E 小调，阶段 Boss 144 BPM、D 小调，最终 Boss 148 BPM、A 小调 LM-001 主题。编曲以短音低音、闷音合成器、短弓和分组鼓点推进，中低音区的重复动机逐步加压。
+
+普通战胜利用两枚短音快速回到主音，阶段 Boss 用 7/8 的分组和低鼓收尾，最终战引用 LM-001 主题，留出稍长的弦乐尾音。三段乐句都收在各自的小调上。播放增益 −3 dB，下一重拍接入，战斗曲在 0.12 s 内淡出。点击继续后，剩余胜利乐句淡出。
 
 ## 运行时
 
@@ -69,7 +73,7 @@ OGG 文件只保留到循环终点。最后一段和循环起点前的同长一�
 - **研发界面：**`rd_ui.gd` 在地图、事件、分子编辑器、战斗显隐变化时，到帧末统一决定播放哪首，优先级是事件 > 分子编辑 > 地图 > 实验室。同一帧里"地图关上、战斗打开"只算一次。卡牌、奖励、暂停、设置、帮助这类子面板不参与判断。
 - **暂停：**音乐和演出短音频停在原位置。暂停期间切进的新曲保持暂停，离开的可续播曲目保存位置。继续时淡入，从暂停菜单返回首页时由首页解除暂停。
 - **音量：**主音量、音乐、音效三条总线加静音，保存在 `user://settings.cfg`（`audio/muted` 是新增项，旧设置文件默认不静音）。拖动音量条或切换静音时，总线音量平滑过渡（每秒最多变化 5 倍线性幅度），不会爆音。
-- **战况：**Suno 曲目是单轨。最终 Boss 和启用兜底分轨的战斗按小节线切换紧张与高潮层。
+- **战况：**所有战斗按小节线切换紧张与高潮层。
 
 ## 场景生命周期
 
@@ -126,17 +130,19 @@ OGG 文件只保留到循环终点。最后一段和循环起点前的同长一�
 
 可以把 WAV 目录作为第一个参数传入。循环点写在工具顶部的 `TRACKS` 表里，换曲时需要重新分析并填写。
 
+胜利乐句用 `tools/gen_battle_music.py --only=victories` 重新生成。
+
 Boss 登场音效与战斗音效：
 
 ```bash
 ~/.local/bin/uv run --with numpy python tools/gen_battle_music.py --only=boss_threat
 ```
 
-旧的程序合成音乐（`title.ogg`、`lab.ogg`、各阶段的分层战斗曲等）保留在 `assets/audio/music/` 下作为兜底。确认新音乐稳定后可以删除；删除前要先把 `GameAudio.MUSIC` 里的 `fallback` 改掉。
+程序合成音乐（`title.ogg`、`lab.ogg`、各阶段的分层战斗曲等）保留在 `assets/audio/music/` 下。battle、boss、boss_final 是当前战斗主配乐，其余用于兜底。
 
 ## 待人工试听
 
-- **BOSS、LAB 的循环接缝：**这两首的长循环自动相似度偏低，靠 2 拍 / 1 小节交叉淡化过渡。
+- **LAB 的循环接缝：**长循环自动相似度偏低，靠 1 小节交叉淡化过渡。
 - **EVENT 的结尾：**淡出加停顿重启是安全方案，原曲本身没有可靠的循环点。
 - **`boss_threat` 的听感：**是否够危险、是否盖住 BOSS 主题的开头。
 - **整体响度：**页面曲与战斗曲、音乐与音效的相对响度，目前按测量值设定。

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """按段落编曲的分层战斗配乐与战斗音效，纯程序合成，可随时重跑。
 
-  · 普通战斗：134–148 BPM，以底鼓、反拍军鼓、短音低音带出从第一小节就能听到的律动。
+  · 普通战斗：132 BPM，以底鼓、反拍军鼓、短音低音和小调固定音型建立推进感。
     32 小节分为建立节拍、展开主题、全奏和短暂回落后重新起势。
-  · Boss：保留分组拍号，用切分鼓点、短促铜管和上行旋律制造压力。
+  · Boss：144 / 148 BPM，保留分组拍号，用切分鼓点、闷音合成器和短弓制造压力。
   · 每首战斗曲三层同长同拍：基础层（Normal）、紧张层（Tension）、高潮层（Climax），游戏按战况在小节边界开关。
   · 短乐句：Boss 登场、Boss 死亡收束、普通战斗胜利。
   · 战斗音效：分子攻击的预备 / 释放、命中余韵、护盾形成、片段联动、AI 激活与失误、Boss 预警 / 受击 / 死亡。
@@ -21,7 +21,7 @@ import numpy as np  # noqa: E402
 
 import gen_audio  # noqa: E402
 from gen_audio import (ROOT, SR, KICK, SNARE, HAT, SHAKER, TAIKO, THEME, Mix, bell, click, crunch, fade,  # noqa: E402
-                       highpass, layer, lowpass, metal, mf, punch, sfx, to_major, ts)
+                       highpass, layer, lowpass, metal, mf, punch, sfx, ts)
 
 
 def write(x, path, peak=0.8):
@@ -33,6 +33,7 @@ MUSIC = os.path.join(ROOT, "music")
 R = np.random.default_rng(2026)
 TAU = 2 * np.pi
 MAJOR = [0, 2, 4, 5, 7, 9, 11]
+MINOR = [0, 2, 3, 5, 7, 8, 10]
 MIXOLYDIAN = [0, 2, 4, 5, 7, 9, 10]
 DORIAN = [0, 2, 3, 5, 7, 9, 10]
 
@@ -187,6 +188,8 @@ def triad(root, scale, chord_degree, raise7):
 # ---------- 普通战斗 ----------
 # motif：两小节（32 个十六分音符）的 (位置, 相对和弦根音的音级, 长度)，按和弦级数做调内模进，节奏型就是辨识度
 MOTIFS = {
+    "pressure": [(0, 0, 2), (3, 0, 1), (6, 4, 2), (8, 0, 2), (11, 1, 1), (14, 0, 2),
+                 (16, 0, 2), (19, 0, 1), (22, 4, 2), (24, 2, 2), (27, 1, 1), (30, 0, 2)],
     "hook": [(0, 0, 2), (3, 0, 2), (6, 4, 2), (8, 2, 1), (10, 1, 1), (11, 2, 1), (12, 4, 2), (14, 6, 2),
              (16, 7, 3), (19, 6, 1), (20, 4, 2), (22, 2, 2), (24, 3, 2), (26, 2, 2), (28, 1, 2), (30, -1, 2)],
     "gallop": [(0, 0, 1), (1, 0, 1), (2, 2, 2), (4, 4, 1), (5, 4, 1), (6, 5, 2), (8, 4, 2), (10, 2, 2), (12, 1, 1), (13, 2, 1),
@@ -199,7 +202,7 @@ MOTIFS = {
 
 # 每个研发阶段一首：调、速度、和弦级数、主题、主奏音色、低音律动与生物纹理都不同
 BATTLES = {
-    "battle": dict(bpm=138, root=40, scale=MAJOR, chords=[0, 5, 3, 4], motif="hook", lead="spiccato",
+    "battle": dict(bpm=132, root=40, scale=MINOR, chords=[0, 0, 3, 4], motif="pressure", lead="muted",
                    kick=[0, 6, 10], bass=[0, 3, 6, 8, 11, 14], texture="bubble"),
     "preclinical": dict(bpm=134, root=38, scale=DORIAN, chords=[0, 3, 6, 4], motif="gallop", lead="pluck",
                         kick=[0, 7, 10], bass=[0, 2, 4, 7, 8, 10, 12, 14], texture="squelch"),
@@ -220,6 +223,8 @@ def combine(*sigs):
 
 
 def lead_voice(kind, m, length_s):
+    if kind == "muted":
+        return saw(m, max(0.08, length_s * 0.65), 0.45, 15.0, 0.0, 0.004, 2, 0.04, 0.05, 12)
     if kind == "pluck":
         return soft_pluck(m, max(0.1, length_s * 0.8)) * 1.1
     if kind == "brass":
@@ -325,10 +330,10 @@ def battle_score(name, spec):
         for pos, deg, length in motif:
             if pos // 16 != phrase_bar or (section == 3 and not build and pos % 16 >= 8):
                 continue
-            note = degree(root + 24, scale, d + deg, raise7)
+            note = degree(root + 12, scale, d + deg, raise7)
             at = t0 + (pos % 16) * step
             if section == 3 and not build:
-                base.add(at, bell(note + 12, 0.7, 1.6, 2.01, 1.0), 0.12, 0.3, 0.6)
+                base.add(at, soft_pluck(note, length * step * 0.8), 0.18, 0.3, 0.16)
             else:
                 base.add(at, lead_voice(spec["lead"], note, length * step), 0.19 if section == 0 else 0.28, 0.2 if pos % 2 else -0.2, 0.22)
                 if section == 2:
@@ -345,10 +350,10 @@ def battle_score(name, spec):
         for s in (7, 15):
             tension.add(t0 + s * step, DRIVE_SNARE, 0.19, 0.15, 0.08)
 
-        # --- 高潮层：铜管齐奏、抬高八度的回应和小节末鼓花 ---
+        # --- 高潮层：低音区和弦重音与小节末鼓花 ---
         for s in (0, 6, 8, 14):
             for n in chord:
-                climax.add(t0 + s * step, brass(n + 12, step * 1.35, 0.85), 0.12, 0, 0.18)
+                climax.add(t0 + s * step, lead_voice("muted", n, step * 1.35), 0.2, 0, 0.16)
             climax.add(t0 + s * step, DRIVE_TAIKO, 0.25 if s in (0, 8) else 0.15, -0.2, 0.12)
         for i, s in enumerate((11, 13, 15) if b % 2 else (5, 13)):
             climax.add(t0 + s * step, TOMS[i], 0.2, 0.28, 0.12)
@@ -364,8 +369,8 @@ def battle_score(name, spec):
 # ---------- Boss ----------
 # groups：每小节的八分音符分组（2+2+3 = 7/8 等），不规则拍号就是 Boss 的「异常」
 BOSSES = {
-    "boss": dict(bpm=150, root=38, scale=MIXOLYDIAN, groups=[2, 2, 3], chords=[0, 3, 6, 4],
-                 motif=[(0, 0, 2), (2, 0, 2), (4, 4, 3), (8, 2, 2), (10, 7, 3)]),
+    "boss": dict(bpm=144, root=38, scale=MINOR, groups=[2, 2, 3], chords=[0, 0, 3, 4],
+                 motif=[(0, 0, 2), (2, 0, 2), (4, 4, 2), (8, 2, 2), (10, 1, 2), (12, 0, 2)]),
     "preclinical_boss": dict(bpm=146, root=36, scale=DORIAN, groups=[3, 3, 2, 2], chords=[0, 3, 6, 4],
                              motif=[(0, 0, 3), (3, 2, 3), (6, 4, 2), (12, 5, 2), (14, 7, 4)]),
     "phase1_boss": dict(bpm=152, root=41, scale=MIXOLYDIAN, groups=[2, 2, 3], chords=[0, 6, 3, 4],
@@ -392,7 +397,7 @@ def boss_score(name, spec, theme=None):
     if theme:   # 最终 Boss：LM-001 主题塞进不规则拍号里
         pos = 0
         for note, beats in theme:
-            theme_events.append((pos, to_major(note), beats * 4))
+            theme_events.append((pos, note, beats * 4))
             pos += int(beats * 4)
     for b in range(bars):
         section = b // 8   # A 宣战 / B 展开 / C 全奏 / D 半拍换气与回升
@@ -431,21 +436,21 @@ def boss_score(name, spec, theme=None):
             base.add(t0 + (s + 2) * step, tbass(low + (12 if i % 2 else 7), step), 0.22, 0, 0.03)
             for n in chord[1:]:
                 base.add(t0 + (s + 2) * step, spiccato(n + (12 if section == 2 else 0)), 0.18, -0.28, 0.16)
-        # --- Boss 主题动机：短促的铜管宣战，全奏抬高八度 ---
+        # --- Boss 主题动机：中低音区短音，反句向下收回 ---
         if theme_events:
             for pos, note, length in theme_events:
                 rel = pos - (b % 8) * bar_steps
                 if 0 <= rel < bar_steps:
                     at = t0 + rel * step
-                    base.add(at, brass(note - 12 + (12 if section == 2 else 0), min(step * 4, length * step)), 0.24, 0, 0.22)
+                    base.add(at, lead_voice("strings", note - 12, min(step * 4, length * step)), 0.22, 0, 0.2)
         elif section != 3 or build:
             for pos, deg, length in spec["motif"]:
                 if b % 2 and pos < accents[-1]:
                     continue
-                note = degree(root + 24, scale, d + deg, raise7) + (12 if section == 2 else 0)
-                base.add(t0 + pos * step, brass(note, length * step * 0.75), 0.29, 0, 0.18)
+                note = degree(root + 12, scale, d + deg, raise7)
+                base.add(t0 + pos * step, lead_voice("muted", note, length * step), 0.3, 0, 0.18)
                 if section == 2:
-                    base.add(t0 + pos * step, spiccato(note + 12), 0.11, 0.3, 0.17)
+                    base.add(t0 + pos * step, spiccato(note + 12), 0.07, 0.3, 0.17)
 
         # --- 紧张层：分组末尾的军鼓、分解短弓与切分踩镲 ---
         for i, s in enumerate(accents):
@@ -453,16 +458,16 @@ def boss_score(name, spec, theme=None):
             tension.add(t0 + (s + 2) * step, HAT, 0.18, 0.4, 0.1)
             tension.add(t0 + (s + groups[i] * 2 - 1) * step, DRIVE_SNARE, 0.2, 0.16, 0.1)
 
-        # --- 高潮层：成组的铜管与太鼓重音，穿插高音反句 ---
+        # --- 高潮层：闷音和弦与太鼓重音，穿插短弓反句 ---
         for i, s in enumerate(accents):
             for n in chord:
-                climax.add(t0 + s * step, brass(n + 12, step * 1.6, 1.0), 0.13, 0, 0.2)
+                climax.add(t0 + s * step, lead_voice("muted", n, step * 1.6), 0.2, 0, 0.16)
             climax.add(t0 + s * step, DRIVE_TAIKO, 0.28, 0, 0.15)
             climax.add(t0 + (s + groups[i] * 2 - 1) * step, TOMS[i], 0.23, 0.28 if i % 2 else -0.28, 0.12)
         if b % 2:
             for pos, deg, length in spec["motif"]:
-                note = degree(root + 36, scale, d + deg, raise7)
-                climax.add(t0 + pos * step, lead_voice("strings", note, length * step), 0.13, 0.4, 0.18)
+                note = degree(root + 24, scale, d + deg, raise7)
+                climax.add(t0 + pos * step, lead_voice("strings", note, length * step), 0.1, 0.4, 0.18)
         if b % 4 == 0:
             climax.add(t0, CRASH, 0.3, -0.3, 0.4)
 
@@ -472,7 +477,7 @@ def boss_score(name, spec, theme=None):
     return {"bpm": bpm, "bar": bar, "bars": bars}
 
 
-FINAL_BOSS = dict(bpm=154, root=33, scale=MAJOR, groups=[3, 3, 2], chords=[0, 3, 5, 4],
+FINAL_BOSS = dict(bpm=148, root=33, scale=MINOR, groups=[3, 3, 2], chords=[0, 0, 3, 4],
                   motif=[(0, 0, 3), (3, 2, 3), (6, 4, 2), (8, 3, 3), (11, 2, 3), (14, 1, 2)])
 
 
@@ -497,34 +502,47 @@ def boss_intro():
     sting_write("boss_intro", mix, 0.64)
 
 
+def victory_score(name, spec, notes, landing, weight, sustain):
+    """拍点先标出胜利，低音落回主音后给结算留出空白。"""
+    root = spec["root"]
+    beat = 60.0 / spec["bpm"]
+    mix = Mix((landing + sustain + 0.5) * beat, tail=0.55)
+    mix.add(0.0, DRIVE_KICK, 0.42, 0, 0.04)
+    mix.add(0.0, DRIVE_TAIKO, weight, 0, 0.11)
+
+    for at, note in notes:
+        mix.add(at * beat, soft_pluck(note, 0.24), 0.26, 0.16, 0.14)
+        mix.add(at * beat, lead_voice("muted", note - 12, 0.25), 0.34, -0.16, 0.12)
+
+    end = landing * beat
+    length = sustain * beat
+    mix.add(end, DRIVE_KICK, 0.47, 0, 0.04)
+    mix.add(end, tbass(root, length * 0.72), 0.3, 0, 0.04)
+    # 主音、五度和高八度小三度。三度放远一些，让结尾有和声归属。
+    for interval, gain in ((12, 0.22), (19, 0.17), (27, 0.12)):
+        note = root + interval
+        mix.add(end, strings(note, length, 0.045), gain, (interval - 19) * 0.035, 0.21)
+    write(mix.render(loop=False, wet_gain=0.28, rt=0.68),
+          os.path.join(MUSIC, name + ".ogg"), 0.57)
+
+
 def boss_death():
-    """战斗结束的铜管短句，上行落到明亮的大三和弦。"""
-    mix = Mix(0.1, tail=3.2)
-    for at, note in ((0.0, 57), (0.22, 62), (0.44, 66), (0.66, 69)):
-        mix.add(at, DRIVE_TAIKO, 0.5, 0.0, 0.18)
-        mix.add(at, brass(note, 0.17), 0.48, 0.0, 0.24)
-    mix.add(0.92, DRIVE_KICK, 0.74, 0.0, 0.08)
-    for n in (50, 57, 66, 74):
-        mix.add(0.92, brass(n, 0.6), 0.25, 0.0, 0.27)
-        mix.add(0.92, strings(n, 0.7, 0.08), 0.13, 0.0, 0.32)
-    mix.add(1.12, bell(86, 0.7, 1.5, 2.01, 1.1), 0.15, 0.25, 0.3)
-    sting_write("boss_death", mix, 0.7)
+    boss = BOSSES["boss"]
+    root = boss["root"]
+    # 7/8 的 2+2+3 分组对应两次下行动机和最后的落拍。
+    victory_score("boss_death", boss, [(0.0, root + 31), (1.0, root + 27), (1.5, root + 26)],
+                  landing=2.0, weight=0.39, sustain=1.45)
+    # 引用 LM-001 主题的前三个音，用终战的 3+3+2 分组交代完旋律。
+    phrase = [(at, note) for at, (note, _) in zip((0.0, 1.5, 3.0), THEME[:3])]
+    victory_score("boss_final_win", FINAL_BOSS, phrase, landing=4.0, weight=0.24, sustain=1.75)
 
 
 def battle_win():
-    """普通战斗胜利：主题节奏（3-3-2）短短一句，结尾转大调"""
-    mix = Mix(0.1, tail=5.0)
-    step = 60 / 124 / 4
-    for i, (pos, note) in enumerate(((0, 64), (3, 64), (6, 71), (8, 68), (10, 71), (12, 76))):
-        mix.add(pos * step, spiccato(note, 1.0), 0.4, 0.2, 0.35)
-        mix.add(pos * step, soft_pluck(note + 12), 0.15, -0.2, 0.4)
-    mix.add(0, KICK, 0.6, 0, 0.1)
-    mix.add(6 * step, KICK, 0.5, 0, 0.1)
-    mix.add(12 * step, impact(0.6), 0.35, 0, 0.5)
-    for n in (64, 68, 71, 76):
-        mix.add(12 * step, strings(n - 12, 1.6, 0.05), 0.14, 0, 0.6)
-        mix.add(12 * step, bell(n + 12, 0.7, 2.2, 2.01, 1.0), 0.12, 0.3, 0.7)
-    sting_write("win", mix)
+    # E 小调的五度与二度回到主音，短到可以反复听。
+    battle = BATTLES["battle"]
+    root = battle["root"]
+    victory_score("win", battle, [(0.0, root + 31), (0.5, root + 26)],
+                  landing=1.0, weight=0.08, sustain=1.0)
 
 
 # ---------- 战斗音效（分层：预备 / 释放 / 命中 / 余韵） ----------
@@ -640,6 +658,10 @@ def combat_sfx():
 def main():
     args = sys.argv[1:]
     only = next((a.split("=", 1)[1] for a in args if a.startswith("--only=")), "")
+    if only == "victories":
+        battle_win()
+        boss_death()
+        return
     if only == "boss_threat":
         boss_threat()
         return

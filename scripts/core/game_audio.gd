@@ -24,14 +24,15 @@ const MUSIC := {
 	"MAP": {"track": "map", "gain_db": -3.5, "fade": 1.0, "resume": true, "fallback": "lab", "fallback_db": -6.5},
 	"LAB": {"track": "lab", "gain_db": -4.0, "fade": 1.0, "resume": true, "fallback": "lab", "fallback_db": -6.5},
 	"EVENT": {"track": "event", "gain_db": -3.5, "fade": 0.8, "resume": true, "fallback": "lab", "fallback_db": -6.5},
-	"BATTLE": {"track": "battle", "gain_db": -4.0, "fade": 0.6, "resume": false, "fallback": "battle", "fallback_db": -1.0},
-	"BOSS": {"track": "boss", "gain_db": -3.0, "fade": 0.4, "resume": false, "lead_into_loop": true, "fallback": "boss", "fallback_db": -1.0},
+	"BATTLE": {"track": "", "fade": 0.6, "resume": false, "fallback": "battle", "fallback_db": -1.0},
+	"BOSS": {"track": "", "fade": 0.4, "resume": false, "fallback": "boss", "fallback_db": -1.0},
 	"BOSS_FINAL": {"track": "", "fade": 0.4, "resume": false, "fallback": "boss_final", "fallback_db": -1.0},
 	"ENDING": {"track": "ending", "gain_db": -2.5, "fade": 1.5, "resume": false, "fallback": "campaign_approved", "fallback_db": -4.0},
 }
 const LEGACY_IDS := {"title": "TITLE", "lab": "LAB", "map": "MAP", "event": "EVENT", "battle": "BATTLE", "boss": "BOSS", "ending": "ENDING"}
 const RESUME_WINDOW_MS := 120000
 const STOP_FADE := 0.8
+const VICTORY_GAIN_DB := -3.0
 ## 各战况下三层的目标音量（线性）：基础、紧张、高潮。只对带分轨的兜底战斗曲生效。
 const MOOD_LEVELS := {
 	"normal": [1.0, 0.0, 0.0],
@@ -250,6 +251,10 @@ func _resolve(id: String) -> Dictionary:
 func play_music(id: String, fade := -1.0) -> void:
 	if id == _current:
 		return
+	if _sting.stream != null and _sting.bus == "Music":
+		var phrase := _sting.stream.resource_path.get_file().get_basename()
+		if phrase in ["win", "boss_death", "boss_final_win"]:
+			fade_sting(phrase)
 	_current = id
 	_ending = ""
 	_restart_left = -1.0
@@ -436,8 +441,10 @@ func _advance_clock(delta: float) -> void:
 	_clock += delta
 	if not _ending.is_empty() and _beat_index(_clock) != _beat_index(before):
 		var phrase := _ending
+		if phrase == "boss_death" and _current == "BOSS_FINAL":
+			phrase = "boss_final_win"
 		_ending = ""
-		_retarget(_active_music, 0.0, 0.5, true)
+		_retarget(_active_music, 0.0, 0.12, true)
 		_active_music = null
 		_current = ""
 		_layers = null
@@ -488,7 +495,7 @@ func play_sting(track: String, duck := true, bus := "Music") -> void:
 		_duck_tween = null
 	_sting.stream = stream
 	_sting.bus = bus
-	_sting.volume_db = 0.0
+	_sting.volume_db = VICTORY_GAIN_DB if track in ["win", "boss_death", "boss_final_win"] else 0.0
 	_sting.play()
 	_sting.stream_paused = _paused
 	if not duck:

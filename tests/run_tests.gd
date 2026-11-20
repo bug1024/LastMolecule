@@ -1737,7 +1737,7 @@ func _test_music_system() -> void:
 			audio._process(1.0 / 60.0)
 	# 1 集中注册：每个场景 ID 都有曲目文件，循环点落在文件内
 	var broken: Array[String] = []
-	for id in ["TITLE", "MAP", "LAB", "EVENT", "BATTLE", "BOSS", "ENDING"]:
+	for id in ["TITLE", "MAP", "LAB", "EVENT", "ENDING"]:
 		var info: Dictionary = MusicTracks.DATA.get(String(GameAudio.MUSIC[id].track), {})
 		var stream := load(String(info.get("file", ""))) as AudioStreamOggVorbis if not info.is_empty() else null
 		if stream == null or float(info.loop_offset) >= stream.get_length() - 5.0 or absf(stream.get_length() - float(info.length)) > 0.1:
@@ -1745,7 +1745,7 @@ func _test_music_system() -> void:
 	_expect(broken.is_empty(), "Every scene music ID resolves to an OGG with its loop inside the file: " + ", ".join(broken))
 	for id in ["mol_charge", "mol_release", "hit", "hit_heavy", "shield_form", "synergy", "ai_scan", "ai_fail", "boss_warn", "boss_hurt", "boss_die", "boss_threat"]:
 		_expect(ResourceLoader.exists("res://assets/audio/sfx/%s.ogg" % id), "Combat sound exists: " + id)
-	for id in ["boss_death", "win", "lose"]:
+	for id in ["boss_death", "boss_final_win", "win", "lose"]:
 		_expect(ResourceLoader.exists("res://assets/audio/music/%s.ogg" % id), "Battle phrase exists: " + id)
 	var battle_src := FileAccess.get_file_as_string("res://scripts/ui/battle/battle_view.gd")
 	_expect(battle_src.contains("cinematic_sfx(\"boss_threat\")") and not battle_src.contains("boss_intro") and not battle_src.contains("level_up\" if _is_boss"),
@@ -1803,6 +1803,9 @@ func _test_music_system() -> void:
 	GameAudio.play("BATTLE")
 	settle.call(1.0)
 	var battle_player := audio._active_music
+	var generated_battle := battle_player.stream as AudioStreamSynchronized
+	_expect(generated_battle != null and generated_battle.get_sync_stream(0).resource_path.ends_with("/battle.ogg"),
+		"Ordinary battles use the generated three-layer score")
 	audio.request_mood("climax")
 	settle.call(audio._bar * 1.5)
 	audio.play_sfx("card_play")
@@ -1832,9 +1835,9 @@ func _test_music_system() -> void:
 	settle.call(1.0)
 	_expect(not battle_player.playing, "The battle track fades out under the victory phrase")
 	GameAudio.play("BOSS")
-	var boss_pickup := float(MusicTracks.DATA.boss.loop_offset) - float(MusicTracks.DATA.boss.bar) / 4.0
-	_expect(absf(audio._active_music.get_playback_position() - boss_pickup) < 0.25,
-		"The stage boss track has a one-beat pickup before the loop body")
+	var generated_boss := audio._active_music.stream as AudioStreamSynchronized
+	_expect(generated_boss != null and generated_boss.get_sync_stream(0).resource_path.ends_with("/boss.ogg"),
+		"Stage bosses use the generated three-layer score")
 	settle.call(0.3)
 	audio.request_end("boss_death")
 	settle.call(audio._bar / 4.0 + 0.05)
@@ -1843,6 +1846,10 @@ func _test_music_system() -> void:
 	var finale := audio._active_music.stream as AudioStreamSynchronized
 	_expect(GameAudio.current() == "BOSS_FINAL" and finale != null and finale.get_sync_stream(0).resource_path.ends_with("/boss_final.ogg"),
 		"The final boss has its own layered LM-001 theme")
+	audio.request_end("boss_death")
+	settle.call(audio._bar + 0.05)
+	_expect(audio._sting.stream.resource_path.ends_with("/boss_final_win.ogg") and audio._sting.volume_db < 0.0,
+		"The final boss uses its matching victory phrase at the balanced volume")
 	# 10 新曲缺失：退回旧的程序合成曲，旧曲的分层换层仍然有效
 	var saved_tracks := audio.tracks
 	audio.tracks = {}
