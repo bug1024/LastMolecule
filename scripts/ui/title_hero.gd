@@ -13,6 +13,7 @@ var _code: Label
 var _status: Label
 var _glow := Color(0.93, 0.42, 0.42)
 var _time := 0.0
+var _plate_center := Vector2.ZERO
 
 
 func _ready() -> void:
@@ -72,17 +73,18 @@ func _layout() -> void:
 	var h := size.y
 	if w < 200 or h < 200:
 		return
-	var base_y := h - 70.0
-	var mol := Vector2(minf(w * 0.95, 540), minf(h - 130, 350))
+	var base_y := h - 66.0
+	var mol := Vector2(minf(w * 0.96, 720), minf(h - 110, 480))
 	_molecule.size = mol
 	# 双脚踩在铭牌上方的地面上
 	var bounds := _molecule.visual_bounds()
-	_molecule.position = Vector2(w * 0.58 - bounds.get_center().x, base_y - 12 - bounds.end.y)
+	_molecule.position = Vector2(w * 0.56 - bounds.get_center().x, base_y - 12 - bounds.end.y)
 	_avatar.size = _avatar.custom_minimum_size
 	_avatar.position = Vector2(w * 0.12, base_y - _avatar.size.y + 8)
-	_code.position = Vector2(w * 0.58 - 120, base_y - 2)
+	_plate_center = Vector2(w * 0.56, base_y + 16)
+	_code.position = Vector2(w * 0.56 - 120, base_y - 2)
 	_code.size = Vector2(240, 36)
-	_status.position = Vector2(w * 0.58 - 180, base_y + 34)
+	_status.position = Vector2(w * 0.56 - 180, base_y + 36)
 	_status.size = Vector2(360, 22)
 	queue_redraw()
 
@@ -103,9 +105,16 @@ func _draw() -> void:
 	var center := _molecule.position + (feet[0] + feet[1]) * 0.5
 	var span := absf(feet[1].x - feet[0].x) + 60.0
 	var pulse := 0.5 + 0.5 * sin(_time * 1.6)
-	Shading.glow(self, center, span * 0.7, Color(_glow, 0.10 + 0.05 * pulse))
+	Shading.glow(self, center, span * 0.8, Color(_glow, 0.12 + 0.06 * pulse))
 	var shadow := PackedVector2Array()
 	for i in 24:
 		var a := TAU * i / 24.0
 		shadow.append(center + Vector2(cos(a) * span * 0.55, sin(a) * 9.0 + 3.0))
 	draw_colored_polygon(shadow, Color(0.02, 0.02, 0.05, 0.35))
+	# 铭牌：编号两侧各一道向外淡出的细线，像标本签而不是悬浮的文字
+	for dir in [-1.0, 1.0]:
+		var inner := _plate_center + Vector2(dir * 78.0, 0)
+		draw_polyline_colors(PackedVector2Array([inner, inner + Vector2(dir * 120.0, 0)]),
+			PackedColorArray([Color(UIKit.GOLD, 0.75), Color(UIKit.GOLD, 0.0)]), 1.5, true)
+		draw_colored_polygon(PackedVector2Array([inner + Vector2(0, -4), inner + Vector2(4, 0), inner + Vector2(0, 4), inner + Vector2(-4, 0)]),
+			Color(UIKit.GOLD, 0.9))
