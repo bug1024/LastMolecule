@@ -46,6 +46,9 @@ var _hover_enemy := -1
 var _energy_label: Label
 var _energy_orb: Control
 var _rule_label: Label               # 脱靶反噬：本回合还能放心打几张攻击牌 / 当前这张牌的反噬预告
+var _rule_back: Control
+var _rule_pips := -1
+var _rule_tone := UIKit.GOLD
 var _draw_button: Button
 var _discard_button: Button
 var _end_button: BattleHud.EndTurnButton
@@ -196,18 +199,17 @@ func _build() -> void:
 	_energy_orb.add_child(_energy_label)
 	_rule_label = UIKit.label("", UIKit.GOLD, 14, true)
 	_rule_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	_rule_label.size = Vector2(230,28)
+	_rule_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_rule_label.size = Vector2(160, 26)
 	_rule_label.tooltip_text = tr("battle.rule_tip")
 	_rule_label.mouse_filter = Control.MOUSE_FILTER_PASS
 	add_child(_rule_label)
-	var rule_back := Panel.new()
-	rule_back.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	rule_back.show_behind_parent = true
-	rule_back.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	rule_back.offset_left = -8
-	rule_back.offset_top = -4
-	rule_back.add_theme_stylebox_override("panel",BattleHud.quiet_style(Color(0.06,0.08,0.14,0.7),Color(UIKit.GOLD,0.18)))
-	_rule_label.add_child(rule_back)
+	_rule_back = Control.new()
+	_rule_back.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_rule_back.show_behind_parent = true
+	_rule_back.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_rule_back.draw.connect(_draw_rule_strip)
+	_rule_label.add_child(_rule_back)
 	_draw_button = UIKit.button("", "ui_draw_pile", "normal", Vector2(110, 44))
 	_draw_button.pressed.connect(func() -> void: pile_requested.emit(_sorted(_manager.draw_pile), "battle.pile.draw"))
 	add_child(_draw_button)
@@ -307,8 +309,8 @@ func _layout() -> void:
 	_mol.pivot_offset = bounds.get_center()
 	_mol.rotation = 0.0
 	_mol.position = Vector2(foot.x - bounds.get_center().x, foot.y - bounds.end.y)
-	_player_tag.position = Vector2(foot.x - 106,foot.y + 14)
-	_player_tag.size = Vector2(212,24)
+	_player_tag.position = Vector2(foot.x - 84,foot.y + 14)
+	_player_tag.size = Vector2(168,24)
 	_player_bar.position = Vector2(foot.x - 120,foot.y + 42)
 	_player_bar.size = Vector2(240,24)
 	_player_status.position = Vector2(foot.x - 105,foot.y + 67)
@@ -357,22 +359,46 @@ func _update_stage() -> void:
 	if _mol.visible:
 		var footprint := _mol.visual_bounds()
 		var projected := _mol.get_transform() * footprint.get_center() + Vector2(_mol.motion_offset().x, 0.0)
-		shadows.append({"center": Vector2(projected.x + 12, ground), "width": footprint.size.x * 0.72, "opacity": 0.085})
+		shadows.append({"center": Vector2(projected.x + 14, ground + 2), "width": footprint.size.x * 0.78, "opacity": 0.13, "depth": 11.0})
 		for foot in _mol.support_points():
 			var p := _mol.get_transform() * foot
 			var distance := absf(p.y - ground)
-			shadows.append({"center": Vector2(p.x + 4, ground), "width": footprint.size.x * 0.14,
-				"opacity": lerpf(0.21, 0.06, clampf(distance / 80.0, 0.0, 1.0)), "depth": 5.5})
+			var grounded := clampf(1.0 - distance / 72.0, 0.0, 1.0)
+			shadows.append({"center": Vector2(p.x + 2, ground), "width": footprint.size.x * 0.22,
+				"opacity": lerpf(0.08, 0.42, grounded), "depth": 5.2, "contact": true})
 	else:
 		shadows.append({"center": Vector2(_player.position.x + _player.size.x * 0.5, ground), "width": _player.size.x * 0.57})
 	for ew in _enemy_widgets:
 		if ew.creature.dying < 0.95:
 			var body := ew.creature.visible_body_rect()
 			var drift := ew.creature.motion.offset().x if ew.creature.motion else 0.0
-			shadows.append({"center": Vector2(ew.position.x + ew.creature.position.x + body.get_center().x + drift, ground),
-				"width": body.size.x * 0.89, "opacity": 0.18 * (1.0 - ew.creature.dying)})
+			var cx := ew.position.x + ew.creature.position.x + body.get_center().x + drift
+			var alive := 1.0 - ew.creature.dying
+			shadows.append({"center": Vector2(cx + 8, ground + 2),
+				"width": body.size.x * 0.94, "opacity": 0.17 * alive, "depth": 11.5})
+			shadows.append({"center": Vector2(cx, ground),
+				"width": body.size.x * 0.72, "opacity": 0.34 * alive, "depth": 5.5, "contact": true})
 	_floor.shadows = shadows
 	_floor.queue_redraw()
+
+
+func _draw_rule_strip() -> void:
+	if _rule_back == null or _rule_label == null:
+		return
+	var box := Rect2(Vector2(-12, -4), _rule_label.size + Vector2(20, 8))
+	BattleHud.quiet_style(Color(0.055, 0.075, 0.135, 0.86), Color(_rule_tone, 0.52)).draw(_rule_back.get_canvas_item(), box)
+	_rule_back.draw_rect(Rect2(box.position + Vector2(4, 6), Vector2(3, maxf(8.0, box.size.y - 12))), Color(_rule_tone, 0.9))
+	if _rule_pips > 0:
+		var font := _rule_label.get_theme_default_font()
+		var text_w := font.get_string_size(_rule_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
+		var start_x := text_w + 10.0
+		var cy := _rule_label.size.y * 0.5
+		for i in mini(_rule_pips, 5):
+			var c := Vector2(start_x + i * 12.0, cy)
+			var gem := PackedVector2Array([c + Vector2(0, -4.5), c + Vector2(4.5, 0), c + Vector2(0, 4.5), c + Vector2(-4.5, 0)])
+			_rule_back.draw_colored_polygon(gem, UIKit.GOLD)
+			gem.append(gem[0])
+			_rule_back.draw_polyline(gem, Color(UIKit.PAPER, 0.85), 1.0, true)
 
 
 func _draw_energy() -> void:
@@ -1864,13 +1890,29 @@ func _refresh_energy() -> void:
 	_rule_label.visible = left >= 0
 	var card := _selected if _selected != null else _hover_card
 	var lines := backfire_lines(_manager.backfire_preview(card, _hover_enemy)) if card != null and card.kind == "attack" else []
-	_rule_label.size.y = maxf(28,lines.size()*20+4)
+	var font := _rule_label.get_theme_default_font()
 	if not lines.is_empty():
+		_rule_pips = -1
+		var risky: bool = lines.size() > 1 or not String(lines[0]).begins_with("✓")
+		_rule_tone = UIKit.DANGER if risky else UIKit.ACCENT
 		_rule_label.text = "\n".join(lines)
-		_rule_label.add_theme_color_override("font_color", UIKit.DANGER.lightened(0.15) if lines.size() > 1 or not lines[0].begins_with("✓") else UIKit.ACCENT.lightened(0.2))
+		_rule_label.add_theme_color_override("font_color", UIKit.DANGER.lightened(0.15) if risky else UIKit.ACCENT.lightened(0.2))
+		var max_w := 0.0
+		for line in lines:
+			max_w = maxf(max_w, font.get_string_size(String(line), HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x)
+		_rule_label.size = Vector2(clampf(max_w + 14.0, 120.0, 340.0), maxf(26.0, lines.size() * 20.0 + 4.0))
+		if _rule_back:
+			_rule_back.queue_redraw()
 		return
+	_rule_pips = left
+	_rule_tone = UIKit.GOLD if left > 0 else UIKit.DANGER
 	_rule_label.text = tr("battle.safe_short") % left if left > 0 else tr("battle.risk_short")
 	_rule_label.add_theme_color_override("font_color", UIKit.GOLD if left > 0 else UIKit.DANGER.lightened(0.15))
+	var tw := font.get_string_size(_rule_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
+	var pip_w := (mini(left, 5) * 12.0 + 10.0) if left > 0 else 0.0
+	_rule_label.size = Vector2(clampf(tw + pip_w + 8.0, 96.0, 320.0), 26.0)
+	if _rule_back:
+		_rule_back.queue_redraw()
 
 
 ## 反噬预告文字：「项目脱靶 -5」「破绽目标：项目规则豁免」「Boss 反噬 -4」；什么都不会发生时为「✓ 这张不会反噬」

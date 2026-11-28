@@ -45,24 +45,25 @@ var selected := false
 var dimmed := false
 var detail_enabled := true   # 右键 / 长按打开大图说明
 var _art_layer: Control
+var _chrome_layer: Control
 var _name_label: Label
 var _rows: Control
 var _type_text := ""
 var pick_style := false   # 奖励挑选用：选中时显示绿色描边与「✓ 已选」徽章（战斗手牌不用）
 var _pick_mark: Control
-var _ai_multiplier := -1.0   # 会失误的 AI 卡：当前威力倍率（插画右下角的小牌子），-1 表示不显示
+var _ai_multiplier := -1.0   # 会失误的 AI 卡：当前威力倍率（插画右上角的小牌子），-1 表示不显示
 var _time := 0.0
 var _mods := {}
 var _ai_info := {}
 var _press_time := -1.0
 
 const PICK_GREEN := UIKit.ACCENT
-const MIN_FONT := 15   # 基准字号下限：0.9 倍时约 12.6px
+const MIN_FONT := 15   # 基准字号下限：0.82 倍时约 12.3px
 const LONG_PRESS := 0.5
-# 牌面布局（基准坐标）
-const NAME_RECT := Rect2(6, 6, 168, 34)
-const ART_RECT := Rect2(14, 44, 152, 76)   # 和 record.png 卡框里的插画窗口对齐
-const BODY_RECT := Rect2(10, 126, 160, 116)
+# 牌面布局（基准坐标）：扩大插画视窗至近 1.66:1，类型铭签骑在插画底边刻线上，释放完整手绘构图
+const NAME_RECT := Rect2(8, 5, 166, 32)
+const ART_RECT := Rect2(12, 39, 156, 94)
+const BODY_RECT := Rect2(10, 143, 160, 101)
 
 
 static func create(model: ResearchCard, scale_factor := 1.0, mods := {}, ai_info := {}) -> CardFace:
@@ -89,11 +90,17 @@ func _build() -> void:
 		var area := Rect2(Vector2.ZERO, _art_layer.size)
 		_draw_art(area)
 		_draw_art_inset(area)
-		_draw_art_tags(area, _role_color()))
+		if _ai_multiplier >= 0.0:
+			_draw_ai_chip(area))
 	add_child(_art_layer)
+	_chrome_layer = Control.new()
+	_chrome_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_chrome_layer.size = size
+	_chrome_layer.draw.connect(_draw_chrome)
+	add_child(_chrome_layer)
 	_name_label = _label(18, HORIZONTAL_ALIGNMENT_CENTER)
-	_name_label.position = Vector2(NAME_RECT.position.x + 38, NAME_RECT.position.y) * face_scale
-	_name_label.size = Vector2(NAME_RECT.size.x - 42, NAME_RECT.size.y) * face_scale
+	_name_label.position = Vector2(NAME_RECT.position.x + 36, NAME_RECT.position.y) * face_scale
+	_name_label.size = Vector2(NAME_RECT.size.x - 40, NAME_RECT.size.y) * face_scale
 	_rows = Control.new()
 	_rows.position = BODY_RECT.position * face_scale
 	_rows.size = BODY_RECT.size * face_scale
@@ -152,6 +159,8 @@ func refresh(mods := {}, ai_info := {}) -> void:
 	tooltip_text = ""
 	queue_redraw()
 	_art_layer.queue_redraw()
+	if _chrome_layer:
+		_chrome_layer.queue_redraw()
 
 
 func _set_name(text: String) -> void:
@@ -161,7 +170,7 @@ func _set_name(text: String) -> void:
 	var fs := _fit(text, _name_label.get_theme_default_font(), _name_label.size.x - _px(4),
 		_name_label.size.y, _px(18), _px(MIN_FONT))
 	_name_label.add_theme_font_size_override("font_size", fs)
-	_name_label.size = Vector2(NAME_RECT.size.x - 42, NAME_RECT.size.y) * face_scale
+	_name_label.size = Vector2(NAME_RECT.size.x - 40, NAME_RECT.size.y) * face_scale
 
 
 ## 效果下方的限制说明：关键词（消耗 / 无法打出…）+ AI 失误率
@@ -371,25 +380,32 @@ func _draw() -> void:
 		for i in 1:
 			draw_style_box(_box(Color(0, 0, 0, 0), glow, 14 + i * 2, 2), rect.grow((i + 1) * 2 * k))
 	PaintedArt.frame(self, rect, UIKit.PAPER, UIKit.GOLD.darkened(0.25), 1.5 * k)
+	# 左侧角色色条：扇形手牌叠放时永远露在外侧，扫一眼就能分辨攻击 / 防护 / 技能 / 能力
+	var stripe_top := Vector2(4.0, 38.0) * k
+	var stripe_bot := Vector2(4.0, BASE.y - 9.0) * k
+	var stripe := PackedVector2Array([
+		stripe_top + Vector2(0, 3 * k), stripe_top + Vector2(4.2 * k, 0),
+		stripe_bot + Vector2(4.2 * k, 0), stripe_bot + Vector2(0, -3 * k)])
+	draw_colored_polygon(stripe, role_color.darkened(0.08))
+	draw_line(stripe[0], stripe[3], Color(role_color.lightened(0.32), 0.75), maxf(1.0, k), true)
 	var header := Rect2(NAME_RECT.position * k, NAME_RECT.size * k)
-	draw_style_box(_box(role_color.lerp(UIKit.PAPER, 0.70), Color(role_color, 0.6), 2, 1), header)
+	draw_style_box(_box(role_color.lerp(UIKit.PAPER, 0.50), role_color.darkened(0.12), 2, 1), header)
 	if card.upgraded:
 		_draw_upgrade_mark(rect, k)
-	var body := Rect2(BODY_RECT.position * k, BODY_RECT.size * k)
-	# 正文区就是卡面本身的纸，不再盖一块平涂的色块；只留一道刻线分隔
-	draw_line(body.position + Vector2(6 * k, 0), Vector2(body.end.x - 6 * k, body.position.y), Color(UIKit.INK, 0.3), k, true)
-	draw_line(body.position + Vector2(6 * k, k), Vector2(body.end.x - 6 * k, body.position.y + k), Color(1, 1, 1, 0.3), k, true)
-	# 左上角费用宝石
+	# 刻线分隔画在 _chrome_layer 与类型铭签连成一体；左上角费用宝石
 	if not card.unplayable:
 		var font: Font = get_theme_font("font", &"NumberLabel")
-		var orb := Vector2(24, 23) * k
+		var orb := Vector2(24, 21) * k
 		var gem := PackedVector2Array()
 		for j in 6:
-			gem.append(orb + Vector2.from_angle(PI / 6 + j * TAU / 6) * 19 * k)
-		draw_colored_polygon(gem, UIKit.DANGER.darkened(0.2) if card.damaged else Color("397b68"))   # 受损的片段卡：费用宝石变红
+			gem.append(orb + Vector2.from_angle(PI / 6 + j * TAU / 6) * 18.0 * k)
+		var gem_fill := UIKit.DANGER.darkened(0.2) if card.damaged else Color("397b68")
+		draw_colored_polygon(gem, gem_fill)
+		# 上半受光切面，让费用宝石有微弱厚涂立体感
+		draw_colored_polygon(PackedVector2Array([gem[3], gem[4], gem[5], orb]), Color(1.0, 0.96, 0.85, 0.16))
 		gem.append(gem[0])
-		draw_polyline(gem, UIKit.PAPER, 2 * k, true)
-		var fs := _px(30)
+		draw_polyline(gem, UIKit.GOLD if card.upgraded else UIKit.PAPER, 2.0 * k, true)
+		var fs := _px(29)
 		var text := str(card.cost)
 		var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 		var pos := orb + Vector2(-w * 0.5, fs * 0.36)
@@ -409,42 +425,77 @@ func _draw_upgrade_mark(rect: Rect2, k: float) -> void:
 	draw_polyline(diamond, UIKit.INK, maxf(1.0, k), true)
 
 
-## 插画上的小标记：左下类型、右上角色图标、左上稀有度宝石、右下 AI 倍率
-func _draw_art_tags(art: Rect2, role_color: Color) -> void:
+## 骑在插画底边刻线上的居中类型铭签（含角色图标与稀有度宝石），让插画视窗彻底干净
+func _draw_chrome() -> void:
+	if card == null:
+		return
 	var k := face_scale
-	var font := get_theme_default_font()
-	var fs := _px(MIN_FONT)
+	var role_color := _role_color()
 	var type_color := _type_color()
+	var art_rect := Rect2(ART_RECT.position * k, ART_RECT.size * k)
+	# 分子片段卡：插画四角加晶化角标，强化「装在主角身上的结构件」身份
+	if card.id.begins_with("frag_"):
+		var brk := Color(type_color.lerp(UIKit.GOLD, 0.35), 0.9)
+		var arm := 9.0 * k
+		var lw := maxf(1.3, 1.8 * k)
+		for corner: Vector2 in [art_rect.position, Vector2(art_rect.end.x, art_rect.position.y), art_rect.end, Vector2(art_rect.position.x, art_rect.end.y)]:
+			var inward: Vector2 = (art_rect.get_center() - corner).sign()
+			_chrome_layer.draw_polyline(PackedVector2Array([
+				corner + Vector2(inward.x * arm, 0), corner, corner + Vector2(0, inward.y * arm)]), brk, lw, true)
+	# 刻线分隔（从左边缘角色色条右侧延展到右边）
+	var div_y := art_rect.end.y + 1.0 * k
+	_chrome_layer.draw_line(Vector2(14 * k, div_y), Vector2((BASE.x - 14) * k, div_y), Color(UIKit.INK, 0.38), maxf(1.0, k), true)
+	_chrome_layer.draw_line(Vector2(14 * k, div_y + k), Vector2((BASE.x - 14) * k, div_y + k), Color(1, 1, 1, 0.35), maxf(1.0, k), true)
+	# 居中铭签：角色小图标 + 类型名 +（稀有/史诗宝石）
+	var font := get_theme_default_font()
+	var fs := maxi(10, _px(13.5))
+	var icon_s := 12.0 * k
+	var gap := 4.0 * k
+	var has_gem := card.rarity != "common"
+	var gem_w := (13.0 * k) if has_gem else 0.0
+	var max_tw := (BASE.x - 36.0) * k - icon_s - gap - gem_w
 	var tw := font.get_string_size(_type_text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-	var tag := Rect2(Vector2(3 * k, art.size.y - fs - 8 * k), Vector2(minf(tw + 10 * k, art.size.x - 6 * k), fs + 5 * k))
-	_art_layer.draw_style_box(_box(type_color.darkened(0.7), type_color, 3, 1), tag)
-	_art_layer.draw_string(font, tag.position + Vector2(5 * k, fs), _type_text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, type_color.lightened(0.35))
-	var badge := Vector2(art.size.x - 14 * k, 14 * k)
-	_art_layer.draw_circle(badge, 12 * k, role_color.darkened(0.65))
-	_art_layer.draw_arc(badge, 12 * k, 0, TAU, 32, role_color, k, true)
+	while tw > max_tw and fs > 9:
+		fs -= 1
+		tw = font.get_string_size(_type_text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	var pill_w := minf((BASE.x - 24.0) * k, icon_s + gap + tw + gem_w + 15.0 * k)
+	var pill_h := maxf(17.5 * k, float(fs) + 6.5 * k)
+	var pill := Rect2(Vector2((BASE.x * k - pill_w) * 0.5, div_y - pill_h * 0.5), Vector2(pill_w, pill_h))
+	var rim: Color = RARITY_COLOR.get(card.rarity, type_color) if has_gem else type_color.lerp(UIKit.PAPER, 0.3)
+	var pts := PaintedArt.contour(pill, 4.5 * k)
+	_chrome_layer.draw_colored_polygon(pts, Color(type_color.darkened(0.76), 0.96))
+	pts.append(pts[0])
+	_chrome_layer.draw_polyline(pts, rim, maxf(1.0, 1.3 * k), true)
+	var cursor_x := pill.position.x + 7.0 * k
+	var cy := pill.get_center().y
 	var role_icon := UIKit.icon(String(ROLE_ICON.get(card.role(), "role_skill")))
 	if role_icon:
-		_art_layer.draw_texture_rect(role_icon, Rect2(badge - Vector2(8, 8) * k, Vector2(16, 16) * k), false, Color.WHITE)
-	if card.rarity != "common":
-		var c := Vector2(10, 10) * k
-		var gem := PackedVector2Array([c + Vector2(0, -5) * k, c + Vector2(5, 0) * k, c + Vector2(0, 5) * k, c + Vector2(-5, 0) * k])
-		_art_layer.draw_colored_polygon(gem, RARITY_COLOR.get(card.rarity, Color.WHITE))
-	if _ai_multiplier >= 0.0:
-		_draw_ai_chip(art)
+		_chrome_layer.draw_texture_rect(role_icon, Rect2(Vector2(cursor_x, cy - icon_s * 0.5), Vector2(icon_s, icon_s)),
+			false, role_color.lightened(0.35))
+	cursor_x += icon_s + gap
+	_chrome_layer.draw_string(font, Vector2(cursor_x, cy + fs * 0.34), _type_text,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, fs, UIKit.PAPER.lightened(0.18))
+	if has_gem:
+		var gc := Vector2(pill.end.x - 7.5 * k, cy)
+		var gr := 4.2 * k
+		var gem := PackedVector2Array([gc + Vector2(0, -gr), gc + Vector2(gr, 0), gc + Vector2(0, gr), gc + Vector2(-gr, 0)])
+		_chrome_layer.draw_colored_polygon(gem, RARITY_COLOR.get(card.rarity, Color.WHITE))
+		gem.append(gem[0])
+		_chrome_layer.draw_polyline(gem, UIKit.INK, maxf(1.0, 0.9 * k), true)
 
 
-## 插画右下角「AI ×0.5」小牌子：低档红、中档蓝、高档金
+## 插画右上角「AI ×0.5」小牌子：低档红、中档蓝、高档金（避开底部居中铭签，最大程度留出完整画面）
 func _draw_ai_chip(art: Rect2) -> void:
 	var k := face_scale
 	var col := UIKit.DANGER if _ai_multiplier < 1.0 else (UIKit.ACCENT_BLUE if _ai_multiplier <= 1.0 else UIKit.GOLD)
 	var text := "AI ×" + String.num(_ai_multiplier, 2)
 	var font := get_theme_default_font()
-	var fs := _px(MIN_FONT)
-	var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 12 * k
-	var h := fs + 6 * k
-	var pill := Rect2(art.end - Vector2(w + 3 * k, h + 25 * k), Vector2(w, h))
-	_art_layer.draw_style_box(_box(Color(Color(0.055, 0.075, 0.11), 0.92), col, 8, 2), pill)
-	_art_layer.draw_string(font, pill.position + Vector2(6 * k, h * 0.5 + fs * 0.36), text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, col.lightened(0.25))
+	var fs := maxi(10, _px(13))
+	var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 10 * k
+	var h := fs + 5 * k
+	var pill := Rect2(Vector2(art.end.x - w - 4 * k, 4 * k), Vector2(w, h))
+	_art_layer.draw_style_box(_box(Color(Color(0.055, 0.075, 0.11), 0.90), col, 4, 1), pill)
+	_art_layer.draw_string(font, pill.position + Vector2(5 * k, h * 0.5 + fs * 0.34), text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, col.lightened(0.28))
 
 
 ## 插画：先按卡牌的作用挑图（攻击＝结合、护盾＝防护、AI＝推理……），再按卡牌 id 取不同的局部取景、
@@ -521,16 +572,32 @@ func _draw_art(art: Rect2) -> void:
 func _draw_fragment_portrait(art: Rect2) -> void:
 	var frag_id := card.id.trim_prefix("frag_")
 	var ground := UIKit.art("geometric-ground")
-	_art_layer.draw_rect(art, Color("263148"))
+	var frag_col := _type_color()
+	_art_layer.draw_rect(art, Color("1d263b"))
 	if ground:
 		var backdrop := Rect2(Vector2(ground.get_width() * 0.21, ground.get_height() * 0.61),
 			ground.get_size() * Vector2(0.55, 0.33))
-		PaintedArt.cover(_art_layer, "geometric-ground", art, backdrop, Color(0.62, 0.70, 0.84))
-	var c := art.get_center() + Vector2(0, -art.size.y * 0.06)
+		PaintedArt.cover(_art_layer, "geometric-ground", art, backdrop, Color(0.52, 0.60, 0.74))
+	var c := art.get_center() + Vector2(0, -art.size.y * 0.04)
+	# 分子位点图谱底纹：淡淡的六边形定位环与左右键接引线，强化「装在角色上的部件」视觉语言
+	var ring_r := art.size.y * 0.38
+	Shading.glow(_art_layer, c, ring_r * 1.45, Color(frag_col.lightened(0.2), 0.18))
+	var hex := PackedVector2Array()
+	for i in 7:
+		hex.append(c + Vector2.from_angle(PI / 6.0 + i * TAU / 6.0) * ring_r)
+	_art_layer.draw_polyline(hex, Color(UIKit.PAPER, 0.22), maxf(1.0, face_scale * 1.1), true)
+	_art_layer.draw_line(Vector2(art.position.x + 8 * face_scale, c.y), c - Vector2(ring_r * 1.05, 0), Color(frag_col.lightened(0.25), 0.26), maxf(1.0, face_scale), true)
+	_art_layer.draw_line(c + Vector2(ring_r * 1.05, 0), Vector2(art.end.x - 8 * face_scale, c.y), Color(frag_col.lightened(0.25), 0.26), maxf(1.0, face_scale), true)
+	# 片段下方的一枚贴底小影
+	var shadow := PackedVector2Array()
+	for i in 16:
+		var a := i * TAU / 16.0
+		shadow.append(c + Vector2(cos(a) * ring_r * 0.72, ring_r * 0.78 + sin(a) * ring_r * 0.16))
+	_art_layer.draw_colored_polygon(shadow, Color(0.02, 0.03, 0.07, 0.42))
 	# 片段图的尺寸按分子骨架单位给；放大到占满插画的大半高度
 	var unit := art.size.y * 0.42
 	var bounds := MoleculeSpecimen.bounds(frag_id, c, unit)
-	unit *= minf(art.size.y * 0.78 / maxf(bounds.size.y, 1.0), art.size.x * 0.6 / maxf(bounds.size.x, 1.0))
+	unit *= minf(art.size.y * 0.74 / maxf(bounds.size.y, 1.0), art.size.x * 0.58 / maxf(bounds.size.x, 1.0))
 	MoleculeSpecimen.draw_fragment(_art_layer, frag_id, c, unit)
 
 

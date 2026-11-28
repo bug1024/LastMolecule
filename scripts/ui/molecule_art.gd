@@ -60,7 +60,12 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
-	if UIKit.atlas(self, "painted-enemies", 5, Rect2(Vector2.ZERO, size)):
+	var hero := UIKit.art(MoleculeCharacter.CORE)
+	if hero:
+		var source := MoleculeCharacter.CORE_SOURCE
+		var k := minf(size.x * 0.9 / source.size.x, size.y * 0.86 / source.size.y)
+		var extent := source.size * k
+		draw_texture_rect_region(hero, Rect2((size - extent) * 0.5, extent), source)
 		return
 	if _atoms.is_empty():
 		return

@@ -208,7 +208,7 @@ func run() -> void:
 	await shot("editor-hover", 0.1)
 	editor.visible = false
 	var summary: Dictionary = game.company.settle_run(game.state.data, "approved", game.state.funding)
-	main._ending.show_ending("approved", "ending.approved.flavor", summary, game.state)
+	main._ending.show_ending("approved", "ending.approved.flavor", summary, game.state, game.molecule, game.get_player_level())
 	await shot("ending")
 	main.queue_free()
 	await process_frame

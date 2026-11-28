@@ -72,7 +72,11 @@ static func draw(ci: CanvasItem, slots: Dictionary, fragments: Dictionary, level
 		else:
 			root = ROOTS[id]
 			root += _core_shift(root.y, pose)
-		_draw_branch(ci, root, point, 0.26 if id in ["R1", "R2", "R3"] else 0.37)
+		var main_arm: bool = id in ["L1", "L2", "T1", "T2"]
+		_draw_branch(ci, root, point, 0.44 if main_arm else 0.31)
+		# 在支链与核心环的连接口叠一枚骨白多面体节点，消除接缝并增强骨架雕塑感
+		if ROOTS.has(id):
+			MoleculeSpecimen.draw_fragment(ci, "carbon", root, 1.15 if main_arm else 0.90)
 	for id in ANCHORS:
 		var fragment := String(fragments.get(id, ""))
 		MoleculeSpecimen.draw_fragment(ci, fragment if not fragment.is_empty() else "hydrogen", slots[id],
@@ -113,9 +117,15 @@ static func _draw_branch(ci: CanvasItem, a: Vector2, b: Vector2, thickness: floa
 		return
 	var direction := axis.normalized()
 	var edge := direction.orthogonal() * thickness * 0.5
-	a -= direction * 0.07
-	b += direction * 0.06
+	a -= direction * 0.09
+	b += direction * 0.08
 	var source := MoleculeSpecimen.region("chain")
 	if source.has_area():
+		# 用支链贴图本身的 Alpha 剪影向右下偏移画暗部厚度，避免实心矩形底块露出黑框
+		var shadow_shift := Vector2(0.032, 0.052)
+		PaintedArt.textured_quad(ci, MoleculeSpecimen.texture(), source,
+			PackedVector2Array([a - edge + shadow_shift, b - edge + shadow_shift,
+				b + edge + shadow_shift, a + edge + shadow_shift]),
+			Color(0.05, 0.07, 0.14, 0.80))
 		PaintedArt.textured_quad(ci, MoleculeSpecimen.texture(), source,
 			PackedVector2Array([a - edge, b - edge, b + edge, a + edge]))

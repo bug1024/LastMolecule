@@ -195,9 +195,11 @@ static func identity_plate(label_node: Label) -> void:
 	plate.show_behind_parent = true
 	plate.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var skin := PaintedStyle.new()
-	skin.surface_kind = 2
-	skin.bg_color = PAPER
-	plate.add_theme_stylebox_override("panel",skin)
+	skin.surface_kind = 3
+	skin.bg_color = Color(0.085, 0.105, 0.175, 0.92)
+	skin.border_color = Color(GOLD, 0.56)
+	plate.add_theme_stylebox_override("panel", skin)
 	label_node.add_child(plate)
-	label_node.add_theme_color_override("font_color",INK)
-	label_node.add_theme_constant_override("outline_size",0)
+	label_node.add_theme_color_override("font_color", PAPER.lightened(0.22))
+	label_node.add_theme_constant_override("outline_size", 2)
+	label_node.add_theme_color_override("font_outline_color", Color(0.02, 0.03, 0.07, 0.92))

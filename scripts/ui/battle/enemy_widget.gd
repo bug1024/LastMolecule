@@ -207,8 +207,9 @@ func set_stage_pose(body_size: Vector2, meta_width: float) -> void:
 	creature.custom_minimum_size = Vector2.ZERO
 	creature.size = body_size
 	creature.position = Vector2(SIZE.x * 0.5 - body_size.x * 0.5, -body_size.y)
-	_name.position = Vector2((SIZE.x - meta_width) * 0.5, 14)
-	_name.size = Vector2(meta_width, 24)
+	var plate_w := clampf(meta_width * 0.78, 128.0, 192.0)
+	_name.position = Vector2((SIZE.x - plate_w) * 0.5, 14)
+	_name.size = Vector2(plate_w, 24)
 	bar.position = Vector2((SIZE.x - meta_width) * 0.5, 42)
 	bar.size = Vector2(meta_width, 24)
 	statuses.position = Vector2((SIZE.x - meta_width) * 0.5 + 8, 67)

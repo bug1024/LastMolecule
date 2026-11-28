@@ -1,11 +1,41 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
-<defs><radialGradient id="g" cx="50%" cy="45%" r="55%"><stop offset="0" stop-color="#5fe0b0" stop-opacity="0.35"/><stop offset="1" stop-color="#5fe0b0" stop-opacity="0"/></radialGradient></defs>
-<circle cx="128" cy="128" r="120" fill="url(#g)"/>
-<g fill="none" stroke-linecap="round" stroke-linejoin="round">
-<path d="M128 58l52 30v60l-52 30-52-30V88z" stroke="#4fc896" stroke-width="10"/>
-<path d="M128 78l35 20" stroke="#4fc896" stroke-width="6"/><path d="M93 138l35 20" stroke="#4fc896" stroke-width="6"/>
-<path d="M180 88l36-22M76 88L40 66M128 178v42M180 148l30 18" stroke="#8fd8ff" stroke-width="8"/>
-</g>
-<circle cx="216" cy="66" r="13" fill="#4aa0ff"/><circle cx="40" cy="66" r="13" fill="#9b6cf2"/><circle cx="128" cy="222" r="13" fill="#f2b84c"/><circle cx="212" cy="168" r="10" fill="#f07070"/>
-<circle cx="128" cy="118" r="16" fill="#ffffff"/>
+  <!-- Geometric faceted jade/bone/gold hexagonal emblem matching LM-018 art direction -->
+  <!-- Outer dark indigo ink backing silhouette -->
+  <polygon points="128,16 218,68 218,172 128,224 38,172 38,68" fill="#131929"/>
+  <!-- Extending angled substituent stubs (upper-right & lower-left kinetic axis) -->
+  <polygon points="196,82 238,56 244,68 202,96" fill="#131929"/>
+  <polygon points="198,85 235,61 239,68 202,92" fill="#397b68"/>
+  <polygon points="198,85 235,61 237,65 200,88" fill="#e6d6ae"/>
+  <polygon points="60,158 18,184 12,172 54,144" fill="#131929"/>
+  <polygon points="58,155 21,179 17,172 54,148" fill="#2c6054"/>
+  <polygon points="58,155 21,179 19,175 56,151" fill="#69aa87"/>
+  <!-- Upper-left bone-white lit bevel planes (upper-left key light) -->
+  <polygon points="128,24 210,72 184,88 128,56" fill="#e6d6ae"/>
+  <polygon points="128,24 46,72 72,88 128,56" fill="#f2e4bf"/>
+  <polygon points="46,72 46,168 72,152 72,88" fill="#69aa87"/>
+  <polygon points="46,72 58,79 58,160 46,168" fill="#dfd0a8"/>
+  <!-- Mid-tone jade & deep shadow facets on right and bottom -->
+  <polygon points="210,72 210,168 184,152 184,88" fill="#397b68"/>
+  <polygon points="210,72 197,80 197,160 210,168" fill="#264f48"/>
+  <polygon points="210,168 128,216 128,184 184,152" fill="#1f3b40"/>
+  <polygon points="46,168 128,216 128,184 72,152" fill="#2c5e54"/>
+  <!-- Inner facet bevels around the open hexagonal core -->
+  <polygon points="128,56 184,88 174,94 128,68" fill="#234546"/>
+  <polygon points="128,56 72,88 82,94 128,68" fill="#1c2f3b"/>
+  <polygon points="72,88 72,152 82,146 82,94" fill="#264b4b"/>
+  <polygon points="184,88 184,152 174,146 174,94" fill="#d8c89e"/>
+  <polygon points="184,152 128,184 128,172 174,146" fill="#e6d6ae"/>
+  <polygon points="72,152 128,184 128,172 82,146" fill="#5b9679"/>
+  <!-- Open negative-space core (transparent) with subtle crisp inner ring -->
+  <polygon points="128,68 174,94 174,146 128,172 82,146 82,94" fill="none" stroke="#131929" stroke-width="5" stroke-linejoin="miter"/>
+  <!-- Restrained warm-gold faceted active node at upper-right vertex -->
+  <polygon points="200,56 220,68 220,90 200,102 180,90 180,68" fill="#131929"/>
+  <polygon points="200,61 215,70 215,88 200,97 185,88 185,70" fill="#d49238"/>
+  <polygon points="200,61 185,70 200,79 215,70" fill="#f7d27d"/>
+  <polygon points="200,79 185,70 185,88 200,97" fill="#e4ae53"/>
+  <polygon points="200,79 215,70 215,88 200,97" fill="#a86824"/>
+  <!-- Subtle gold tip accent on lower-left vertex -->
+  <polygon points="48,154 58,160 58,172 48,178 38,172 38,160" fill="#131929"/>
+  <polygon points="48,158 54,162 54,170 48,174 42,170 42,162" fill="#e4ae53"/>
+  <polygon points="48,158 42,162 48,166 54,162" fill="#f7d27d"/>
 </svg>

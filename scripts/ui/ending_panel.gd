@@ -37,8 +37,8 @@ func _ready() -> void:
 	_panel.add_child(_box)
 
 
-## state 为 ProjectState；summary 为 Company.settle_run 的返回值
-func show_ending(outcome: String, reason_key: String, summary: Dictionary, state: ProjectState) -> void:
+## state 为 ProjectState；summary 为 Company.settle_run 的返回值；molecule 为本局玩家亲手打造的分子
+func show_ending(outcome: String, reason_key: String, summary: Dictionary, state: ProjectState, molecule: Molecule = null, mol_form := 1) -> void:
 	for child in _box.get_children():
 		child.queue_free()
 	var color: Color = OUTCOME_COLOR.get(outcome, OUTCOME_COLOR.failed)
@@ -52,25 +52,59 @@ func show_ending(outcome: String, reason_key: String, summary: Dictionary, state
 		color = UIKit.GOLD
 		style.border_color = color
 		style.shadow_color = Color(color, 0.3)
-	var icon := UIKit.icon_rect("logo" if not campaign.is_empty() else "outcome_" + outcome, 84, color)
-	icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	_box.add_child(icon)
-	if not campaign.is_empty():
-		var badge := UIKit.label(tr("campaign.badge"), UIKit.GOLD, 15)
-		badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		_box.add_child(badge)
-	var title := UIKit.header(tr("campaign.%s.title" % campaign) if not campaign.is_empty() else tr("ending." + outcome + ".title"), 36, color)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_box.add_child(title)
-	var reason := UIKit.label(tr(reason_key), UIKit.TEXT, 16, true)
-	reason.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	reason.custom_minimum_size = Vector2(560, 0)
-	_box.add_child(reason)
-	var flavor := UIKit.label(tr("campaign.%s.flavor" % campaign) if not campaign.is_empty() else tr("ending." + outcome + ".flavor"),
-		UIKit.TEXT if not campaign.is_empty() else UIKit.TEXT_DIM, 14 if campaign.is_empty() else 16, true)
-	flavor.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	flavor.custom_minimum_size = Vector2(560, 0)
-	_box.add_child(flavor)
+	var title_text := tr("campaign.%s.title" % campaign) if not campaign.is_empty() else tr("ending." + outcome + ".title")
+	var flavor_text := tr("campaign.%s.flavor" % campaign) if not campaign.is_empty() else tr("ending." + outcome + ".flavor")
+	if molecule != null:
+		# 结局主角展示横幅：左侧是玩家亲手打造的终态分子角色，右侧是结局徽标、标题与叙事，兼顾仪式感与 720p 紧凑高度
+		var hero_row := HBoxContainer.new()
+		hero_row.add_theme_constant_override("separation", 20)
+		hero_row.alignment = BoxContainer.ALIGNMENT_CENTER
+		_box.add_child(hero_row)
+		hero_row.add_child(_molecule_showcase(molecule, mol_form, outcome, color))
+		var meta := VBoxContainer.new()
+		meta.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		meta.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		meta.add_theme_constant_override("separation", 6)
+		hero_row.add_child(meta)
+		var head := HBoxContainer.new()
+		head.add_theme_constant_override("separation", 10)
+		head.alignment = BoxContainer.ALIGNMENT_BEGIN
+		head.add_child(UIKit.icon_rect("logo" if not campaign.is_empty() else "outcome_" + outcome, 36, color))
+		var title_col := VBoxContainer.new()
+		title_col.add_theme_constant_override("separation", 0)
+		if not campaign.is_empty():
+			title_col.add_child(UIKit.label(tr("campaign.badge"), UIKit.GOLD, 13))
+		title_col.add_child(UIKit.header(title_text, 30, color))
+		head.add_child(title_col)
+		meta.add_child(head)
+		var reason := UIKit.label(tr(reason_key), UIKit.TEXT, 15, true)
+		reason.custom_minimum_size = Vector2(340, 0)
+		meta.add_child(reason)
+		if tr(reason_key) != flavor_text:
+			var flavor := UIKit.label(flavor_text, UIKit.TEXT if not campaign.is_empty() else UIKit.TEXT_DIM, 13 if campaign.is_empty() else 15, true)
+			flavor.custom_minimum_size = Vector2(340, 0)
+			meta.add_child(flavor)
+	else:
+		var icon := UIKit.icon_rect("logo" if not campaign.is_empty() else "outcome_" + outcome, 84, color)
+		icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		_box.add_child(icon)
+		if not campaign.is_empty():
+			var badge := UIKit.label(tr("campaign.badge"), UIKit.GOLD, 15)
+			badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			_box.add_child(badge)
+		var title := UIKit.header(title_text, 36, color)
+		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_box.add_child(title)
+		var reason := UIKit.label(tr(reason_key), UIKit.TEXT, 16, true)
+		reason.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		reason.custom_minimum_size = Vector2(560, 0)
+		_box.add_child(reason)
+		if tr(reason_key) != flavor_text:
+			var flavor := UIKit.label(flavor_text,
+				UIKit.TEXT if not campaign.is_empty() else UIKit.TEXT_DIM, 14 if campaign.is_empty() else 16, true)
+			flavor.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			flavor.custom_minimum_size = Vector2(560, 0)
+			_box.add_child(flavor)
 	_box.add_child(HSeparator.new())
 	_scroll = ScrollContainer.new()
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -218,6 +252,49 @@ static func chain_lines(company: Company, run_route: String, run_decisions: Arra
 		if not String(d).begins_with("route:"):
 			lines.append(t.translate("chain.final_decision") % t.translate("milestone.opt." + String(d)))
 	return lines
+
+
+## 结局主角标本展台：把玩家一路进化到终态的分子放进纪念框里
+func _molecule_showcase(molecule: Molecule, mol_form: int, outcome: String, accent: Color) -> Control:
+	var frame := Control.new()
+	frame.custom_minimum_size = Vector2(216, 134)
+	frame.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	frame.clip_contents = true
+	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	frame.draw.connect(func() -> void:
+		var area := Rect2(Vector2.ZERO, frame.size)
+		var bg := PaintedStyle.new()
+		bg.surface_kind = 3
+		bg.bg_color = Color(0.055, 0.072, 0.125, 0.96)
+		bg.border_color = Color(accent, 0.65)
+		bg.draw(frame.get_canvas_item(), area)
+		var c := Vector2(frame.size.x * 0.5, frame.size.y * 0.52)
+		Shading.glow(frame, c, frame.size.x * 0.44, Color(accent, 0.24 if outcome == "approved" else 0.14))
+		# 纪念台座底面与脚影
+		var foot_y := frame.size.y - 16.0
+		var dais := PackedVector2Array([
+			Vector2(c.x - 62, foot_y - 4), Vector2(c.x + 62, foot_y - 4),
+			Vector2(c.x + 76, foot_y + 5), Vector2(c.x - 76, foot_y + 5)])
+		frame.draw_colored_polygon(dais, Color(0.11, 0.14, 0.22, 0.9))
+		frame.draw_line(dais[0], dais[1], Color(UIKit.PAPER, 0.35), 1.2, true)
+		var shadow := PackedVector2Array()
+		for i in 18:
+			var a := i * TAU / 18.0
+			shadow.append(Vector2(c.x + cos(a) * 46.0, foot_y - 2.0 + sin(a) * 3.5))
+		frame.draw_colored_polygon(shadow, Color(0.015, 0.02, 0.05, 0.55))
+		UIKit.inset(frame, area.grow(-2.0), 8.0))
+	var view := MoleculeView.new()
+	view.character = true
+	view.form = clampi(mol_form, 1, 5)
+	view.set_molecule(molecule)
+	view.position = Vector2(8, 12)
+	view.size = Vector2(200, 108)
+	if outcome == "approved":
+		view.cheer()
+	elif outcome != "approved":
+		view.modulate = Color(0.76, 0.74, 0.82)
+	frame.add_child(view)
+	return frame
 
 
 func _cell(grid: GridContainer, icon_name: String, key: String, value: String) -> void:

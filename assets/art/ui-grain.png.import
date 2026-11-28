@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bo48o1ojaccsq"
-path="res://.godot/imported/molecular-fragments.png-4059acf802ba4a452aff440c3f53b982.ctex"
+uid="uid://bt6dl24n7elrh"
+path="res://.godot/imported/ui-grain.png-5233965c02cef391ce0c7c66f5a3f4ea.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/art/molecular-fragments.png"
-dest_files=["res://.godot/imported/molecular-fragments.png-4059acf802ba4a452aff440c3f53b982.ctex"]
+source_file="res://assets/art/ui-grain.png"
+dest_files=["res://.godot/imported/ui-grain.png-5233965c02cef391ce0c7c66f5a3f4ea.ctex"]
 
 [params]
 
@@ -23,7 +23,7 @@ compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=true
+mipmaps/generate=false
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""

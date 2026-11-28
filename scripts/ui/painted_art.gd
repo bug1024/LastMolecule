@@ -97,7 +97,9 @@ static func stage_world(ci: CanvasItem, area: Rect2, stage: int, shade: float) -
 
 
 static func world(ci: CanvasItem, area: Rect2, shade := 0.0) -> void:
-	var texture := UIKit.art("painted-world")
+	var texture := UIKit.art("geometric-title")
+	if texture == null:
+		texture = UIKit.art("geometric-arena")
 	ci.draw_rect(area, INK)
 	if texture:
 		var factor := maxf(area.size.x / texture.get_width(), area.size.y / texture.get_height())

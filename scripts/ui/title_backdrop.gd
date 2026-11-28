@@ -53,7 +53,9 @@ func _draw() -> void:
 		draw_texture_rect(_vignette_tex(), area.grow(2.0), false)
 		return
 	draw_rect(area, UIKit.INK)
-	var texture := UIKit.art("painted-world")
+	var texture := UIKit.art("geometric-title")
+	if texture == null:
+		texture = UIKit.art("geometric-arena")
 	if texture:
 		# 比画面略大一圈，在余量里缓慢漂移
 		var cover := maxf(size.x / texture.get_width(), size.y / texture.get_height()) * 1.05

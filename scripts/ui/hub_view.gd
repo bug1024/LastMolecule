@@ -321,53 +321,101 @@ func _process(delta: float) -> void:
 func _draw() -> void:
 	if mol_view == null or not mol_view.visible:
 		return
-	# 观察室视窗随研发阶段打开不同环境，结构始终取自玩家当前分子。
-	var viewport_rect := Rect2(Vector2(STATUS_W + 24, 77),
+	# 标本观察龛：取消硬切矩形写实视窗与科幻全息圆盘，改用几何膜岩底座 + 柔和阶段柔光 + 极克制的刻度弧
+	var alcove := Rect2(Vector2(STATUS_W + 24, 77),
 		Vector2(size.x - STATUS_W - CARDS_W - 48, size.y - BENCH_FROM_BOTTOM - 82))
-	if viewport_rect.has_area():
-		PaintedArt.stage_world(self, viewport_rect, _stage_index, 0.48)
-		UIKit.inset(self, viewport_rect, 16.0)
 	var bounds := mol_view.visual_bounds()
 	var center := mol_view.position + bounds.get_center()
-	var foot := Vector2(center.x, mol_view.position.y + bounds.end.y + 16.0)
+	var feet := mol_view.support_points()
+	var foot := Vector2(center.x, mol_view.position.y + bounds.end.y + 4.0)
+	if feet.size() >= 2:
+		foot = mol_view.position + (feet[0] + feet[1]) * 0.5
 	var radius := bounds.size.x * 0.56
 	var light := _tint.lightened(0.35)
-	# 用压扁的环贴合视窗和观察台，刻度不会穿过标题或台面文字。
-	var ring_height := minf(0.66, viewport_rect.size.y * 0.39 / maxf(1.0, radius * 1.08))
+	if alcove.has_area():
+		# 柔和的八角形暗角框架 + 左上方阶段主光束，与整体几何膜世界融为一体
+		var frame_pts := PaintedArt.contour(alcove, 16.0)
+		draw_colored_polygon(frame_pts, Color(0.035, 0.045, 0.085, 0.34))
+		frame_pts.append(frame_pts[0])
+		draw_polyline(frame_pts, Color(light, 0.24), 1.4, true)
+		var beam_src := Vector2(alcove.position.x + alcove.size.x * 0.16, alcove.position.y)
+		var beam := PackedVector2Array([
+			beam_src, beam_src + Vector2(alcove.size.x * 0.28, 0),
+			Vector2(foot.x + radius * 0.82, foot.y + 6.0), Vector2(foot.x - radius * 0.72, foot.y + 6.0)])
+		var warm_light := Color(1.0, 0.90, 0.72).lerp(light, 0.45)
+		draw_polygon(beam, PackedColorArray([Color(warm_light, 0.11), Color(warm_light, 0.06), Color(warm_light, 0.0), Color(warm_light, 0.02)]))
+		# 四角细金标本标尺折线
+		var arm := 16.0
+		var corner_col := Color(UIKit.GOLD, 0.45)
+		for corner: Vector2 in [alcove.position + Vector2(8, 8), Vector2(alcove.end.x - 8, alcove.position.y + 8),
+				alcove.end - Vector2(8, 8), Vector2(alcove.position.x + 8, alcove.end.y - 8)]:
+			var inward: Vector2 = (alcove.get_center() - corner).sign()
+			draw_polyline(PackedVector2Array([corner + Vector2(inward.x * arm, 0), corner, corner + Vector2(0, inward.y * arm)]), corner_col, 1.5, true)
+	# 克制的标本刻度弧（不再铺黑底圆盘挡住背景）
+	var ring_height := minf(0.62, alcove.size.y * 0.37 / maxf(1.0, radius * 1.06))
 	draw_set_transform(center, 0.0, Vector2(1.0, ring_height))
-	draw_circle(Vector2.ZERO, radius * 0.86, Color(0.02, 0.03, 0.06, 0.40))
-	draw_arc(Vector2.ZERO, radius * 0.86, 0, TAU, 96, Color(light, 0.35), 1.5, true)
-	draw_arc(Vector2.ZERO, radius * 0.72, 0, TAU, 96, Color(light, 0.17), 1.0, true)
+	draw_arc(Vector2.ZERO, radius * 0.86, -PI * 0.86, -PI * 0.14, 48, Color(light, 0.28), 1.4, true)
+	draw_arc(Vector2.ZERO, radius * 0.86, PI * 0.14, PI * 0.86, 48, Color(light, 0.18), 1.2, true)
 	for ring in _stage_index:
-		var start := -PI * 0.9 + ring * 0.18
-		draw_arc(Vector2.ZERO, radius * (0.91 + ring * 0.042), start, start + PI * 1.24,
-			48, Color(light, 0.46 - ring * 0.045), 2.0, true)
-	for i in 48:
-		var a := i * TAU / 48.0 + _time * 0.04
-		var inner := radius * (0.81 if i % 4 == 0 else 0.84)
-		draw_line(Vector2.from_angle(a) * inner, Vector2.from_angle(a) * radius * 0.86, Color(light, 0.38), 1.0, true)
+		var start := -PI * 0.88 + ring * 0.18
+		draw_arc(Vector2.ZERO, radius * (0.91 + ring * 0.04), start, start + PI * 0.85,
+			36, Color(UIKit.GOLD.lerp(light, 0.5), 0.38 - ring * 0.04), 1.8, true)
+	for i in 24:
+		var a := i * TAU / 24.0 + _time * 0.025
+		var inner := radius * (0.82 if i % 3 == 0 else 0.845)
+		draw_line(Vector2.from_angle(a) * inner, Vector2.from_angle(a) * radius * 0.86, Color(UIKit.PAPER, 0.22), 1.0, true)
 	draw_set_transform(Vector2.ZERO)
 	if _scan > 0.0:
 		var y := center.y + lerpf(-radius * 0.72, radius * 0.72, 1.0 - _scan) * ring_height
-		draw_line(Vector2(center.x - radius * 0.84, y), Vector2(center.x + radius * 0.84, y),
-			Color(UIKit.PAPER, sin(_scan * PI) * 0.7), 2.0, true)
-	# 光柱从观察台升起，把分子托在里面
-	var top_y := foot.y - radius * 1.35
-	var beam := PackedVector2Array([Vector2(foot.x - radius * 0.72, foot.y), Vector2(foot.x + radius * 0.72, foot.y),
-		Vector2(foot.x + radius * 0.92, top_y), Vector2(foot.x - radius * 0.92, top_y)])
-	draw_polygon(beam, PackedColorArray([Color(light, 0.2), Color(light, 0.2), Color(light, 0.0), Color(light, 0.0)]))
-	# 观察台：几层压扁的圆盘，上沿受光，下方落影
-	var squash := 0.13
-	draw_set_transform(foot + Vector2(0, 15), 0.0, Vector2(1.0, squash))
-	draw_circle(Vector2.ZERO, radius * 0.96, Color(0.012, 0.015, 0.035, 0.75))
-	draw_set_transform(foot + Vector2(0, 8), 0.0, Vector2(1.0, squash))
-	draw_circle(Vector2.ZERO, radius * 0.86, Color(0.09, 0.105, 0.17))
-	draw_set_transform(foot, 0.0, Vector2(1.0, squash))
-	draw_circle(Vector2.ZERO, radius * 0.86, Color(0.15, 0.17, 0.26))
-	draw_arc(Vector2.ZERO, radius * 0.86, 0, TAU, 96, Color(light, 0.75), 6.0, true)
-	draw_circle(Vector2.ZERO, radius * 0.62, Color(light, 0.14))
-	draw_arc(Vector2.ZERO, radius * 0.62, 0, TAU, 96, Color(light, 0.35), 4.0, true)
-	draw_set_transform(Vector2.ZERO)
+		draw_line(Vector2(center.x - radius * 0.82, y), Vector2(center.x + radius * 0.82, y),
+			Color(UIKit.PAPER, sin(_scan * PI) * 0.65), 2.0, true)
+	# 几何厚涂切面石台底座：替代原来的扁平椭圆科幻圆盘，左上受光、右下厚暗面
+	var hw := radius * 0.94
+	var hh := 16.0
+	var thick := 13.0
+	var top_poly := PackedVector2Array([
+		foot + Vector2(-hw * 0.76, -hh), foot + Vector2(hw * 0.68, -hh * 0.92),
+		foot + Vector2(hw, 0.0), foot + Vector2(hw * 0.72, hh),
+		foot + Vector2(-hw * 0.72, hh * 0.95), foot + Vector2(-hw, 0.0)])
+	var drop_poly := PackedVector2Array()
+	for p in top_poly:
+		drop_poly.append(p + Vector2(6.0, thick + 6.0))
+	draw_colored_polygon(drop_poly, Color(0.012, 0.016, 0.04, 0.65))
+	# 台座正面三个受光不同的厚切面
+	var f0 := top_poly[5]
+	var f1 := top_poly[4]
+	var f2 := top_poly[3]
+	var f3 := top_poly[2]
+	draw_colored_polygon(PackedVector2Array([f0, f1, f1 + Vector2(0, thick), f0 + Vector2(0, thick * 0.85)]), Color(0.14, 0.17, 0.27))
+	draw_colored_polygon(PackedVector2Array([f1, f2, f2 + Vector2(0, thick), f1 + Vector2(0, thick)]), Color(0.095, 0.115, 0.19))
+	draw_colored_polygon(PackedVector2Array([f2, f3, f3 + Vector2(0, thick * 0.85), f2 + Vector2(0, thick)]), Color(0.06, 0.075, 0.135))
+	# 顶面按左上主光做渐变明暗
+	var top_colors := PackedColorArray()
+	var ldir := PaintedStyle.LIGHT.normalized()
+	for p in top_poly:
+		var lit := clampf(((p - foot).dot(ldir) / maxf(hw, 1.0)) * 0.5 + 0.5, 0.0, 1.0)
+		var base := Color(0.13, 0.16, 0.26).lerp(light.darkened(0.35), 0.25)
+		top_colors.append(base.lerp(Color(0.32, 0.36, 0.47).lerp(UIKit.PAPER, 0.14), lit * 0.75))
+	draw_polygon(top_poly, top_colors)
+	# 顶面斜切受光面 + 正面折线棱边，增强手绘切面石台的体块感
+	draw_colored_polygon(PackedVector2Array([top_poly[5], top_poly[0], top_poly[1], foot + Vector2(-hw * 0.12, hh * 0.2)]),
+		Color(UIKit.PAPER, 0.07))
+	draw_polyline(PackedVector2Array([top_poly[5], top_poly[0], top_poly[1]]), Color(UIKit.PAPER, 0.58), 1.8, true)
+	var rim := top_poly.duplicate()
+	rim.append(top_poly[0])
+	draw_polyline(rim, Color(0.035, 0.04, 0.085, 0.9), 1.6, true)
+	draw_line(f1, f1 + Vector2(0, thick), Color(UIKit.PAPER, 0.18), 1.2, true)
+	draw_line(f2, f2 + Vector2(0, thick), Color(0.025, 0.03, 0.065, 0.75), 1.2, true)
+	draw_line(f1 + Vector2(0, thick), f2 + Vector2(0, thick), Color(0.025, 0.03, 0.065, 0.9), 1.6, true)
+	# 角色双足贴台接触阴影
+	if feet.size() >= 2:
+		for fp in feet:
+			var sp := mol_view.position + fp
+			var s_pts := PackedVector2Array()
+			for k in 18:
+				var a := k * TAU / 18.0
+				s_pts.append(sp + Vector2(cos(a) * 28.0 + 2.0, sin(a) * 5.0 + 1.5))
+			draw_colored_polygon(s_pts, Color(0.015, 0.02, 0.05, 0.55))
 
 
 func _glass_panel() -> PanelContainer:

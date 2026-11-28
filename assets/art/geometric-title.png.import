@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dg0svg8og25lw"
-path="res://.godot/imported/painted-fragments.png-53c522fba4631327947fd9fe187459b1.ctex"
+uid="uid://boe1w0v0ppjj5"
+path="res://.godot/imported/geometric-title.png-c078d3a56478cf4cc996ea0a91b3f76f.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/art/painted-fragments.png"
-dest_files=["res://.godot/imported/painted-fragments.png-53c522fba4631327947fd9fe187459b1.ctex"]
+source_file="res://assets/art/geometric-title.png"
+dest_files=["res://.godot/imported/geometric-title.png-c078d3a56478cf4cc996ea0a91b3f76f.ctex"]
 
 [params]
 
@@ -23,7 +23,7 @@ compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=true
+mipmaps/generate=false
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""

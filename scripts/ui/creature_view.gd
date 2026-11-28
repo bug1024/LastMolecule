@@ -26,16 +26,16 @@ const GEOMETRIC_PORTRAITS := {
 		"infusion_reaction": Rect2(462, 114, 408, 247),
 		"pk_variance": Rect2(913, 89, 388, 290),
 		"cytokine_storm": Rect2(1335, 38, 425, 390),
-		"dlt": Rect2(4, 466, 431, 393),
+		"dlt": Rect2(22, 561, 398, 304),
 		"placebo": Rect2(488, 553, 359, 223),
-		"enroll_drag": Rect2(901, 539, 414, 237),
-		"progression": Rect2(1334, 466, 439, 384),
+		"enroll_drag": Rect2(914, 606, 389, 255),
+		"progression": Rect2(1353, 581, 398, 284),
 	},
 	"geometric-foes-c": {
 		"endpoint_miss": Rect2(49, 128, 376, 238),
-		"protocol_dev": Rect2(465, 77, 400, 323),
+		"protocol_dev": Rect2(561, 117, 302, 304),
 		"safety_signal": Rect2(902, 106, 414, 240),
-		"center_pd": Rect2(1350, 54, 409, 350),
+		"center_pd": Rect2(1353, 193, 398, 228),
 		"center_ae": Rect2(46, 466, 354, 386),
 		"center_drop": Rect2(483, 480, 361, 377),
 		"last_molecule": Rect2(900, 457, 421, 398),
@@ -112,9 +112,8 @@ func setup(def: Dictionary, boss := false, elite := false) -> void:
 	elif _portrait in ["geometric-foes-a", "geometric-foes-c"]:
 		var edge := ShaderMaterial.new()
 		edge.shader = preload("res://assets/shaders/painted_edge.gdshader")
-		if _portrait == "geometric-foes-c":
-			edge.set_shader_parameter("fringe", Vector2(0.90, 0.96))
-			texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		# 图集已完成像素级去白边与色彩外扩，统一保留柔和抗锯齿过渡与 Mipmap
+		edge.set_shader_parameter("fringe", Vector2(0.18, 0.56))
 		material = edge
 	_fx = Control.new()
 	_fx.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -363,7 +362,7 @@ func _draw_fx() -> void:
 		Shading.glow(_fx, Vector2(c.x, body.end.y - 6), r * 1.3, Color(1.0, 0.3, 0.2, 0.32 * _windup * alpha))
 	if _id == "dlt" or strain > 0.0:
 		var pivot := Vector2(size.x * 0.5, size.y)
-		var chest := body.position + body.size * Vector2(0.69, 0.57)
+		var chest := body.position + body.size * Vector2(0.62, 0.50)
 		var pose := _body_transform()
 		_draw_toxicity(pose * (chest - pivot), r * 0.47 * pose.x.length(), alpha)
 	var pose := _body_transform()
@@ -373,7 +372,7 @@ func _draw_fx() -> void:
 	if _critical > 0.01 and dying <= 0.0:
 		_draw_critical(pose * (c - pivot2), r, alpha)
 	if _windup > 0.01 and strain > 0.0:   # 剂量毒性蓄力：体内的危险脉冲从胸口一圈圈扩出去
-		var chest := pose * (body.position + body.size * Vector2(0.69, 0.57) - pivot2)
+		var chest := pose * (body.position + body.size * Vector2(0.62, 0.50) - pivot2)
 		for k in 2:
 			var beat := fmod(_time * (1.4 + strain) + k * 0.5, 1.0)
 			_fx.draw_arc(chest, r * (0.2 + 0.6 * beat), 0, TAU, 36, Color(1.0, 0.45, 0.2, (1.0 - beat) * 0.7 * _windup * alpha), 3.0, true)
@@ -475,15 +474,35 @@ func _draw_toxicity(c: Vector2, r: float, alpha: float) -> void:
 		_fx.draw_polyline(pts, glow, 2.2, true)
 		_fx.draw_polyline(pts, Color(1.0, 0.92, 0.7, glow.a * 0.8), 0.8, true)
 	if hp_ratio < 0.5:
-		Shading.glow(_fx, c, r * (0.6 + 0.1 * throb), Color(1.0, 0.35, 0.15, 0.7 * alpha))
-		Shading.sphere(_fx, c, r * (0.17 + 0.03 * throb), Color(1.0, 0.8, 0.45, alpha), 1.0)
-		_fx.draw_arc(c, r * (0.24 + 0.04 * throb), 0, TAU, 40, Color(1.0, 0.9, 0.6, 0.7 * alpha), 2.0, true)
+		Shading.glow(_fx, c, r * (0.62 + 0.1 * throb), Color(1.0, 0.35, 0.15, 0.65 * alpha))
+		# 几何切面晶核 + 六边形应力裂环，和几何厚涂质感统一
+		var core_r := r * (0.20 + 0.03 * throb)
+		var facet := PackedVector2Array()
+		for k in 6:
+			facet.append(c + Vector2.from_angle(PI / 6.0 + k * TAU / 6.0) * core_r)
+		_fx.draw_colored_polygon(facet, Color(0.95, 0.56, 0.22, alpha))
+		_fx.draw_colored_polygon(PackedVector2Array([facet[3], facet[4], facet[5], c]), Color(1.0, 0.93, 0.72, alpha))
+		_fx.draw_colored_polygon(PackedVector2Array([facet[0], facet[1], facet[2], c]), Color(0.55, 0.18, 0.14, 0.85 * alpha))
+		var core_edge := facet.duplicate()
+		core_edge.append(facet[0])
+		_fx.draw_polyline(core_edge, Color(0.12, 0.05, 0.09, 0.9 * alpha), 2.0, true)
+		var ring_r := r * (0.29 + 0.04 * throb)
+		var hex_ring := PackedVector2Array()
+		for k in 7:
+			hex_ring.append(c + Vector2.from_angle(k * TAU / 6.0) * ring_r)
+		_fx.draw_polyline(hex_ring, Color(1.0, 0.86, 0.55, 0.75 * alpha), 1.8, true)
 	if s > 0.2:
 		for i in int(s * 6):
 			var t := fmod(_time * 0.7 + i * 0.37, 1.0)
 			var x := c.x + (fmod(i * 0.618, 1.0) - 0.5) * r * 1.3
 			var p := Vector2(x, c.y + r * 0.7 + t * r * 0.55)
-			_fx.draw_circle(p, 3.0 * (1.0 - t * 0.5), Color(0.75, 1.0, 0.35, (1.0 - t) * 0.85 * alpha))
+			var d := 4.4 * (1.0 - t * 0.45)
+			var drop := PackedVector2Array([p + Vector2(0, -d * 1.5), p + Vector2(d * 0.85, 0),
+				p + Vector2(0, d), p + Vector2(-d * 0.85, 0)])
+			var da := (1.0 - t) * 0.88 * alpha
+			_fx.draw_colored_polygon(drop, Color(0.75, 0.94, 0.42, da))
+			drop.append(drop[0])
+			_fx.draw_polyline(drop, Color(0.12, 0.09, 0.16, da * 0.85), 1.2, true)
 	if _surge > 0.0:
 		Shading.glow(_fx, c, r * (1.2 + (1.0 - _surge) * 0.6), Color(1.0, 0.3, 0.15, 0.5 * _surge * alpha))
 

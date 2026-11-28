@@ -99,19 +99,28 @@ func _draw() -> void:
 	var pos := Vector2(rect.get_center().x - w * 0.5, rect.get_center().y + fs * 0.35)
 	draw_string_outline(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 4, Color(0.02, 0.03, 0.06, 0.95))
 	draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(0.98, 0.96, 0.9))
-	if is_player:
-		var heart := UIKit.icon("ui_heart")
-		if heart:
-			draw_texture_rect(heart, Rect2(Vector2(size.x - 4, size.y * 0.5 - 13), Vector2(26, 26)), false, Color(1.0, 0.45, 0.5))
 	if block > 0:
 		var c := Vector2(14, size.y * 0.5)
 		var s := 1.0 + _block_pop * 0.5
 		var shield := PackedVector2Array([c + Vector2(0, -13) * s, c + Vector2(11, -8) * s, c + Vector2(10, 4) * s,
 			c + Vector2(0, 13) * s, c + Vector2(-10, 4) * s, c + Vector2(-11, -8) * s])
-		draw_colored_polygon(shield, Color(0.3, 0.55, 0.95))
+		draw_colored_polygon(shield, Color(0.26, 0.52, 0.88))
+		draw_colored_polygon(PackedVector2Array([shield[5], shield[0], shield[1], c]), Color(0.75, 0.92, 1.0, 0.25))
 		shield.append(shield[0])
-		draw_polyline(shield, Color(0.75, 0.9, 1.0), 2.0, true)
+		draw_polyline(shield, Color(0.78, 0.92, 1.0), 1.8, true)
 		var bt := str(block)
 		var bw := font.get_string_size(bt, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
 		draw_string_outline(font, c + Vector2(-bw * 0.5, 5), bt, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, 4, Color(0, 0, 0, 0.9))
 		draw_string(font, c + Vector2(-bw * 0.5, 5), bt, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color.WHITE)
+	elif is_player:
+		# 玩家血条左端嵌一枚小型几何生命晶徽，有护盾时自然被护盾徽章替代，不再在右外侧孤零零悬一颗细线红心
+		var c := Vector2(14, size.y * 0.5)
+		var hex := PackedVector2Array()
+		for j in 6:
+			hex.append(c + Vector2.from_angle(PI / 6.0 + j * TAU / 6.0) * 9.5)
+		draw_colored_polygon(hex, Color(0.11, 0.25, 0.22))
+		hex.append(hex[0])
+		draw_polyline(hex, Color(UIKit.ACCENT.lightened(0.25), 0.9), 1.4, true)
+		var heart := UIKit.icon("ui_heart")
+		if heart:
+			draw_texture_rect(heart, Rect2(c - Vector2(6, 6), Vector2(12, 12)), false, Color(0.95, 0.52, 0.48))

@@ -182,9 +182,13 @@ func _draw_rim(canvas: RID, points: PackedVector2Array, rect: Rect2, kind: int) 
 
 
 static func _grain_texture() -> Texture2D:
-	if _texture == null and ResourceLoader.exists("res://assets/art/painted-ui.png"):
-		_texture = load("res://assets/art/painted-ui.png")
-		# 只用骨白格中央的干净笔触当颗粒：它接近中性，乘上材质色后不会带出别的颜色
-		var size := _texture.get_size()
-		_grain = Rect2(size * Vector2(0.105, 0.615), Vector2(GRAIN_PIXELS, GRAIN_PIXELS))
+	if _texture == null:
+		if ResourceLoader.exists("res://assets/art/ui-grain.png"):
+			_texture = load("res://assets/art/ui-grain.png")
+			_grain = Rect2(Vector2.ZERO, _texture.get_size())
+		elif ResourceLoader.exists("res://assets/art/painted-ui.png"):
+			_texture = load("res://assets/art/painted-ui.png")
+			# 只用骨白格中央的干净笔触当颗粒：它接近中性，乘上材质色后不会带出别的颜色
+			var size := _texture.get_size()
+			_grain = Rect2(size * Vector2(0.105, 0.615), Vector2(GRAIN_PIXELS, GRAIN_PIXELS))
 	return _texture

@@ -34,14 +34,27 @@ func _draw() -> void:
 		var c: Vector2 = shadow.center
 		var opacity := float(shadow.get("opacity", 0.14))
 		var depth := float(shadow.get("depth", 10.0))
+		var contact := bool(shadow.get("contact", false))
+		var width := float(shadow.width)
+		if contact:
+			# 紧贴脚底 / 躯干底缘的深墨接触闭塞影，彻底消除角色浮在地面上的贴纸感
+			for j in 3:
+				var points := PackedVector2Array()
+				var shrink := 1.0 - j * 0.24
+				var offset := Vector2(2.0 - j * 0.7, 1.0 + j * 0.3)
+				for k in 24:
+					var a := k * TAU / 24.0
+					points.append(c + offset + Vector2(cos(a) * width * 0.5 * shrink, sin(a) * depth * shrink))
+				draw_colored_polygon(points, Color(0.015, 0.022, 0.05, opacity * (0.55 + j * 0.28)))
+			continue
 		for j in 4:
 			var points := PackedVector2Array()
-			var offset := Vector2((3 - j) * 4, (3 - j) * 1.4)
+			var offset := Vector2((3 - j) * 4.5, (3 - j) * 1.5)
 			for k in 28:
 				var a := k * TAU / 28.0
-				points.append(c + offset + Vector2(cos(a) * float(shadow.width) * (0.52 - j * 0.074),
+				points.append(c + offset + Vector2(cos(a) * width * (0.54 - j * 0.08),
 					sin(a) * depth * (1.0 - j * 0.16)))
-			draw_colored_polygon(points, Color(0.035, 0.045, 0.085, opacity))
+			draw_colored_polygon(points, Color(0.025, 0.035, 0.072, opacity))
 	if impact_light > 0:
 		Shading.glow(self, Vector2(impact.x, ground), 160, Color(UIKit.GOLD, impact_light * 0.45))
 	# Stable quiet UI reading plane, independent of the world illustration.
@@ -53,3 +66,16 @@ func _draw() -> void:
 	draw_polygon(PackedVector2Array([Vector2(-over, top), Vector2(w + over, top), Vector2(w + over, dock_y), Vector2(-over, dock_y)]),
 		PackedColorArray([Color(dark, 0.0), Color(dark, 0.0), dark, dark]))
 	draw_rect(Rect2(-over, dock_y, w + over * 2.0, maxf(0, size.y - dock_y) + over), dark)
+	# 左右远角极暗的几何前景膜缘，建立 2.5D 框景纵深且完全避开站位与按钮
+	var fg_dark := Color(0.025, 0.032, 0.065, 0.88)
+	var fg_edge := Color(0.16, 0.21, 0.34, 0.22)
+	var left_fold := PackedVector2Array([
+		Vector2(-over, ground - 42), Vector2(w * 0.032, ground + 6),
+		Vector2(w * 0.072, ground + 44), Vector2(w * 0.045, dock_y + 12), Vector2(-over, dock_y + 12)])
+	draw_colored_polygon(left_fold, fg_dark)
+	draw_polyline(PackedVector2Array([left_fold[0], left_fold[1], left_fold[2]]), fg_edge, 1.5, true)
+	var right_fold := PackedVector2Array([
+		Vector2(w + over, ground - 52), Vector2(w * 0.962, ground + 4),
+		Vector2(w * 0.922, ground + 46), Vector2(w * 0.955, dock_y + 12), Vector2(w + over, dock_y + 12)])
+	draw_colored_polygon(right_fold, fg_dark)
+	draw_polyline(PackedVector2Array([right_fold[0], right_fold[1], right_fold[2]]), fg_edge, 1.5, true)

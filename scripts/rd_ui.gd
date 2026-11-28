@@ -422,4 +422,4 @@ func _on_run_ended(outcome: String, reason_key: String, summary: Dictionary) -> 
 		else:
 			GameAudio.stop_music()
 			GameAudio.sting(outcome)
-		_ending.show_ending(outcome, reason_key, summary, _game_logic.get_state()))
+		_ending.show_ending(outcome, reason_key, summary, _game_logic.get_state(), _game_logic.molecule, _game_logic.get_player_level()))
